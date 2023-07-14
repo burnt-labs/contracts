@@ -1,0 +1,20 @@
+[workspace]
+members = [
+    "account"
+]
+
+[workspace.dependencies]
+cosmos-sdk-proto = { version = "0.19", default-features = false }
+cosmwasm-schema  = "1.2"
+cosmwasm-std     = { version = "1.2", features = ["stargate"] }
+cw2              = "1.0"
+cw-storage-plus  = "1"
+cw-utils         = "1"
+hex              = "0.4"
+prost            = "0.11"
+sha2             = "0.10"
+thiserror        = "1"
+tiny-keccak      = { version = "2", features = ["keccak"] }
+serde = { version = "1.0.145", default-features = false, features = ["derive"] }
+serde_json = "1.0.87"
+schemars = "0.8.10"
