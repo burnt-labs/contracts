@@ -75,7 +75,9 @@ pub fn add_auth_method(deps: DepsMut, env: Env, info: MessageInfo, add_authentic
                 exclude_credentials: vec![],
                 // the registration challenge is always the contract ID
                 // replay attack mitigation is based on users needing another
-                // authorization method to submit registrations to the contract
+                // authorization method to submit registrations to the contract,
+                // also, as this will be used exclusively to sign tx data,
+                // including a nonce, replays should not be a concern
                 challenge: Base64UrlSafeData::from(env.contract.address.as_bytes().to_vec()),
                 credential_algorithms: vec![],
                 require_resident_key: false,
