@@ -87,10 +87,12 @@ impl Authenticator {
 
                 let passkey: Passkey = serde_json::from_str(passkey)?;
 
+                let authenticator_response = serde_json::from_slice(sig_bytes.as_slice())?;
+
                 let pkc = PublicKeyCredential{
                     id: passkey.cred_id().to_string(),
                     raw_id: passkey.cred_id().into(),
-                    response: AuthenticatorAssertionResponseRaw {},
+                    response: authenticator_response,
                     extensions: Default::default(),
                     type_: "public-key".to_string(),
                 };
