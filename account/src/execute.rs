@@ -1,10 +1,13 @@
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, Storage, Uint64};
+use webauthn_rs::prelude::*;
+use webauthn_rs_core::interface::{Credential, RegistrationState};
+use webauthn_rs_core::proto::{AuthenticatorAttestationResponseRaw, UserVerificationPolicy};
 
 use crate::{
     error::{ContractError, ContractResult},
     state::AUTHENTICATORS,
 };
-use crate::auth::Authenticator;
+use crate::auth::{AddAuthenticator, Authenticator};
 
 pub const MAX_AUTHENTICATORS: u8 = 10;
 
@@ -53,14 +56,81 @@ pub fn after_tx() -> ContractResult<Response> {
     Ok(Response::new().add_attribute("method", "after_tx"))
 }
 
-pub fn add_auth_method(deps: DepsMut, env: Env, info: MessageInfo, id: Uint64, authenticator: Authenticator, signature: &Binary) -> ContractResult<Response> {
+pub fn add_auth_method(deps: DepsMut, env: Env, info: MessageInfo, add_authenticator: AddAuthenticator, signature: &Binary) -> ContractResult<Response> {
     assert_self(&info.sender, &env.contract.address)?;
-    if !authenticator.verify(deps.api, &Binary::from(env.contract.address.as_bytes()), signature)? {
-        Err(ContractError::InvalidSignature)
-    } else {
-        AUTHENTICATORS.save(deps.storage, u64::to_be_bytes(id.u64()), &authenticator)?;
-        Ok(Response::new().add_attribute("method", "execute")
-            .add_attribute("authenticator_id", id))
+
+    match add_authenticator {
+        AddAuthenticator::WebAuthN { rp_origin, rp_id, authenticator_attestation } => {
+            let rp_origin = match Url::parse(rp_origin.as_str()) {
+                Ok(rpo) => rpo,
+                Err(error) => return Err(ContractError::Parsing)
+            };
+
+            let builder = WebauthnBuilder::new(rp_id.as_str(), &rp_origin)?;
+            let webauthn = builder.build()?;
+
+            let rpkc: RegisterPublicKeyCredential = serde_json::from_str(authenticator_attestation.as_str())?;
+            let state = PasskeyRegistration { rs: RegistrationState{
+                policy: UserVerificationPolicy::Required,
+                exclude_credentials: vec![],
+                // the registration challenge is always the contract ID
+                // replay attack mitigation is based on users needing another
+                // authorization method to submit registrations to the contract
+                challenge: Base64UrlSafeData::from(env.contract.address.as_bytes().to_vec()),
+                credential_algorithms: vec![],
+                require_resident_key: false,
+                authenticator_attachment: None,
+                extensions: Default::default(),
+                experimental_allow_passkeys: false,
+            } };
+            let passkey = match webauthn.finish_passkey_registration(&rpkc, &state) {
+                Ok(p) => p,
+                Err(error) => return Err(ContractError::InvalidSignature),
+            };
+            let cred_id = &passkey.cred_id().clone().0;
+            let cred_id_prefix = parse_cred_id(&cred_id[0..8]);
+            let passkey_str = serde_json::to_string(&passkey)?;
+            AUTHENTICATORS.save(deps.storage, *cred_id_prefix,
+                                &Authenticator::WebAuthN {
+                                    rp_origin: rp_origin.to_string(),
+                                    rp_id,
+                                    passkey: passkey_str })?;
+            Ok(Response::new().add_attribute("method", "execute")
+                .add_attribute("authenticator_id", u64::from_be_bytes(*cred_id_prefix).to_string()))
+        },
+        AddAuthenticator::Secp256K1 { id, pubkey, signature} => {
+            let auth = Authenticator::Secp256K1 {pubkey};
+
+            if !auth.verify(deps.api, &Binary::from(env.contract.address.as_bytes()), &signature)? {
+                Err(ContractError::InvalidSignature)
+            } else {
+                AUTHENTICATORS.save(deps.storage, u64::to_be_bytes(id.u64()), &auth)?;
+                Ok(Response::new().add_attribute("method", "execute")
+                    .add_attribute("authenticator_id", id))
+            }
+        },
+        AddAuthenticator::Ed25519 { id, pubkey, signature } => {
+            let auth = Authenticator::Ed25519 {pubkey};
+
+            if !auth.verify(deps.api, &Binary::from(env.contract.address.as_bytes()), &signature)? {
+                Err(ContractError::InvalidSignature)
+            } else {
+                AUTHENTICATORS.save(deps.storage, u64::to_be_bytes(id.u64()), &auth)?;
+                Ok(Response::new().add_attribute("method", "execute")
+                    .add_attribute("authenticator_id", id))
+            }
+        }
+        AddAuthenticator::EthWallet { id, address, signature } => {
+            let auth = Authenticator::EthWallet {address};
+
+            if !auth.verify(deps.api, &Binary::from(env.contract.address.as_bytes()), &signature)? {
+                Err(ContractError::InvalidSignature)
+            } else {
+                AUTHENTICATORS.save(deps.storage, u64::to_be_bytes(id.u64()), &auth)?;
+                Ok(Response::new().add_attribute("method", "execute")
+                    .add_attribute("authenticator_id", id))
+            }
+        }
     }
 }
 

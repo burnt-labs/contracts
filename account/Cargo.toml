@@ -18,3 +18,4 @@ serde_json       = { workspace = true }
 tiny-keccak      = { workspace = true }
 schemars         = { workspace = true }
 hex              = { workspace = true }
+webauthn-rs      = { workspace = true }

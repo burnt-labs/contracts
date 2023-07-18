@@ -15,6 +15,12 @@ pub enum ContractError {
     #[error(transparent)]
     FromHex(#[from] hex::FromHexError),
 
+    #[error(transparent)]
+    Webauthn(#[from] webauthn_rs_core::error::WebauthnError),
+
+    #[error("issue parsing input")]
+    Parsing,
+
     #[error("signature is invalid")]
     InvalidSignature,
 

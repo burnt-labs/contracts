@@ -45,8 +45,8 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> ContractResult<Response> {
     match msg {
-        ExecuteMsg::AddAuthMethod {id, authenticator, signature} =>
-            add_auth_method(deps, env, info, id, authenticator, &signature),
+        ExecuteMsg::AddAuthMethod {add_authenticator} =>
+            add_auth_method(deps, env, info, authenticator),
         ExecuteMsg::RemoveAuthMethod {id} => remove_auth_method(deps, env, info, id)
     }
 }

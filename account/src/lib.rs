@@ -1,3 +1,5 @@
+extern crate core;
+
 mod auth;
 #[cfg(not(feature = "library"))]
 pub mod contract;
