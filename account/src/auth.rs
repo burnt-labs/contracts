@@ -44,7 +44,7 @@ pub enum Authenticator {
     WebAuthN {
         rp_origin: String,
         rp_id: String,
-        passkey: String
+        passkey: Binary
     },
 }
 
@@ -85,9 +85,9 @@ impl Authenticator {
                 let builder = WebauthnBuilder::new(rp_id.as_str(), &rp_origin)?;
                 let webauthn = builder.build()?;
 
-                let passkey: Passkey = serde_json::from_str(passkey)?;
+                let passkey: Passkey = cosmwasm_std::from_str(passkey)?;
 
-                let authenticator_response = serde_json::from_slice(sig_bytes.as_slice())?;
+                let authenticator_response = cosmwasm_std::from_slice(sig_bytes.as_slice())?;
 
                 let pkc = PublicKeyCredential{
                     id: passkey.cred_id().to_string(),

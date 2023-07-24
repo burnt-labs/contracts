@@ -69,7 +69,7 @@ pub fn add_auth_method(deps: DepsMut, env: Env, info: MessageInfo, add_authentic
             let builder = WebauthnBuilder::new(rp_id.as_str(), &rp_origin)?;
             let webauthn = builder.build()?;
 
-            let rpkc: RegisterPublicKeyCredential = serde_json::from_str(authenticator_attestation.as_str())?;
+            let rpkc: RegisterPublicKeyCredential = cosmwasm_std::from_slice(authenticator_attestation.as_bytes())?;
             let state = PasskeyRegistration { rs: RegistrationState{
                 policy: UserVerificationPolicy::Required,
                 exclude_credentials: vec![],
@@ -91,7 +91,7 @@ pub fn add_auth_method(deps: DepsMut, env: Env, info: MessageInfo, add_authentic
             };
             let cred_id = &passkey.cred_id().clone().0;
             let cred_id_prefix = parse_cred_id(&cred_id[0..8]);
-            let passkey_str = serde_json::to_string(&passkey)?;
+            let passkey_str = cosmwasm_std::to_binary(&passkey)?;
             AUTHENTICATORS.save(deps.storage, *cred_id_prefix,
                                 &Authenticator::WebAuthN {
                                     rp_origin: rp_origin.to_string(),
