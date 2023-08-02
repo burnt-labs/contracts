@@ -1,10 +1,10 @@
-use crate::auth::Authenticator;
+use crate::auth::{AddAuthenticator, Authenticator};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Binary, Uint64};
+use cosmwasm_std::{Binary};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub id: Uint64,
+    pub id: u8,
     pub authenticator: Authenticator,
     pub signature: Binary,
 }
@@ -12,12 +12,10 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     AddAuthMethod {
-        id: Uint64,
-        authenticator: Authenticator,
-        signature: Binary,
+        add_authenticator: AddAuthenticator,
     },
     RemoveAuthMethod {
-        id: Uint64,
+        id: u8,
     },
 }
 
@@ -29,5 +27,5 @@ pub enum QueryMsg {
     AuthenticatorIDs {},
 
     #[returns(Binary)]
-    AuthenticatorByID { id: Uint64 },
+    AuthenticatorByID { id: u8 },
 }
