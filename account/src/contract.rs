@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult,
+    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
 
 use absacc::AccountSudoMsg;
@@ -45,8 +45,8 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> ContractResult<Response> {
     match msg {
-        ExecuteMsg::AddAuthMethod {id, authenticator, signature} =>
-            add_auth_method(deps, env, info, id, authenticator, &signature),
+        ExecuteMsg::AddAuthMethod {add_authenticator} =>
+            add_auth_method(deps, env, info, add_authenticator),
         ExecuteMsg::RemoveAuthMethod {id} => remove_auth_method(deps, env, info, id)
     }
 }

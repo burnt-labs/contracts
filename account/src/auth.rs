@@ -1,10 +1,28 @@
 use crate::eth_crypto;
-use cosmwasm_std::{Api, Binary, Deps};
+use cosmwasm_std::{Api, Binary};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::fmt::{Error, Formatter};
 use schemars::JsonSchema;
 use crate::error::ContractError;
+
+#[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
+pub enum AddAuthenticator {
+    Secp256K1 {
+        id: u8,
+        pubkey: Binary,
+        signature: Binary,
+    },
+    Ed25519 {
+        id: u8,
+        pubkey: Binary,
+        signature: Binary,
+    },
+    EthWallet {
+        id: u8,
+        address: String,
+        signature: Binary,
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub enum Authenticator {
