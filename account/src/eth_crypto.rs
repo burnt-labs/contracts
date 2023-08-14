@@ -21,7 +21,7 @@
 //! - hash:
 //!   https://github.com/gakonst/ethers-rs/blob/master/ethers-core/src/utils/hash.rs
 
-use cosmwasm_std::{Api};
+use cosmwasm_std::Api;
 use tiny_keccak::{Hasher, Keccak};
 
 use crate::error::{ContractError, ContractResult};

@@ -1,13 +1,23 @@
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response};
 
+use crate::auth::{AddAuthenticator, Authenticator};
 use crate::{
     error::{ContractError, ContractResult},
     state::AUTHENTICATORS,
 };
-use crate::auth::{AddAuthenticator, Authenticator};
 
-pub fn init(deps: DepsMut, env: Env, id: u8, authenticator: Authenticator, signature: &Binary) -> ContractResult<Response> {
-    if !authenticator.verify(deps.api, &Binary::from(env.contract.address.as_bytes()), signature)? {
+pub fn init(
+    deps: DepsMut,
+    env: Env,
+    id: u8,
+    authenticator: Authenticator,
+    signature: &Binary,
+) -> ContractResult<Response> {
+    if !authenticator.verify(
+        deps.api,
+        &Binary::from(env.contract.address.as_bytes()),
+        signature,
+    )? {
         return Err(ContractError::InvalidSignature);
     } else {
         AUTHENTICATORS.save(deps.storage, id, &authenticator)?;
@@ -51,53 +61,96 @@ pub fn after_tx() -> ContractResult<Response> {
     Ok(Response::new().add_attribute("method", "after_tx"))
 }
 
-pub fn add_auth_method(deps: DepsMut, env: Env, info: MessageInfo, add_authenticator: AddAuthenticator) -> ContractResult<Response> {    assert_self(&info.sender, &env.contract.address)?;
+pub fn add_auth_method(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    add_authenticator: AddAuthenticator,
+) -> ContractResult<Response> {
+    assert_self(&info.sender, &env.contract.address)?;
     match add_authenticator {
-        AddAuthenticator::Secp256K1 { id, pubkey, signature} => {
-            let auth = Authenticator::Secp256K1 {pubkey};
+        AddAuthenticator::Secp256K1 {
+            id,
+            pubkey,
+            signature,
+        } => {
+            let auth = Authenticator::Secp256K1 { pubkey };
 
-            if !auth.verify(deps.api, &Binary::from(env.contract.address.as_bytes()), &signature)? {
+            if !auth.verify(
+                deps.api,
+                &Binary::from(env.contract.address.as_bytes()),
+                &signature,
+            )? {
                 Err(ContractError::InvalidSignature)
             } else {
                 AUTHENTICATORS.save(deps.storage, id, &auth)?;
-                Ok(Response::new().add_attribute("method", "execute")
-                    .add_attribute("authenticator_id", id.to_string()))
-            }
-        },
-        AddAuthenticator::Ed25519 { id, pubkey, signature } => {
-            let auth = Authenticator::Ed25519 {pubkey};
-
-            if !auth.verify(deps.api, &Binary::from(env.contract.address.as_bytes()), &signature)? {
-                Err(ContractError::InvalidSignature)
-            } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
-                Ok(Response::new().add_attribute("method", "execute")
+                Ok(Response::new()
+                    .add_attribute("method", "execute")
                     .add_attribute("authenticator_id", id.to_string()))
             }
         }
-        AddAuthenticator::EthWallet { id, address, signature } => {
-            let auth = Authenticator::EthWallet {address};
+        AddAuthenticator::Ed25519 {
+            id,
+            pubkey,
+            signature,
+        } => {
+            let auth = Authenticator::Ed25519 { pubkey };
 
-            if !auth.verify(deps.api, &Binary::from(env.contract.address.as_bytes()), &signature)? {
+            if !auth.verify(
+                deps.api,
+                &Binary::from(env.contract.address.as_bytes()),
+                &signature,
+            )? {
                 Err(ContractError::InvalidSignature)
             } else {
                 AUTHENTICATORS.save(deps.storage, id, &auth)?;
-                Ok(Response::new().add_attribute("method", "execute")
+                Ok(Response::new()
+                    .add_attribute("method", "execute")
+                    .add_attribute("authenticator_id", id.to_string()))
+            }
+        }
+        AddAuthenticator::EthWallet {
+            id,
+            address,
+            signature,
+        } => {
+            let auth = Authenticator::EthWallet { address };
+
+            if !auth.verify(
+                deps.api,
+                &Binary::from(env.contract.address.as_bytes()),
+                &signature,
+            )? {
+                Err(ContractError::InvalidSignature)
+            } else {
+                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                Ok(Response::new()
+                    .add_attribute("method", "execute")
                     .add_attribute("authenticator_id", id.to_string()))
             }
         }
     }
 }
 
-pub fn remove_auth_method(deps: DepsMut, env: Env, info: MessageInfo, id: u8) -> ContractResult<Response> {
+pub fn remove_auth_method(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    id: u8,
+) -> ContractResult<Response> {
     assert_self(&info.sender, &env.contract.address)?;
 
-    if AUTHENTICATORS.keys(deps.storage, None, None, Order::Ascending).count() <= 1 {
+    if AUTHENTICATORS
+        .keys(deps.storage, None, None, Order::Ascending)
+        .count()
+        <= 1
+    {
         return Err(ContractError::MinimumAuthenticatorCount);
     }
 
     AUTHENTICATORS.remove(deps.storage, id);
-    Ok(Response::new().add_attribute("method", "execute")
+    Ok(Response::new()
+        .add_attribute("method", "execute")
         .add_attribute("authenticator_id", id.to_string()))
 }
 
