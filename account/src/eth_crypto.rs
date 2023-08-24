@@ -33,7 +33,7 @@ pub fn verify(
     addr_bytes: &[u8],
 ) -> ContractResult<()> {
     if sig_bytes.len() < 65 {
-        return Err(ContractError::ShortSignature)
+        return Err(ContractError::ShortSignature);
     }
 
     let msg_hash_bytes = hash_message(msg_bytes);

@@ -1,7 +1,11 @@
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response};
 
 use crate::auth::{AddAuthenticator, Authenticator};
-use crate::{auth, error::{ContractError, ContractResult}, state::AUTHENTICATORS};
+use crate::{
+    auth,
+    error::{ContractError, ContractResult},
+    state::AUTHENTICATORS,
+};
 
 pub fn init(
     deps: DepsMut,
@@ -52,14 +56,17 @@ pub fn before_tx(
         let sig_bytes = &Binary::from(&cred_bytes.as_slice()[1..]);
 
         match authenticator {
-            Authenticator::Secp256K1 { .. } | auth::Authenticator::Ed25519 { .. } => if sig_bytes.len() != 64 {
-                return Err(ContractError::ShortSignature)
-            },
-            Authenticator::EthWallet { .. } => if sig_bytes.len() != 65 {
-                return Err(ContractError::ShortSignature)
-            },
+            Authenticator::Secp256K1 { .. } | auth::Authenticator::Ed25519 { .. } => {
+                if sig_bytes.len() != 64 {
+                    return Err(ContractError::ShortSignature);
+                }
+            }
+            Authenticator::EthWallet { .. } => {
+                if sig_bytes.len() != 65 {
+                    return Err(ContractError::ShortSignature);
+                }
+            }
         }
-
 
         return match authenticator.verify(deps.api, tx_bytes, sig_bytes)? {
             true => Ok(Response::new().add_attribute("method", "before_tx")),
