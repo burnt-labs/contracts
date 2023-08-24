@@ -21,6 +21,9 @@ pub enum ContractError {
     #[error("signature is empty")]
     EmptySignature,
 
+    #[error("short signature")]
+    ShortSignature,
+
     #[error("only the contract itself can call this method")]
     Unauthorized,
 
