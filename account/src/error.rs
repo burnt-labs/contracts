@@ -4,9 +4,6 @@ pub enum ContractError {
     Std(#[from] cosmwasm_std::StdError),
 
     #[error(transparent)]
-    Serde(#[from] serde_json::Error),
-
-    #[error(transparent)]
     Verification(#[from] cosmwasm_std::VerificationError),
 
     #[error(transparent)]

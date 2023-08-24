@@ -1,10 +1,7 @@
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response};
 
 use crate::auth::{AddAuthenticator, Authenticator};
-use crate::{
-    error::{ContractError, ContractResult},
-    state::AUTHENTICATORS,
-};
+use crate::{auth, error::{ContractError, ContractResult}, state::AUTHENTICATORS};
 
 pub fn init(
     deps: DepsMut,
@@ -36,19 +33,35 @@ pub fn before_tx(
 ) -> ContractResult<Response> {
     if !simulate {
         let cred_bytes = cred_bytes.ok_or(ContractError::EmptySignature)?;
-        if cred_bytes.len() < 1 {
-            return Err(ContractError::InvalidSignature);
+        // currently, the minimum size of a signature by any auth method is 64 bytes
+        // this may change in the future, and this check will need to be re-evaluated.
+        //
+        // checking the cred_bytes are at least 1 + 64 bytes long
+        if cred_bytes.len() < 65 {
+            return Err(ContractError::ShortSignature);
         }
 
+        // the first byte of the signature is the index of the authenticator
         let cred_index: u8 = match cred_bytes.first() {
             None => return Err(ContractError::InvalidSignature),
             Some(i) => *i,
         };
+        // retrieve the authenticator by index, or error
+        let authenticator = AUTHENTICATORS.load(deps.storage, cred_index)?;
 
         let sig_bytes = &Binary::from(&cred_bytes.as_slice()[1..]);
 
-        let auth = AUTHENTICATORS.load(deps.storage, cred_index)?;
-        return match auth.verify(deps.api, tx_bytes, sig_bytes)? {
+        match authenticator {
+            Authenticator::Secp256K1 { .. } | auth::Authenticator::Ed25519 { .. } => if sig_bytes.len() != 64 {
+                return Err(ContractError::ShortSignature)
+            },
+            Authenticator::EthWallet { .. } => if sig_bytes.len() != 65 {
+                return Err(ContractError::ShortSignature)
+            },
+        }
+
+
+        return match authenticator.verify(deps.api, tx_bytes, sig_bytes)? {
             true => Ok(Response::new().add_attribute("method", "before_tx")),
             false => Err(ContractError::InvalidSignature),
         };
