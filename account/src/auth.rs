@@ -1,9 +1,12 @@
 use crate::error::ContractError;
-use crate::eth_crypto;
 use cosmwasm_std::{Api, Binary};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha2::Digest;
+
+mod eth_crypto;
+mod sign_arb;
+pub mod util;
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub enum AddAuthenticator {
@@ -40,14 +43,24 @@ impl Authenticator {
     ) -> Result<bool, ContractError> {
         match self {
             Authenticator::Secp256K1 { pubkey } => {
-                let tx_bytes_hash = sha256(tx_bytes);
-                match api.secp256k1_verify(&tx_bytes_hash, sig_bytes, pubkey) {
-                    Ok(verification) => Ok(verification),
-                    Err(error) => Err(error.into()),
+                let tx_bytes_hash = util::sha256(tx_bytes);
+                let verification = api.secp256k1_verify(&tx_bytes_hash, sig_bytes, pubkey);
+                if verification.is_ok() {
+                    Ok(verification.unwrap())
+                } else {
+                    // if the direct verification failed, check to see if they
+                    // are signing with signArbitrary (common for cosmos wallets)
+                    let verification = sign_arb::verify(
+                        api,
+                        tx_bytes.as_slice(),
+                        sig_bytes.as_slice(),
+                        pubkey.as_slice(),
+                    )?;
+                    Ok(verification)
                 }
             }
             Authenticator::Ed25519 { pubkey } => {
-                let tx_bytes_hash = sha256(tx_bytes);
+                let tx_bytes_hash = util::sha256(tx_bytes);
                 match api.ed25519_verify(&tx_bytes_hash, sig_bytes, pubkey) {
                     Ok(verification) => Ok(verification),
                     Err(error) => Err(error.into()),
@@ -62,10 +75,4 @@ impl Authenticator {
             }
         }
     }
-}
-
-pub fn sha256(msg: &[u8]) -> Vec<u8> {
-    let mut hasher = Sha256::new();
-    hasher.update(msg);
-    hasher.finalize().to_vec()
 }
