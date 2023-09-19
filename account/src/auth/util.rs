@@ -1,6 +1,5 @@
 use crate::error::ContractError;
 use bech32::{ToBase32, Variant};
-use cosmwasm_std::{Addr, Api, ContractResult};
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 

@@ -1,18 +1,8 @@
 use crate::auth::util;
 use crate::auth::util::{derive_addr, sha256};
 use crate::error::ContractResult;
-use cosmwasm_schema::cw_serde;
+use base64::{engine::general_purpose, Engine as _};
 use cosmwasm_std::{Addr, Api};
-use std::fmt::Binary;
-
-#[cw_serde]
-pub struct TxInfo {
-    pub address: String,
-    pub chain_id: String,
-    pub account_number: u64,
-    pub sequence: u64,
-    pub pub_key: String, // todo: sort this out
-}
 
 pub fn verify(
     api: &dyn Api,
@@ -30,42 +20,25 @@ pub fn verify(
 }
 
 fn wrap_message(msg_bytes: &[u8], signer: Addr) -> Vec<u8> {
-    let msg_b64 = base64::encode(msg_bytes);
-
-    let envelope = serde_json::json!({
-          "type": "cosmos-sdk/StdTx",
-    "value": {
-      "msg": [
-        {
-          "type": "sign/MsgSignData",
-          "value": {
-            "signer": signer.to_string(),
-            "data": msg_b64,
-          }
-        }
-      ],
-      "fee": {
-        "amount": [],
-        "gas": "0"
-      },
-      "memo": ""
-    }
-      });
+    let msg_b64 = general_purpose::STANDARD.encode(msg_bytes);
+    // format the msg in the style of ADR-036 SignArbitrary
+    let  envelope = format!("{{\"account_number\":\"0\",\"chain_id\":\"\",\"fee\":{{\"amount\":[],\"gas\":\"0\"}},\"memo\":\"\",\"msgs\":[{{\"type\":\"sign/MsgSignData\",\"value\":{{\"data\":\"{}\",\"signer\":\"{}\"}}}}],\"sequence\":\"0\"}}", msg_b64.as_str(), signer.as_str());
 
     return sha256(envelope.to_string().as_bytes());
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::auth::sign_arb::wrap_message;
     use crate::auth::util;
-    use crate::auth::util::sha256;
+    use base64::{engine::general_purpose, Engine as _};
     use cosmwasm_std::testing::mock_dependencies;
     use cosmwasm_std::Api;
 
     #[test]
     fn test_derive_addr() {
         let pub_key = "AxVQixKMvKkMWMgEBn5E+QjXxFLLiOUNs3EG3vvsgaGs";
-        let pub_key_bytes = base64::decode(pub_key).unwrap();
+        let pub_key_bytes = general_purpose::STANDARD.decode(pub_key).unwrap();
 
         let deps = mock_dependencies();
         let addr = util::derive_addr("osmo", pub_key_bytes.as_slice()).unwrap();
@@ -81,7 +54,7 @@ mod tests {
     #[test]
     fn test_verify_sign_arb() {
         let pubkey = "AxVQixKMvKkMWMgEBn5E+QjXxFLLiOUNs3EG3vvsgaGs";
-        let pubkey_bytes = base64::decode(pubkey).unwrap();
+        let pubkey_bytes = general_purpose::STANDARD.decode(pubkey).unwrap();
 
         let deps = mock_dependencies();
         let signer_s = util::derive_addr("xion", pubkey_bytes.as_slice()).unwrap();
@@ -97,30 +70,12 @@ mod tests {
         let test_msg_b64 = base64::encode(test_msg);
         assert_eq!("V29vSG9v", test_msg_b64);
 
-        let envelope = serde_json::json!({
-              "type": "cosmos-sdk/StdTx",
-        "value": {
-          "msg": [
-            {
-              "type": "sign/MsgSignData",
-              "value": {
-                "signer": signer.to_string(),
-                "data": test_msg_b64,
-              }
-            }
-          ],
-          "fee": {
-            "amount": [],
-            "gas": "0"
-          },
-          "memo": ""
-        }
-          });
-        println!("envelope: {}", envelope.to_string());
-        let env_hash = sha256(envelope.to_string().as_bytes());
+        let env_hash = wrap_message(test_msg.as_bytes(), signer);
 
         let expected_signature = "E5AKzlomNEYUjtYbdC8Boqlg2UIcHUL3tOq1e9CEcmlBMnONpPaAFQIZzJLIT6Jx87ViSTW58LJwGdFQqh0otA==";
-        let expected_sig_bytes = base64::decode(expected_signature).unwrap();
+        let expected_sig_bytes = general_purpose::STANDARD
+            .decode(expected_signature)
+            .unwrap();
         let verification = deps
             .api
             .secp256k1_verify(
