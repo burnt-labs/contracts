@@ -2,7 +2,6 @@ use crate::error::ContractError;
 use cosmwasm_std::{Api, Binary};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use sha2::Digest;
 
 mod eth_crypto;
 mod sign_arb;
@@ -45,8 +44,8 @@ impl Authenticator {
             Authenticator::Secp256K1 { pubkey } => {
                 let tx_bytes_hash = util::sha256(tx_bytes);
                 let verification = api.secp256k1_verify(&tx_bytes_hash, sig_bytes, pubkey);
-                if verification.is_ok() {
-                    Ok(verification.unwrap())
+                if let Ok(ver) = verification {
+                    Ok(ver)
                 } else {
                     // if the direct verification failed, check to see if they
                     // are signing with signArbitrary (common for cosmos wallets)

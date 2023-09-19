@@ -17,11 +17,11 @@ fn ripemd160(bytes: &[u8]) -> Vec<u8> {
 
 pub const CHAIN_BECH_PREFIX: &str = "xion";
 pub fn derive_addr(prefix: &str, pubkey_bytes: &[u8]) -> Result<String, ContractError> {
-    let address_bytes = ripemd160(&sha256(&pubkey_bytes));
+    let address_bytes = ripemd160(&sha256(pubkey_bytes));
     let address_str = bech32::encode(prefix, address_bytes.to_base32(), Variant::Bech32);
 
-    return match address_str {
+    match address_str {
         Ok(s) => Ok(s),
         Err(err) => Err(err.into()),
-    };
+    }
 }
