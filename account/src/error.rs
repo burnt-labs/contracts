@@ -4,9 +4,6 @@ pub enum ContractError {
     Std(#[from] cosmwasm_std::StdError),
 
     #[error(transparent)]
-    Serde(#[from] serde_json::Error),
-
-    #[error(transparent)]
     Verification(#[from] cosmwasm_std::VerificationError),
 
     #[error(transparent)]
@@ -20,6 +17,9 @@ pub enum ContractError {
 
     #[error("signature is empty")]
     EmptySignature,
+
+    #[error("short signature")]
+    ShortSignature,
 
     #[error("only the contract itself can call this method")]
     Unauthorized,
