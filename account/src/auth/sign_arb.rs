@@ -67,7 +67,7 @@ mod tests {
 
         let test_msg = "WooHoo";
 
-        let test_msg_b64 = base64::encode(test_msg);
+        let test_msg_b64 = general_purpose::STANDARD.encode(test_msg);
         assert_eq!("V29vSG9v", test_msg_b64);
 
         let env_hash = wrap_message(test_msg.as_bytes(), signer);
