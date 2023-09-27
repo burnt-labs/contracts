@@ -12,6 +12,9 @@ pub enum ContractError {
     #[error(transparent)]
     FromHex(#[from] hex::FromHexError),
 
+    #[error(transparent)]
+    Bech32(#[from] bech32::Error),
+
     #[error("signature is invalid")]
     InvalidSignature,
 
