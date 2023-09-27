@@ -16,6 +16,7 @@ pub fn init(
 ) -> ContractResult<Response> {
     if !authenticator.verify(
         deps.api,
+        &env,
         &Binary::from(env.contract.address.as_bytes()),
         signature,
     )? {
@@ -31,6 +32,7 @@ pub fn init(
 
 pub fn before_tx(
     deps: Deps,
+    env: &Env,
     tx_bytes: &Binary,
     cred_bytes: Option<&Binary>,
     simulate: bool,
@@ -66,9 +68,12 @@ pub fn before_tx(
                     return Err(ContractError::ShortSignature);
                 }
             }
+            Authenticator::JWT { .. } => {
+                // todo: figure out if there are minimum checks for JWTs
+            }
         }
 
-        return match authenticator.verify(deps.api, tx_bytes, sig_bytes)? {
+        return match authenticator.verify(deps.api, env, tx_bytes, sig_bytes)? {
             true => Ok(Response::new().add_attribute("method", "before_tx")),
             false => Err(ContractError::InvalidSignature),
         };
@@ -98,6 +103,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.api,
+                &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
             )? {
@@ -118,6 +124,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.api,
+                &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
             )? {
@@ -138,8 +145,31 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.api,
+                &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
+            )? {
+                Err(ContractError::InvalidSignature)
+            } else {
+                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                Ok(Response::new()
+                    .add_attribute("method", "execute")
+                    .add_attribute("authenticator_id", id.to_string()))
+            }
+        }
+        AddAuthenticator::JWT {
+            id,
+            aud,
+            sub,
+            token,
+        } => {
+            let auth = Authenticator::JWT { aud, sub };
+
+            if !auth.verify(
+                deps.api,
+                &env,
+                &Binary::from(env.contract.address.as_bytes()),
+                &token,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
