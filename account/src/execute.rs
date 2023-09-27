@@ -68,7 +68,7 @@ pub fn before_tx(
                     return Err(ContractError::ShortSignature);
                 }
             }
-            Authenticator::JWT { .. } => {
+            Authenticator::Jwt { .. } => {
                 // todo: figure out if there are minimum checks for JWTs
             }
         }
@@ -157,13 +157,13 @@ pub fn add_auth_method(
                     .add_attribute("authenticator_id", id.to_string()))
             }
         }
-        AddAuthenticator::JWT {
+        AddAuthenticator::Jwt {
             id,
             aud,
             sub,
             token,
         } => {
-            let auth = Authenticator::JWT { aud, sub };
+            let auth = Authenticator::Jwt { aud, sub };
 
             if !auth.verify(
                 deps.api,

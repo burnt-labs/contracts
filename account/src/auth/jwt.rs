@@ -28,14 +28,14 @@ pub fn verify(
     current_time: &Timestamp,
     tx_hash: &Vec<u8>,
     sig_bytes: &[u8],
-    aud: &String,
-    sub: &String,
+    aud: &str,
+    sub: &str,
 ) -> ContractResult<bool> {
-    if !AUD_KEY_MAP.contains_key(aud.as_str()) {
+    if !AUD_KEY_MAP.contains_key(aud) {
         return Err(InvalidJWTAud);
     }
 
-    let key = match AUD_KEY_MAP.get(aud.as_str()) {
+    let key = match AUD_KEY_MAP.get(aud) {
         None => return Err(InvalidJWTAud),
         Some(k) => *k,
     };
@@ -55,8 +55,8 @@ pub fn verify(
     ]);
 
     // make sure the sub and aud ids are as expected
-    options.sub = Option::from(sub.clone());
-    options.aud = Option::from(HashSet::from([aud.clone()]));
+    options.sub = Option::from(sub.to_string());
+    options.aud = Option::from(HashSet::from([aud.to_string()]));
 
     // disable time checks because system time is not available, will pull directly from BlockInfo
     options.validate_exp = false;
@@ -66,7 +66,7 @@ pub fn verify(
     let modulus = key_split.next().ok_or(InvalidJWTAud)?;
     let exponent = key_split.next().ok_or(InvalidJWTAud)?;
     let decoding_key = DecodingKey::from_rsa_components(modulus, exponent)?;
-    let token = decode::<Claims>(&token, &decoding_key, &options)?;
+    let token = decode::<Claims>(token, &decoding_key, &options)?;
 
     // complete the time checks
     let expiration = Timestamp::from_seconds(token.claims.exp as u64);

@@ -25,7 +25,7 @@ pub enum AddAuthenticator {
         address: String,
         signature: Binary,
     },
-    JWT {
+    Jwt {
         id: u8,
         aud: String,
         sub: String,
@@ -38,7 +38,7 @@ pub enum Authenticator {
     Secp256K1 { pubkey: Binary },
     Ed25519 { pubkey: Binary },
     EthWallet { address: String },
-    JWT { aud: String, sub: String },
+    Jwt { aud: String, sub: String },
 }
 
 impl Authenticator {
@@ -81,7 +81,7 @@ impl Authenticator {
                     Err(error) => Err(error),
                 }
             }
-            Authenticator::JWT { aud, sub } => {
+            Authenticator::Jwt { aud, sub } => {
                 let tx_bytes_hash = util::sha256(tx_bytes);
                 return jwt::verify(
                     &env.block.time,
