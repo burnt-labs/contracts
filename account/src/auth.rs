@@ -1,9 +1,10 @@
 use crate::error::ContractError;
-use cosmwasm_std::{Api, Binary};
+use cosmwasm_std::{Api, Binary, Env};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 mod eth_crypto;
+mod jwt;
 mod sign_arb;
 pub mod util;
 
@@ -24,6 +25,12 @@ pub enum AddAuthenticator {
         address: String,
         signature: Binary,
     },
+    JWT {
+        id: u8,
+        aud: String,
+        sub: String,
+        token: Binary,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
@@ -31,12 +38,14 @@ pub enum Authenticator {
     Secp256K1 { pubkey: Binary },
     Ed25519 { pubkey: Binary },
     EthWallet { address: String },
+    JWT { aud: String, sub: String },
 }
 
 impl Authenticator {
     pub fn verify(
         &self,
         api: &dyn Api,
+        env: &Env,
         tx_bytes: &Binary,
         sig_bytes: &Binary,
     ) -> Result<bool, ContractError> {
@@ -71,6 +80,16 @@ impl Authenticator {
                     Ok(_) => Ok(true),
                     Err(error) => Err(error),
                 }
+            }
+            Authenticator::JWT { aud, sub } => {
+                let tx_bytes_hash = util::sha256(tx_bytes);
+                return jwt::verify(
+                    &env.block.time,
+                    &tx_bytes_hash,
+                    sig_bytes.as_slice(),
+                    aud,
+                    sub,
+                );
             }
         }
     }
