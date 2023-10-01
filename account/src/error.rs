@@ -16,13 +16,13 @@ pub enum ContractError {
     Bech32(#[from] bech32::Error),
 
     #[error(transparent)]
-    JsonWebToken(#[from] jsonwebtoken::errors::Error),
-
-    #[error(transparent)]
     UTF8Error(#[from] std::str::Utf8Error),
 
     #[error(transparent)]
     Base64Decode(#[from] base64::DecodeError),
+
+    #[error(transparent)]
+    Rsa(#[from] rsa::Error),
 
     #[error("signature is invalid")]
     InvalidSignature,
@@ -50,6 +50,9 @@ pub enum ContractError {
 
     #[error("invalid jwt aud")]
     InvalidJWTAud,
+
+    #[error("invalid token")]
+    InvalidToken,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
