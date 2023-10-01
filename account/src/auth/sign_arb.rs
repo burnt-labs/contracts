@@ -30,10 +30,13 @@ fn wrap_message(msg_bytes: &[u8], signer: Addr) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use crate::auth::sign_arb::wrap_message;
-    use crate::auth::util;
+    use crate::auth::Authenticator::Secp256K1;
+    use crate::auth::{util, Authenticator};
+    use crate::contract::instantiate;
+    use crate::msg::InstantiateMsg;
     use base64::{engine::general_purpose, Engine as _};
-    use cosmwasm_std::testing::mock_dependencies;
-    use cosmwasm_std::Api;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{Addr, Api, Binary};
 
     #[test]
     fn test_derive_addr() {
@@ -85,5 +88,35 @@ mod tests {
             )
             .unwrap();
         assert!(verification)
+    }
+
+    #[test]
+    fn test_init_sign_arb() {
+        let mut deps = mock_dependencies();
+        let mut env = mock_env();
+        let info = mock_info("sender", &[]);
+        env.contract.address = Addr::unchecked(
+            "xion1e3u8cs3vj5qzz6f75dcwqa5wd2sul9msvxl0cv3ren4v6jn2we6sssfzyt".to_string(),
+        );
+
+        let pubkey = "AxVQixKMvKkMWMgEBn5E+QjXxFLLiOUNs3EG3vvsgaGs";
+        let pubkey_bytes = general_purpose::STANDARD.decode(pubkey).unwrap();
+
+        let signer_s = util::derive_addr("xion", pubkey_bytes.as_slice()).unwrap();
+        let signer = deps.api.addr_validate(signer_s.as_str()).unwrap();
+
+        let signature = "zChcnjeC7xX6HBOTMuuaxp3cbbD3G8RISix2V6rx6DgTAKcwn9RQqUJ1D7DtgAtkT7lKq+AGbeWiBp9N7UU83Q==";
+        let signature_bytes = general_purpose::STANDARD.decode(signature).unwrap();
+
+        let instantiate_msg = InstantiateMsg {
+            id: 0,
+            authenticator: Secp256K1 {
+                pubkey: Binary::from(pubkey_bytes),
+            },
+            signature: Binary::from(signature_bytes),
+        };
+
+        let res = instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
+        println!("response: {:?}", res);
     }
 }

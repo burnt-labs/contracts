@@ -45,18 +45,20 @@ impl Authenticator {
                 let tx_bytes_hash = util::sha256(tx_bytes);
                 let verification = api.secp256k1_verify(&tx_bytes_hash, sig_bytes, pubkey);
                 if let Ok(ver) = verification {
-                    Ok(ver)
-                } else {
-                    // if the direct verification failed, check to see if they
-                    // are signing with signArbitrary (common for cosmos wallets)
-                    let verification = sign_arb::verify(
-                        api,
-                        tx_bytes.as_slice(),
-                        sig_bytes.as_slice(),
-                        pubkey.as_slice(),
-                    )?;
-                    Ok(verification)
+                    if ver {
+                        return Ok(true);
+                    }
                 }
+
+                // if the direct verification failed, check to see if they
+                // are signing with signArbitrary (common for cosmos wallets)
+                let verification = sign_arb::verify(
+                    api,
+                    tx_bytes.as_slice(),
+                    sig_bytes.as_slice(),
+                    pubkey.as_slice(),
+                )?;
+                Ok(verification)
             }
             Authenticator::Ed25519 { pubkey } => {
                 let tx_bytes_hash = util::sha256(tx_bytes);
