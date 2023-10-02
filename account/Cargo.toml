@@ -25,3 +25,4 @@ bech32           = { workspace = true }
 base64           = { workspace = true }
 phf              = { workspace = true }
 rsa              = { workspace = true }
+getrandom = { version = "0.2.10", features = ["custom"] }
