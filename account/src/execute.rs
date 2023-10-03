@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response};
+use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Order, Response};
 
 use crate::auth::{AddAuthenticator, Authenticator};
 use crate::{
@@ -24,9 +24,15 @@ pub fn init(
         AUTHENTICATORS.save(deps.storage, id, &authenticator)?;
     }
 
-    Ok(Response::new()
-        .add_attribute("method", "init")
-        .add_attribute("authenticator_id", id.to_string()))
+    Ok(
+        Response::new().add_event(Event::new("create_abstract_account").add_attributes(vec![
+            ("contract_address", env.contract.address.to_string()),
+            (
+                "authenticator",
+                serde_json::to_string(&authenticator).unwrap(),
+            ),
+        ])),
+    )
 }
 
 pub fn before_tx(
@@ -94,7 +100,9 @@ pub fn add_auth_method(
             pubkey,
             signature,
         } => {
-            let auth = Authenticator::Secp256K1 { pubkey };
+            let auth = Authenticator::Secp256K1 {
+                pubkey: pubkey.clone(),
+            };
 
             if !auth.verify(
                 deps.api,
@@ -104,9 +112,14 @@ pub fn add_auth_method(
                 Err(ContractError::InvalidSignature)
             } else {
                 AUTHENTICATORS.save(deps.storage, id, &auth)?;
-                Ok(Response::new()
-                    .add_attribute("method", "execute")
-                    .add_attribute("authenticator_id", id.to_string()))
+                Ok(
+                    Response::new().add_event(Event::new("add_auth_method").add_attributes(vec![
+                        ("authenticator_id", id.to_string()),
+                        ("authenticator_type", "secp256k1".to_string()),
+                        ("authenticator_pubkey", pubkey.to_string()),
+                        ("contract_address", env.contract.address.to_string()),
+                    ])),
+                )
             }
         }
         AddAuthenticator::Ed25519 {
