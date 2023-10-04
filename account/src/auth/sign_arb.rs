@@ -95,17 +95,23 @@ mod tests {
         let mut deps = mock_dependencies();
         let mut env = mock_env();
         let info = mock_info("sender", &[]);
+        // This is the local faucet address to simplify reuse
         env.contract.address = Addr::unchecked(
-            "xion1e3u8cs3vj5qzz6f75dcwqa5wd2sul9msvxl0cv3ren4v6jn2we6sssfzyt".to_string(),
+            "xion14apeydfljtmvv8vdj97u3mtmlednfhz6dr5scfs2p6xd0gdlxutqvfagkh".to_string(),
         );
 
-        let pubkey = "AxVQixKMvKkMWMgEBn5E+QjXxFLLiOUNs3EG3vvsgaGs";
+        let pubkey = "Ayrlj6q3WWs91p45LVKwI8JyfMYNmWMrcDinLNEdWYE4";
         let pubkey_bytes = general_purpose::STANDARD.decode(pubkey).unwrap();
 
         let signer_s = util::derive_addr("xion", pubkey_bytes.as_slice()).unwrap();
         let signer = deps.api.addr_validate(signer_s.as_str()).unwrap();
 
-        let signature = "zChcnjeC7xX6HBOTMuuaxp3cbbD3G8RISix2V6rx6DgTAKcwn9RQqUJ1D7DtgAtkT7lKq+AGbeWiBp9N7UU83Q==";
+        assert_eq!(
+            "xion1e2fuwe3uhq8zd9nkkk876nawrwdulgv460vzg7",
+            signer.as_str()
+        );
+
+        let signature = "ywxOndY+x+AzT77KBVptdCarKG6YyPBVRkpm188P8Sh9SOQ4sIIFK5ZMzN8XLqClTTIsXT14FeeRhuDaL+fMYA==";
         let signature_bytes = general_purpose::STANDARD.decode(signature).unwrap();
 
         let instantiate_msg = InstantiateMsg {
