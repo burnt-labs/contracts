@@ -94,7 +94,7 @@ pub fn add_auth_method(
     add_authenticator: AddAuthenticator,
 ) -> ContractResult<Response> {
     assert_self(&info.sender, &env.contract.address)?;
-    match add_authenticator {
+    match add_authenticator.clone() {
         AddAuthenticator::Secp256K1 {
             id,
             pubkey,
@@ -112,14 +112,7 @@ pub fn add_auth_method(
                 Err(ContractError::InvalidSignature)
             } else {
                 AUTHENTICATORS.save(deps.storage, id, &auth)?;
-                Ok(
-                    Response::new().add_event(Event::new("add_auth_method").add_attributes(vec![
-                        ("authenticator_id", id.to_string()),
-                        ("authenticator_type", "secp256k1".to_string()),
-                        ("authenticator_pubkey", pubkey.to_string()),
-                        ("contract_address", env.contract.address.to_string()),
-                    ])),
-                )
+                Ok(())
             }
         }
         AddAuthenticator::Ed25519 {
@@ -137,9 +130,7 @@ pub fn add_auth_method(
                 Err(ContractError::InvalidSignature)
             } else {
                 AUTHENTICATORS.save(deps.storage, id, &auth)?;
-                Ok(Response::new()
-                    .add_attribute("method", "execute")
-                    .add_attribute("authenticator_id", id.to_string()))
+                Ok(())
             }
         }
         AddAuthenticator::EthWallet {
@@ -157,12 +148,19 @@ pub fn add_auth_method(
                 Err(ContractError::InvalidSignature)
             } else {
                 AUTHENTICATORS.save(deps.storage, id, &auth)?;
-                Ok(Response::new()
-                    .add_attribute("method", "execute")
-                    .add_attribute("authenticator_id", id.to_string()))
+                Ok(())
             }
         }
-    }
+    }?;
+    Ok(
+        Response::new().add_event(Event::new("add_auth_method").add_attributes(vec![
+            ("contract_address", env.contract.address.to_string()),
+            (
+                "authenticator",
+                serde_json::to_string(&add_authenticator).unwrap(),
+            ),
+        ])),
+    )
 }
 
 pub fn remove_auth_method(
@@ -182,9 +180,12 @@ pub fn remove_auth_method(
     }
 
     AUTHENTICATORS.remove(deps.storage, id);
-    Ok(Response::new()
-        .add_attribute("method", "execute")
-        .add_attribute("authenticator_id", id.to_string()))
+    Ok(
+        Response::new().add_event(Event::new("remove_auth_method").add_attributes(vec![
+            ("contract_address", env.contract.address.to_string()),
+            ("authenticator_id", id.to_string()),
+        ])),
+    )
 }
 
 pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {
