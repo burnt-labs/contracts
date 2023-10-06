@@ -30,10 +30,13 @@ fn wrap_message(msg_bytes: &[u8], signer: Addr) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use crate::auth::sign_arb::wrap_message;
-    use crate::auth::util;
+    use crate::auth::Authenticator::Secp256K1;
+    use crate::auth::{util, Authenticator};
+    use crate::contract::instantiate;
+    use crate::msg::InstantiateMsg;
     use base64::{engine::general_purpose, Engine as _};
-    use cosmwasm_std::testing::mock_dependencies;
-    use cosmwasm_std::Api;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{Addr, Api, Binary};
 
     #[test]
     fn test_derive_addr() {
@@ -85,5 +88,41 @@ mod tests {
             )
             .unwrap();
         assert!(verification)
+    }
+
+    #[test]
+    fn test_init_sign_arb() {
+        let mut deps = mock_dependencies();
+        let mut env = mock_env();
+        let info = mock_info("sender", &[]);
+        // This is the local faucet address to simplify reuse
+        env.contract.address = Addr::unchecked(
+            "xion14apeydfljtmvv8vdj97u3mtmlednfhz6dr5scfs2p6xd0gdlxutqvfagkh".to_string(),
+        );
+
+        let pubkey = "Ayrlj6q3WWs91p45LVKwI8JyfMYNmWMrcDinLNEdWYE4";
+        let pubkey_bytes = general_purpose::STANDARD.decode(pubkey).unwrap();
+
+        let signer_s = util::derive_addr("xion", pubkey_bytes.as_slice()).unwrap();
+        let signer = deps.api.addr_validate(signer_s.as_str()).unwrap();
+
+        assert_eq!(
+            "xion1e2fuwe3uhq8zd9nkkk876nawrwdulgv460vzg7",
+            signer.as_str()
+        );
+
+        let signature = "ywxOndY+x+AzT77KBVptdCarKG6YyPBVRkpm188P8Sh9SOQ4sIIFK5ZMzN8XLqClTTIsXT14FeeRhuDaL+fMYA==";
+        let signature_bytes = general_purpose::STANDARD.decode(signature).unwrap();
+
+        let instantiate_msg = InstantiateMsg {
+            id: 0,
+            authenticator: Secp256K1 {
+                pubkey: Binary::from(pubkey_bytes),
+            },
+            signature: Binary::from(signature_bytes),
+        };
+
+        let res = instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
+        println!("response: {:?}", res);
     }
 }
