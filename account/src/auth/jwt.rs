@@ -17,10 +17,10 @@ static AUD_KEY_MAP: Map<&'static str, &'static str> = phf_map! {
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     aud: Box<[String]>, // Optional. Audience
-    exp: usize, // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
-    iat: usize, // Optional. Issued at (as UTC timestamp)
+    exp: u64, // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
+    iat: u64, // Optional. Issued at (as UTC timestamp)
     iss: String, // Optional. Issuer
-    nbf: usize, // Optional. Not Before (as UTC timestamp)
+    nbf: u64, // Optional. Not Before (as UTC timestamp)
     sub: String, // Optional. Subject (whom token refers to)
 
     transaction_hash: String,
