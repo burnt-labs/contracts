@@ -27,6 +27,9 @@ pub enum ContractError {
     #[error("signature is invalid")]
     InvalidSignature,
 
+    #[error("signature is invalid. expected: {expected}, received {received}")]
+    InvalidSignatureDetail { expected: String, received: String },
+
     #[error("signature is empty")]
     EmptySignature,
 
