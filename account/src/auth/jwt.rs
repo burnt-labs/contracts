@@ -4,7 +4,7 @@ use crate::error::ContractError::{
 use crate::error::ContractResult;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
-use cosmwasm_std::Timestamp;
+use cosmwasm_std::{Binary, Timestamp};
 use phf::{phf_map, Map};
 use rsa::traits::SignatureScheme;
 use rsa::{BigUint, Pkcs1v15Sign, RsaPublicKey};
@@ -26,7 +26,7 @@ struct Claims {
     nbf: u64, // Optional. Not Before (as UTC timestamp)
     sub: String, // Optional. Subject (whom token refers to)
 
-    transaction_hash: String,
+    transaction_hash: Binary,
 }
 
 pub fn verify(
@@ -96,12 +96,12 @@ pub fn verify(
         return Err(InvalidTime);
     }
     // make sure the provided hash matches the one from the tx
-    if tx_hash.eq(claims.transaction_hash.as_bytes()) {
+    if tx_hash.eq(&claims.transaction_hash) {
         Ok(true)
     } else {
         Err(InvalidSignatureDetail {
             expected: URL_SAFE_NO_PAD.encode(tx_hash),
-            received: claims.transaction_hash,
+            received: URL_SAFE_NO_PAD.encode(claims.transaction_hash),
         })
     }
 }
