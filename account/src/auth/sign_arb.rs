@@ -123,6 +123,5 @@ mod tests {
         };
 
         let res = instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
-        println!("response: {:?}", res);
     }
 }
