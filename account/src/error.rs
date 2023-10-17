@@ -48,8 +48,8 @@ pub enum ContractError {
     #[error("cannot delete the last authenticator")]
     MinimumAuthenticatorCount,
 
-    #[error("invalid time on signature")]
-    InvalidTime,
+    #[error("invalid time on signature. current: {current} received: {received}")]
+    InvalidTime { current: u64, received: u64 },
 
     #[error("invalid jwt aud")]
     InvalidJWTAud,

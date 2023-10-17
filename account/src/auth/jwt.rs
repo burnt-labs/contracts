@@ -89,11 +89,17 @@ pub fn verify(
     // complete the time checks
     let expiration = Timestamp::from_seconds(claims.exp as u64);
     if expiration.lt(current_time) {
-        return Err(InvalidTime);
+        return Err(InvalidTime {
+            current: current_time.seconds(),
+            received: expiration.seconds(),
+        });
     }
     let not_before = Timestamp::from_seconds(claims.nbf as u64);
     if not_before.gt(current_time) {
-        return Err(InvalidTime);
+        return Err(InvalidTime {
+            current: current_time.seconds(),
+            received: not_before.seconds(),
+        });
     }
     // make sure the provided hash matches the one from the tx
     if tx_hash.eq(&claims.transaction_hash) {
