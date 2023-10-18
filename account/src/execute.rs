@@ -16,6 +16,7 @@ pub fn init(
 ) -> ContractResult<Response> {
     if !authenticator.verify(
         deps.api,
+        &env,
         &Binary::from(env.contract.address.as_bytes()),
         signature,
     )? {
@@ -31,6 +32,7 @@ pub fn init(
 
 pub fn before_tx(
     deps: Deps,
+    env: &Env,
     tx_bytes: &Binary,
     cred_bytes: Option<&Binary>,
     simulate: bool,
@@ -66,9 +68,12 @@ pub fn before_tx(
                     return Err(ContractError::ShortSignature);
                 }
             }
+            Authenticator::Jwt { .. } => {
+                // todo: figure out if there are minimum checks for JWTs
+            }
         }
 
-        return match authenticator.verify(deps.api, tx_bytes, sig_bytes)? {
+        return match authenticator.verify(deps.api, env, tx_bytes, sig_bytes)? {
             true => Ok(Response::new().add_attribute("method", "before_tx")),
             false => Err(ContractError::InvalidSignature),
         };
@@ -98,6 +103,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.api,
+                &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
             )? {
@@ -118,6 +124,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.api,
+                &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
             )? {
@@ -138,8 +145,31 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.api,
+                &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
+            )? {
+                Err(ContractError::InvalidSignature)
+            } else {
+                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                Ok(Response::new()
+                    .add_attribute("method", "execute")
+                    .add_attribute("authenticator_id", id.to_string()))
+            }
+        }
+        AddAuthenticator::Jwt {
+            id,
+            aud,
+            sub,
+            token,
+        } => {
+            let auth = Authenticator::Jwt { aud, sub };
+
+            if !auth.verify(
+                deps.api,
+                &env,
+                &Binary::from(env.contract.address.as_bytes()),
+                &token,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
@@ -185,7 +215,7 @@ pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {
 #[cfg(test)]
 mod tests {
     use base64::{engine::general_purpose, Engine as _};
-    use cosmwasm_std::testing::mock_dependencies;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::Binary;
 
     use crate::auth::Authenticator;
@@ -196,6 +226,7 @@ mod tests {
     fn test_before_tx() {
         let authId = 0;
         let mut deps = mock_dependencies();
+        let env = mock_env();
 
         let pubkey = "Ayrlj6q3WWs91p45LVKwI8JyfMYNmWMrcDinLNEdWYE4";
         let pubkey_bytes = general_purpose::STANDARD.decode(pubkey).unwrap();
@@ -218,6 +249,6 @@ mod tests {
         let sig_bytes = Binary::from(new_vec);
         let tx_bytes = Binary::from(general_purpose::STANDARD.decode("Cp0BCpoBChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEnoKP3hpb24xbTZ2aDIwcHM3NW0ybjZxeHdwandmOGZzM2t4dzc1enN5M3YycnllaGQ5c3BtbnUwcTlyc2g0NnljeRIreGlvbjFlMmZ1d2UzdWhxOHpkOW5ra2s4NzZuYXdyd2R1bGd2NDYwdnpnNxoKCgV1eGlvbhIBMRJTCksKQwodL2Fic3RyYWN0YWNjb3VudC52MS5OaWxQdWJLZXkSIgog3pl1PDD1NqnoBnBk5J0wjYzvUFAkWKGTN2lgHc+PAUcSBAoCCAESBBDgpxIaFHhpb24tbG9jYWwtdGVzdG5ldC0xIAg=").unwrap());
 
-        before_tx(deps.as_ref(), &tx_bytes, Some(&sig_bytes), false).unwrap();
+        before_tx(deps.as_ref(), &env, &tx_bytes, Some(&sig_bytes), false).unwrap();
     }
 }

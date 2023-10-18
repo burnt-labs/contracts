@@ -15,8 +15,20 @@ pub enum ContractError {
     #[error(transparent)]
     Bech32(#[from] bech32::Error),
 
+    #[error(transparent)]
+    UTF8Error(#[from] std::str::Utf8Error),
+
+    #[error(transparent)]
+    Base64Decode(#[from] base64::DecodeError),
+
+    #[error(transparent)]
+    Rsa(#[from] rsa::Error),
+
     #[error("signature is invalid")]
     InvalidSignature,
+
+    #[error("signature is invalid. expected: {expected}, received {received}")]
+    InvalidSignatureDetail { expected: String, received: String },
 
     #[error("signature is empty")]
     EmptySignature,
@@ -35,6 +47,15 @@ pub enum ContractError {
 
     #[error("cannot delete the last authenticator")]
     MinimumAuthenticatorCount,
+
+    #[error("invalid time on signature. current: {current} received: {received}")]
+    InvalidTime { current: u64, received: u64 },
+
+    #[error("invalid jwt aud")]
+    InvalidJWTAud,
+
+    #[error("invalid token")]
+    InvalidToken,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;

@@ -25,14 +25,20 @@ pub fn instantiate(
 }
 
 #[entry_point]
-pub fn sudo(deps: DepsMut, _env: Env, msg: AccountSudoMsg) -> ContractResult<Response> {
+pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Response> {
     match msg {
         AccountSudoMsg::BeforeTx {
             tx_bytes,
             cred_bytes,
             simulate,
             ..
-        } => execute::before_tx(deps.as_ref(), &tx_bytes, cred_bytes.as_ref(), simulate),
+        } => execute::before_tx(
+            deps.as_ref(),
+            &env,
+            &tx_bytes,
+            cred_bytes.as_ref(),
+            simulate,
+        ),
         AccountSudoMsg::AfterTx { .. } => execute::after_tx(),
     }
 }
