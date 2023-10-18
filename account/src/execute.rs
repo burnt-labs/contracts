@@ -215,7 +215,7 @@ pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {
 #[cfg(test)]
 mod tests {
     use base64::{engine::general_purpose, Engine as _};
-    use cosmwasm_std::testing::mock_dependencies;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::Binary;
 
     use crate::auth::Authenticator;
@@ -226,6 +226,7 @@ mod tests {
     fn test_before_tx() {
         let authId = 0;
         let mut deps = mock_dependencies();
+        let env = mock_env();
 
         let pubkey = "Ayrlj6q3WWs91p45LVKwI8JyfMYNmWMrcDinLNEdWYE4";
         let pubkey_bytes = general_purpose::STANDARD.decode(pubkey).unwrap();
@@ -248,6 +249,6 @@ mod tests {
         let sig_bytes = Binary::from(new_vec);
         let tx_bytes = Binary::from(general_purpose::STANDARD.decode("Cp0BCpoBChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEnoKP3hpb24xbTZ2aDIwcHM3NW0ybjZxeHdwandmOGZzM2t4dzc1enN5M3YycnllaGQ5c3BtbnUwcTlyc2g0NnljeRIreGlvbjFlMmZ1d2UzdWhxOHpkOW5ra2s4NzZuYXdyd2R1bGd2NDYwdnpnNxoKCgV1eGlvbhIBMRJTCksKQwodL2Fic3RyYWN0YWNjb3VudC52MS5OaWxQdWJLZXkSIgog3pl1PDD1NqnoBnBk5J0wjYzvUFAkWKGTN2lgHc+PAUcSBAoCCAESBBDgpxIaFHhpb24tbG9jYWwtdGVzdG5ldC0xIAg=").unwrap());
 
-        before_tx(deps.as_ref(), &tx_bytes, Some(&sig_bytes), false).unwrap();
+        before_tx(deps.as_ref(), &env, &tx_bytes, Some(&sig_bytes), false).unwrap();
     }
 }
