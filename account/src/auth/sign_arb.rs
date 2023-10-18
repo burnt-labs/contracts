@@ -97,7 +97,7 @@ mod tests {
         let info = mock_info("sender", &[]);
         // This is the local faucet address to simplify reuse
         env.contract.address = Addr::unchecked(
-            "xion14apeydfljtmvv8vdj97u3mtmlednfhz6dr5scfs2p6xd0gdlxutqvfagkh".to_string(),
+            "xion1cyyld62ly828e2xnp0c0ckpyz68wwfs26tjpscmqlaum2jcj8zdstlxvya".to_string(),
         );
 
         let pubkey = "Ayrlj6q3WWs91p45LVKwI8JyfMYNmWMrcDinLNEdWYE4";
@@ -111,7 +111,7 @@ mod tests {
             signer.as_str()
         );
 
-        let signature = "ywxOndY+x+AzT77KBVptdCarKG6YyPBVRkpm188P8Sh9SOQ4sIIFK5ZMzN8XLqClTTIsXT14FeeRhuDaL+fMYA==";
+        let signature = "AKgG8slCFM78fE9tZzmf+L6yQskPQI0acUg3PBv/kNIO0i19i/RNaJtfFJ8A8MyHmg7Ate5imbwuzsP6mfbEaA==";
         let signature_bytes = general_purpose::STANDARD.decode(signature).unwrap();
 
         let instantiate_msg = InstantiateMsg {
@@ -123,6 +123,5 @@ mod tests {
         };
 
         let res = instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
-        println!("response: {:?}", res);
     }
 }

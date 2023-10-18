@@ -211,3 +211,43 @@ pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use base64::{engine::general_purpose, Engine as _};
+    use cosmwasm_std::testing::mock_dependencies;
+    use cosmwasm_std::Binary;
+
+    use crate::auth::Authenticator;
+    use crate::execute::before_tx;
+    use crate::state::AUTHENTICATORS;
+
+    #[test]
+    fn test_before_tx() {
+        let authId = 0;
+        let mut deps = mock_dependencies();
+
+        let pubkey = "Ayrlj6q3WWs91p45LVKwI8JyfMYNmWMrcDinLNEdWYE4";
+        let pubkey_bytes = general_purpose::STANDARD.decode(pubkey).unwrap();
+        let auth = Authenticator::Secp256K1 {
+            pubkey: Binary::from(pubkey_bytes),
+        };
+
+        let signature = "UDerMpp4QzGxjuu3uTmqoOdPrmRnwiOf6BOlL5xG2pAEx+gS8DV3HwBzrb+QRIVyKVc3D7RYMOAlRFRkpVANDA==";
+        let sig_arr = general_purpose::STANDARD.decode(signature).unwrap();
+
+        // The index of the first authenticator is 0.
+        let credIndex = vec![0u8];
+
+        let mut new_vec = Vec::new();
+        new_vec.extend_from_slice(&credIndex);
+        new_vec.extend_from_slice(&sig_arr);
+
+        AUTHENTICATORS.save(deps.as_mut().storage, authId, &auth);
+
+        let sig_bytes = Binary::from(new_vec);
+        let tx_bytes = Binary::from(general_purpose::STANDARD.decode("Cp0BCpoBChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEnoKP3hpb24xbTZ2aDIwcHM3NW0ybjZxeHdwandmOGZzM2t4dzc1enN5M3YycnllaGQ5c3BtbnUwcTlyc2g0NnljeRIreGlvbjFlMmZ1d2UzdWhxOHpkOW5ra2s4NzZuYXdyd2R1bGd2NDYwdnpnNxoKCgV1eGlvbhIBMRJTCksKQwodL2Fic3RyYWN0YWNjb3VudC52MS5OaWxQdWJLZXkSIgog3pl1PDD1NqnoBnBk5J0wjYzvUFAkWKGTN2lgHc+PAUcSBAoCCAESBBDgpxIaFHhpb24tbG9jYWwtdGVzdG5ldC0xIAg=").unwrap());
+
+        before_tx(deps.as_ref(), &tx_bytes, Some(&sig_bytes), false).unwrap();
+    }
+}

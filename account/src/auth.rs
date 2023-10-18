@@ -63,7 +63,7 @@ impl Authenticator {
                 // are signing with signArbitrary (common for cosmos wallets)
                 let verification = sign_arb::verify(
                     api,
-                    tx_bytes_hash.as_slice(),
+                    tx_bytes.as_slice(),
                     sig_bytes.as_slice(),
                     pubkey.as_slice(),
                 )?;
