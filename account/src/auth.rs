@@ -34,11 +34,11 @@ pub enum AddAuthenticator {
         sub: String,
         token: Binary,
     },
-    Secp256R1 {
-        id: u8,
-        pubkey: Binary,
-        signature: Binary,
-    },
+    // Secp256R1 {
+    //     id: u8,
+    //     pubkey: Binary,
+    //     signature: Binary,
+    // },
 }
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
@@ -47,7 +47,7 @@ pub enum Authenticator {
     Ed25519 { pubkey: Binary },
     EthWallet { address: String },
     Jwt { aud: String, sub: String },
-    Secp256R1 { pubkey: AffinePoint },
+    // Secp256R1 { pubkey: Binary },
 }
 
 impl Authenticator {
