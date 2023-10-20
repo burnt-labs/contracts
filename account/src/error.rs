@@ -24,6 +24,9 @@ pub enum ContractError {
     #[error(transparent)]
     Rsa(#[from] rsa::Error),
 
+    #[error(transparent)]
+    P256(#[from] p256::elliptic_curve::Error),
+
     #[error("signature is invalid")]
     InvalidSignature,
 

@@ -1,10 +1,13 @@
 use crate::error::ContractError;
 use cosmwasm_std::{Api, Binary, Env};
+use p256::elliptic_curve::PublicKey;
+use p256::{AffinePoint, NistP256};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 mod eth_crypto;
 mod jwt;
+mod secp256r1;
 mod sign_arb;
 pub mod util;
 
@@ -31,6 +34,11 @@ pub enum AddAuthenticator {
         sub: String,
         token: Binary,
     },
+    Secp256R1 {
+        id: u8,
+        pubkey: Binary,
+        signature: Binary,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
@@ -39,6 +47,7 @@ pub enum Authenticator {
     Ed25519 { pubkey: Binary },
     EthWallet { address: String },
     Jwt { aud: String, sub: String },
+    Secp256R1 { pubkey: AffinePoint },
 }
 
 impl Authenticator {
