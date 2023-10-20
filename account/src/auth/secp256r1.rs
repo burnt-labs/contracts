@@ -1,13 +1,12 @@
 use crate::error::{ContractError::RebuildingKey, ContractResult};
 use cosmwasm_std::Binary;
 use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
-use p256::elliptic_curve::PublicKey;
-use p256::{AffinePoint, EncodedPoint, NistP256};
+use p256::EncodedPoint;
 
-pub fn verify(tx_hash: &Vec<u8>, sig_bytes: &[u8], pubkey_bytes: Binary) -> ContractResult<bool> {
+pub fn verify(tx_hash: &[u8], sig_bytes: &[u8], pubkey_bytes: &Binary) -> ContractResult<bool> {
     let encoded_point = match EncodedPoint::from_bytes(pubkey_bytes) {
         Ok(point) => point,
-        Err(err) => return Err(RebuildingKey),
+        Err(_) => return Err(RebuildingKey),
     };
     let verifying_key: VerifyingKey = VerifyingKey::from_encoded_point(&encoded_point)?;
 
@@ -43,7 +42,7 @@ mod tests {
             verify(
                 &test_value.to_vec(),
                 signature_bytes.as_slice(),
-                verifying_key_bytes.as_bytes().into()
+                &verifying_key_bytes.as_bytes().into(),
             )
             .unwrap()
         );
@@ -53,7 +52,7 @@ mod tests {
         let result = verify(
             &bad_value.to_vec(),
             signature_bytes.as_slice(),
-            verifying_key_bytes.as_bytes().into(),
+            &verifying_key_bytes.as_bytes().into(),
         );
         assert!(result.is_err())
     }

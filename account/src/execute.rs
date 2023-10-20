@@ -2,7 +2,6 @@ use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Respons
 
 use crate::auth::{AddAuthenticator, Authenticator};
 use crate::{
-    auth,
     error::{ContractError, ContractResult},
     state::AUTHENTICATORS,
 };
@@ -58,7 +57,9 @@ pub fn before_tx(
         let sig_bytes = &Binary::from(&cred_bytes.as_slice()[1..]);
 
         match authenticator {
-            Authenticator::Secp256K1 { .. } | auth::Authenticator::Ed25519 { .. } => {
+            Authenticator::Secp256K1 { .. }
+            | Authenticator::Ed25519 { .. }
+            | Authenticator::Secp256R1 { .. } => {
                 if sig_bytes.len() != 64 {
                     return Err(ContractError::ShortSignature);
                 }
@@ -170,6 +171,27 @@ pub fn add_auth_method(
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &token,
+            )? {
+                Err(ContractError::InvalidSignature)
+            } else {
+                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                Ok(Response::new()
+                    .add_attribute("method", "execute")
+                    .add_attribute("authenticator_id", id.to_string()))
+            }
+        }
+        AddAuthenticator::Secp256R1 {
+            id,
+            pubkey,
+            signature,
+        } => {
+            let auth = Authenticator::Secp256R1 { pubkey };
+
+            if !auth.verify(
+                deps.api,
+                &env,
+                &Binary::from(env.contract.address.as_bytes()),
+                &signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
