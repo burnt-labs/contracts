@@ -26,4 +26,4 @@ base64           = { workspace = true }
 phf              = { workspace = true }
 rsa              = { workspace = true }
 getrandom        = { workspace = true }
-p256 = {version = "0.13.2", features = ["ecdsa-core", "ecdsa", "serde", "arithmetic", "alloc", "std"]}
+p256             = { workspace = true }
