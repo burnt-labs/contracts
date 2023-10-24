@@ -56,6 +56,9 @@ pub enum ContractError {
 
     #[error("invalid token")]
     InvalidToken,
+    
+    #[error("emit data too large")]
+    EmissionSizeExceeded,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;

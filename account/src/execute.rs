@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response};
+use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Order, Response};
 
 use crate::auth::{AddAuthenticator, Authenticator};
 use crate::{
@@ -202,6 +202,20 @@ pub fn remove_auth_method(
     Ok(Response::new()
         .add_attribute("method", "execute")
         .add_attribute("authenticator_id", id.to_string()))
+}
+
+const MAX_SIZE: usize = 1024;
+pub fn emit(env: Env, info: MessageInfo, data: String) -> ContractResult<Response> {
+    assert_self(&info.sender, &env.contract.address)?;
+
+    if data.len() > MAX_SIZE {
+        Err(ContractError::EmissionSizeExceeded)
+    } else {
+        let emit_event = Event::new("account_emit")
+            .add_attribute("contract", env.contract.address)
+            .add_attribute("data", data);
+        Ok(Response::new().add_event(emit_event))
+    }
 }
 
 pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {
