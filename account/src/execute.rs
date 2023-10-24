@@ -212,7 +212,7 @@ pub fn emit(env: Env, info: MessageInfo, data: String) -> ContractResult<Respons
         Err(ContractError::EmissionSizeExceeded)
     } else {
         let emit_event = Event::new("account_emit")
-            .add_attribute("contract", env.contract.address)
+            .add_attribute("address", env.contract.address)
             .add_attribute("data", data);
         Ok(Response::new().add_event(emit_event))
     }
