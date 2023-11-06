@@ -30,8 +30,8 @@ fn wrap_message(msg_bytes: &[u8], signer: Addr) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use crate::auth::sign_arb::wrap_message;
+    use crate::auth::util;
     use crate::auth::Authenticator::Secp256K1;
-    use crate::auth::{util, Authenticator};
     use crate::contract::instantiate;
     use crate::msg::InstantiateMsg;
     use base64::{engine::general_purpose, Engine as _};
