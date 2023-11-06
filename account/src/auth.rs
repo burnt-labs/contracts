@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 mod eth_crypto;
 mod jwt;
+pub mod passkey;
 mod secp256r1;
 mod sign_arb;
 pub mod util;
@@ -38,6 +39,11 @@ pub enum AddAuthenticator {
         pubkey: Binary,
         signature: Binary,
     },
+    Passkey {
+        id: u8,
+        url: String,
+        credential: Binary,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
@@ -47,6 +53,7 @@ pub enum Authenticator {
     EthWallet { address: String },
     Jwt { aud: String, sub: String },
     Secp256R1 { pubkey: Binary },
+    Passkey { url: String, passkey: Binary },
 }
 
 impl Authenticator {
@@ -104,6 +111,12 @@ impl Authenticator {
             Authenticator::Secp256R1 { pubkey } => {
                 let tx_bytes_hash = util::sha256(tx_bytes);
                 verify(&tx_bytes_hash, sig_bytes.as_slice(), pubkey)?;
+
+                Ok(true)
+            }
+            Authenticator::Passkey { url, passkey } => {
+                let tx_bytes_hash = util::sha256(tx_bytes);
+                passkey::verify(url.clone(), passkey, sig_bytes, tx_bytes_hash)?;
 
                 Ok(true)
             }

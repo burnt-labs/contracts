@@ -1,6 +1,6 @@
-use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response};
+use cosmwasm_std::{to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response};
 
-use crate::auth::{AddAuthenticator, Authenticator};
+use crate::auth::{passkey, AddAuthenticator, Authenticator};
 use crate::{
     error::{ContractError, ContractResult},
     state::AUTHENTICATORS,
@@ -71,6 +71,9 @@ pub fn before_tx(
             }
             Authenticator::Jwt { .. } => {
                 // todo: figure out if there are minimum checks for JWTs
+            }
+            Authenticator::Passkey { .. } => {
+                // todo: figure out if there are minimum checks for passkeys
             }
         }
 
@@ -200,6 +203,28 @@ pub fn add_auth_method(
                     .add_attribute("method", "execute")
                     .add_attribute("authenticator_id", id.to_string()))
             }
+        }
+        AddAuthenticator::Passkey {
+            id,
+            url,
+            credential,
+        } => {
+            let passkey = passkey::register(
+                url.clone(),
+                &credential,
+                env.contract.address.as_bytes().to_vec(),
+            )?;
+
+            let passkey_bytes = to_binary(&passkey)?;
+            let auth = Authenticator::Passkey {
+                url,
+                passkey: passkey_bytes,
+            };
+            AUTHENTICATORS.save(deps.storage, id, &auth)?;
+
+            Ok(Response::new()
+                .add_attribute("method", "execute")
+                .add_attribute("authenticator_id", id.to_string()))
         }
     }
 }
