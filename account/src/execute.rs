@@ -32,6 +32,7 @@ pub fn init(
                 "authenticator",
                 serde_json::to_string(&authenticator).unwrap(),
             ),
+            ("authenticator_id", id.to_string()),
         ])),
     )
 }
