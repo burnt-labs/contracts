@@ -1,25 +1,20 @@
 use crate::error::{ContractError, ContractResult};
 use cosmwasm_std::{from_binary, Binary};
-use phf::{phf_set, Set};
 use webauthn_rs::prelude::*;
 use webauthn_rs::WebauthnBuilder;
 use webauthn_rs_core::interface::RegistrationState;
 use webauthn_rs_proto::{COSEAlgorithm, UserVerificationPolicy};
 
-// static ALLOWED_ORIGINS: Set<&'static str> = phf_set! {
-//     "burnt.com",
-// };
-
 pub fn register(url: String, cred: &Binary, challenge: Vec<u8>) -> ContractResult<Passkey> {
     let rp_origin = match Url::parse(&url) {
         Ok(u) => u,
-        Err(err) => return Err(ContractError::URLParse { url }),
+        Err(_) => return Err(ContractError::URLParse { url }),
     };
 
     let reg = from_binary(cred)?;
 
     let rp_id = rp_origin.domain().ok_or(ContractError::URLParse { url })?;
-    let mut builder = WebauthnBuilder::new(rp_id, &rp_origin)?;
+    let builder = WebauthnBuilder::new(rp_id, &rp_origin)?;
     let webauthn = builder.build()?;
 
     let registration_state = RegistrationState {
@@ -55,7 +50,7 @@ pub fn verify(
     };
 
     let rp_id = rp_origin.domain().ok_or(ContractError::URLParse { url })?;
-    let mut builder = WebauthnBuilder::new(rp_id, &rp_origin).expect("Invalid configuration");
+    let builder = WebauthnBuilder::new(rp_id, &rp_origin).expect("Invalid configuration");
     let webauthn = builder.build().expect("Invalid configuration");
 
     let passkey: Passkey = from_binary(passkey_bytes)?;
