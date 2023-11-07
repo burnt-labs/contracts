@@ -21,7 +21,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    execute::init(deps, env, msg.id, msg.authenticator)
+    execute::init(deps, env, msg.authenticator)
 }
 
 #[entry_point]

@@ -9,19 +9,18 @@ use crate::{
 pub fn init(
     deps: DepsMut,
     env: Env,
-    id: u8,
-    authenticator: AddAuthenticator,
+    add_authenticator: AddAuthenticator,
 ) -> ContractResult<Response> {
-    add_auth_method(deps, env.clone(), authenticator.clone())?;
+    add_auth_method(deps, env.clone(), add_authenticator.clone())?;
 
     Ok(
         Response::new().add_event(Event::new("create_abstract_account").add_attributes(vec![
             ("contract_address", env.contract.address.to_string()),
             (
                 "authenticator",
-                serde_json::to_string(&authenticator).unwrap(),
+                serde_json::to_string(&add_authenticator).unwrap(),
             ),
-            ("authenticator_id", id.to_string()),
+            ("authenticator_id", add_authenticator.get_id().to_string()),
         ])),
     )
 }

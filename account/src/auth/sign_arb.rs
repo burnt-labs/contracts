@@ -31,7 +31,7 @@ fn wrap_message(msg_bytes: &[u8], signer: Addr) -> Vec<u8> {
 mod tests {
     use crate::auth::sign_arb::wrap_message;
     use crate::auth::util;
-    use crate::auth::Authenticator::Secp256K1;
+    use crate::auth::AddAuthenticator::Secp256K1;
     use crate::contract::instantiate;
     use crate::msg::InstantiateMsg;
     use base64::{engine::general_purpose, Engine as _};
@@ -115,13 +115,13 @@ mod tests {
         let signature_bytes = general_purpose::STANDARD.decode(signature).unwrap();
 
         let instantiate_msg = InstantiateMsg {
-            id: 0,
             authenticator: Secp256K1 {
+                id: 0,
                 pubkey: Binary::from(pubkey_bytes),
+                signature: Binary::from(signature_bytes),
             },
-            signature: Binary::from(signature_bytes),
         };
 
-        let res = instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
+        instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
     }
 }

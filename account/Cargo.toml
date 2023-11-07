@@ -8,27 +8,25 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-absacc           = { git = "https://github.com/larry0x/abstract-account.git" }
-cosmwasm-schema  = { workspace = true }
-cosmwasm-std     = { workspace = true }
-cw2              = { workspace = true }
-cw-storage-plus  = { workspace = true }
-sha2             = { workspace = true }
-thiserror        = { workspace = true }
-serde            = { workspace = true }
-serde_json       = { workspace = true }
-tiny-keccak      = { workspace = true }
-schemars         = { workspace = true }
-hex              = { workspace = true }
-ripemd           = { workspace = true }
-bech32           = { workspace = true }
-base64           = { workspace = true }
-phf              = { workspace = true }
-rsa              = { workspace = true }
-getrandom        = { workspace = true }
-p256 = {version = "0.13.2", features = ["ecdsa-core", "arithmetic", "serde"]}
-serde_cbor = { version = "0.12.0-dev", package = "serde_cbor_2" }
-webauthn-rs = { path = "../../webauthn-rs/webauthn-rs", features = ["danger-allow-state-serialisation", "danger-credential-internals"] }
-webauthn-rs-proto = { path = "../../webauthn-rs/webauthn-rs-proto" }
-webauthn-rs-core = { path = "../../webauthn-rs/webauthn-rs-core" }
-log = "0.4.20"
+absacc            = { git = "https://github.com/larry0x/abstract-account.git" }
+cosmwasm-schema   = { workspace = true }
+cosmwasm-std      = { workspace = true }
+cw2               = { workspace = true }
+cw-storage-plus   = { workspace = true }
+sha2              = { workspace = true }
+thiserror         = { workspace = true }
+serde             = { workspace = true }
+serde_json        = { workspace = true }
+tiny-keccak       = { workspace = true }
+schemars          = { workspace = true }
+hex               = { workspace = true }
+ripemd            = { workspace = true }
+bech32            = { workspace = true }
+base64            = { workspace = true }
+phf               = { workspace = true }
+rsa               = { workspace = true }
+getrandom         = { workspace = true }
+p256              = { workspace = true }
+webauthn-rs       = { workspace = true }
+webauthn-rs-proto = { workspace = true }
+webauthn-rs-core  = { workspace = true }

@@ -4,7 +4,6 @@ use cosmwasm_std::Binary;
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub id: u8,
     pub authenticator: AddAuthenticator,
 }
 
