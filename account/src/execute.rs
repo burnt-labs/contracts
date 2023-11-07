@@ -10,19 +10,9 @@ pub fn init(
     deps: DepsMut,
     env: Env,
     id: u8,
-    authenticator: Authenticator,
-    signature: &Binary,
+    authenticator: AddAuthenticator,
 ) -> ContractResult<Response> {
-    if !authenticator.verify(
-        deps.api,
-        &env,
-        &Binary::from(env.contract.address.as_bytes()),
-        signature,
-    )? {
-        return Err(ContractError::InvalidSignature);
-    } else {
-        AUTHENTICATORS.save(deps.storage, id, &authenticator)?;
-    }
+    add_auth_method(deps, env, authenticator)?;
 
     Ok(Response::new()
         .add_attribute("method", "init")
@@ -93,10 +83,8 @@ pub fn after_tx() -> ContractResult<Response> {
 pub fn add_auth_method(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
     add_authenticator: AddAuthenticator,
 ) -> ContractResult<Response> {
-    assert_self(&info.sender, &env.contract.address)?;
     match add_authenticator {
         AddAuthenticator::Secp256K1 {
             id,
@@ -229,14 +217,7 @@ pub fn add_auth_method(
     }
 }
 
-pub fn remove_auth_method(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    id: u8,
-) -> ContractResult<Response> {
-    assert_self(&info.sender, &env.contract.address)?;
-
+pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Response> {
     if AUTHENTICATORS
         .keys(deps.storage, None, None, Order::Ascending)
         .count()
