@@ -49,12 +49,12 @@ pub enum AddAuthenticator {
 impl AddAuthenticator {
     pub fn get_id(&self) -> u8 {
         match self {
-            AddAuthenticator::Secp256K1 { id, .. } => id.clone(),
-            AddAuthenticator::Ed25519 { id, .. } => id.clone(),
-            AddAuthenticator::EthWallet { id, .. } => id.clone(),
-            AddAuthenticator::Jwt { id, .. } => id.clone(),
-            AddAuthenticator::Secp256R1 { id, .. } => id.clone(),
-            AddAuthenticator::Passkey { id, .. } => id.clone(),
+            AddAuthenticator::Secp256K1 { id, .. } => *id,
+            AddAuthenticator::Ed25519 { id, .. } => *id,
+            AddAuthenticator::EthWallet { id, .. } => *id,
+            AddAuthenticator::Jwt { id, .. } => *id,
+            AddAuthenticator::Secp256R1 { id, .. } => *id,
+            AddAuthenticator::Passkey { id, .. } => *id,
         }
     }
 }
