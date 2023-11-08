@@ -22,7 +22,8 @@ static AUD_KEY_MAP: Map<&'static str, &'static str> = phf_map! {
     "integration-test-project" => "olg7TF3aai-wR4HTDe5oR-WRhEsdW3u-O3IJHl0BiHkmR4MLskHG9HzivWoXsloUBnBMrFNxOH0x5cNMI07oi4PeRbHySiogRW9CXPjJaNlTi-pT_IgKFsyJNXsLyzrnajLkDbQU6pRsHmNeL0hAOUv48rtXv8VVWWN8okJehD2q9N7LHoFAOmIUEPg_VTHTt8K__O-9eMZKN4eMjh_4-sxRX6NXPSPT87XRlrK4GZ4pUdp86K0tOFLhwO4Uj0JkMNfI82eVZ1tAbDlqjd8jFnAb8fWm8wtdaTNbL_AAXmbDhswwJOyrw8fARZIhrXSdKBWa6e4k7sLwTIy-OO8saebnlARsjGst7ZCzmw5KCm2ctEVl3hYhHwyXu_A5rOblMrV3H0G7WqeKMCMVSJ11ssrlsmfVhNIwu1Qlt5GYmPTTJiCgGUGRxZkgDyOyjFNHglYpZamCGyJ9oyofsukEGoqMQ6WzjFi_hjVapzXi7Li-Q0OjEopIUUDDgeUrgjbGY0eiHI6sAz5hoaD0Qjc9e3Hk6-y7VcKCTCAanZOlJV0vJkHB98LBLh9qAoVUei_VaLFe2IcfVlrL_43aXlsHhr_SUQY5pHPlUMbQihE_57dpPRh31qDX_w6ye8dilniP8JmpKM2uIwnJ0x7hfJ45Qa0oLHmrGlzY9wi-RGP0YUk;AQAB",
 };
 
-const AVERAGE_BLOCK_TIME: u64 = 6;
+// The average block time of 2 blocks.
+const AVERAGE_BLOCK_TIME_OF_TWO_BLOCKS: u64 = 12;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -98,7 +99,7 @@ pub fn verify(
     // the average block time to allow for a more realistic timestamp. this has
     // implications for the "not before" and "expiration" timestamps, in that we
     // are more forgiving for "not before" and less forgiving for "expiration"
-    let working_time = &current_time.plus_seconds(AVERAGE_BLOCK_TIME);
+    let working_time = &current_time.plus_seconds(AVERAGE_BLOCK_TIME_OF_TWO_BLOCKS);
     let expiration = Timestamp::from_seconds(claims.exp as u64);
     if expiration.lt(working_time) {
         return Err(InvalidTime {
