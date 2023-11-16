@@ -124,4 +124,31 @@ mod tests {
 
         let res = instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
     }
+
+    #[test]
+    fn test_direct_sign() {
+        let mut deps = mock_dependencies();
+        let mut env = mock_env();
+        let info = mock_info("sender", &[]);
+        // This is the local faucet address to simplify reuse
+        env.contract.address = Addr::unchecked(
+            "xion1n62qc4aqlsnt40casq0r8erlxfu5l0mfr2nzv7j93cnhlryshqksuca2kh".to_string(),
+        );
+
+        let pubkey = "A0PIiYUarMb00YSaWyPrVQ/doq2yKexpGy2VS2c0Z6fx";
+        let pubkey_bytes = general_purpose::STANDARD.decode(pubkey).unwrap();
+
+        let signature = "cp/ucUEWL12ZS/ULf09R/1MxJwwPWkw0rsOv0XKhUTIr3CDbJENwbSNXlNaYa+6se8jonsTxHJTRPWOHPAjmBQ==";
+        let signature_bytes = general_purpose::STANDARD.decode(signature).unwrap();
+
+        let instantiate_msg = InstantiateMsg {
+            id: 0,
+            signature: Binary::from(signature_bytes),
+            authenticator: Secp256K1 {
+                pubkey: Binary::from(pubkey_bytes),
+            },
+        };
+
+        let res = instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
+    }
 }
