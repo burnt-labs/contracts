@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 mod eth_crypto;
 mod jwt;
 pub mod passkey;
-mod passkey2;
 mod secp256r1;
 mod sign_arb;
 pub mod util;

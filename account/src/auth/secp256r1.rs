@@ -4,11 +4,7 @@ use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
 use p256::EncodedPoint;
 
 pub fn verify(tx_hash: &[u8], sig_bytes: &[u8], pubkey_bytes: &Binary) -> ContractResult<bool> {
-    let encoded_point = match EncodedPoint::from_bytes(pubkey_bytes) {
-        Ok(point) => point,
-        Err(_) => return Err(RebuildingKey),
-    };
-    let verifying_key: VerifyingKey = VerifyingKey::from_encoded_point(&encoded_point)?;
+    let verifying_key: VerifyingKey = VerifyingKey::from_sec1_bytes(pubkey_bytes.as_slice())?;
 
     let signature: Signature = Signature::from_bytes(sig_bytes.into())?;
     verifying_key.verify(tx_hash, &signature)?;
@@ -19,6 +15,7 @@ pub fn verify(tx_hash: &[u8], sig_bytes: &[u8], pubkey_bytes: &Binary) -> Contra
 #[cfg(test)]
 mod tests {
     use crate::auth::secp256r1::verify;
+    use cosmwasm_std::Binary;
     use p256::ecdsa::{signature::Signer, Signature, SigningKey, VerifyingKey};
 
     #[test]
@@ -34,7 +31,8 @@ mod tests {
         println!("signature: {}", hex::encode(signature_bytes));
 
         let verifying_key = VerifyingKey::from(&signing_key);
-        let verifying_key_bytes = verifying_key.to_encoded_point(true);
+        let verifying_key_bytes = verifying_key.to_sec1_bytes();
+        let verifying_key_binary = Binary::from(verifying_key_bytes.to_vec());
         println!("verifying key: {}", hex::encode(verifying_key_bytes));
 
         assert_eq!(
@@ -42,7 +40,7 @@ mod tests {
             verify(
                 &test_value.to_vec(),
                 signature_bytes.as_slice(),
-                &verifying_key_bytes.as_bytes().into(),
+                &verifying_key_binary,
             )
             .unwrap()
         );
@@ -52,7 +50,7 @@ mod tests {
         let result = verify(
             &bad_value.to_vec(),
             signature_bytes.as_slice(),
-            &verifying_key_bytes.as_bytes().into(),
+            &verifying_key_binary,
         );
         assert!(result.is_err())
     }
