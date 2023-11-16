@@ -1,9 +1,11 @@
 use crate::error::{ContractError, ContractResult};
 use cosmwasm_std::{from_binary, Binary};
-use webauthn_rs::prelude::*;
+use webauthn_rs::prelude::{Passkey, PasskeyAuthentication, PasskeyRegistration, Url};
+// use webauthn_rs::prelude::*;
+use crate::error::ContractError::InvalidToken;
 use webauthn_rs::WebauthnBuilder;
-use webauthn_rs_core::interface::RegistrationState;
-use webauthn_rs_proto::{COSEAlgorithm, UserVerificationPolicy};
+use webauthn_rs_core::interface::{AuthenticationState, RegistrationState};
+use webauthn_rs_proto::{COSEAlgorithm, PublicKeyCredential, UserVerificationPolicy};
 
 pub fn register(url: String, cred: &Binary, challenge: Vec<u8>) -> ContractResult<Passkey> {
     let rp_origin = match Url::parse(&url) {
