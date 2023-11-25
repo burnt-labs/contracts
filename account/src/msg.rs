@@ -13,6 +13,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     AddAuthMethod { add_authenticator: AddAuthenticator },
     RemoveAuthMethod { id: u8 },
+    Emit { data: String },
 }
 
 #[cw_serde]
