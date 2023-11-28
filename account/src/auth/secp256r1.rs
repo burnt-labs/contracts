@@ -1,7 +1,6 @@
-use crate::error::{ContractError::RebuildingKey, ContractResult};
+use crate::error::ContractResult;
 use cosmwasm_std::Binary;
 use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
-use p256::EncodedPoint;
 
 pub fn verify(tx_hash: &[u8], sig_bytes: &[u8], pubkey_bytes: &Binary) -> ContractResult<bool> {
     let verifying_key: VerifyingKey = VerifyingKey::from_sec1_bytes(pubkey_bytes.as_slice())?;

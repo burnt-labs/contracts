@@ -1,4 +1,4 @@
-use cosmwasm_std::{to_binary, Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
+use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
 use crate::auth::{passkey, AddAuthenticator, Authenticator};
 use crate::{
@@ -73,7 +73,7 @@ pub fn before_tx(
             }
         }
 
-        return match authenticator.verify(deps.api, env, tx_bytes, sig_bytes)? {
+        return match authenticator.verify(deps, env, tx_bytes, sig_bytes)? {
             true => Ok(Response::new().add_attribute("method", "before_tx")),
             false => Err(ContractError::InvalidSignature),
         };
@@ -102,7 +102,7 @@ pub fn add_auth_method(
             };
 
             if !auth.verify(
-                deps.api,
+                deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
@@ -121,7 +121,7 @@ pub fn add_auth_method(
             let auth = Authenticator::Ed25519 { pubkey };
 
             if !auth.verify(
-                deps.api,
+                deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
@@ -140,7 +140,7 @@ pub fn add_auth_method(
             let auth = Authenticator::EthWallet { address };
 
             if !auth.verify(
-                deps.api,
+                deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
@@ -160,7 +160,7 @@ pub fn add_auth_method(
             let auth = Authenticator::Jwt { aud, sub };
 
             if !auth.verify(
-                deps.api,
+                deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &token,
@@ -179,7 +179,7 @@ pub fn add_auth_method(
             let auth = Authenticator::Secp256R1 { pubkey };
 
             if !auth.verify(
-                deps.api,
+                deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
@@ -196,16 +196,13 @@ pub fn add_auth_method(
             credential,
         } => {
             let passkey = passkey::register(
+                deps.as_ref(),
+                env.contract.address.clone(),
                 url.clone(),
-                &credential,
-                env.contract.address.as_bytes().to_vec(),
+                credential,
             )?;
 
-            let passkey_bytes = to_binary(&passkey)?;
-            let auth = Authenticator::Passkey {
-                url,
-                passkey: passkey_bytes,
-            };
+            let auth = Authenticator::Passkey { url, passkey };
             AUTHENTICATORS.save(deps.storage, id, &auth)?;
 
             Ok(())
@@ -213,7 +210,7 @@ pub fn add_auth_method(
     }?;
     Ok(
         Response::new().add_event(Event::new("add_auth_method").add_attributes(vec![
-            ("contract_address", env.contract.address.to_string()),
+            ("contract_address", env.contract.address.clone().to_string()),
             (
                 "authenticator",
                 serde_json::to_string(&add_authenticator).unwrap(),

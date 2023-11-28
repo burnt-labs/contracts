@@ -1,6 +1,6 @@
 use crate::auth::secp256r1::verify;
 use crate::error::ContractError;
-use cosmwasm_std::{Api, Binary, Env};
+use cosmwasm_std::{Binary, Deps, Env};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -72,7 +72,7 @@ pub enum Authenticator {
 impl Authenticator {
     pub fn verify(
         &self,
-        api: &dyn Api,
+        deps: Deps,
         env: &Env,
         tx_bytes: &Binary,
         sig_bytes: &Binary,
@@ -80,7 +80,7 @@ impl Authenticator {
         match self {
             Authenticator::Secp256K1 { pubkey } => {
                 let tx_bytes_hash = util::sha256(tx_bytes);
-                let verification = api.secp256k1_verify(&tx_bytes_hash, sig_bytes, pubkey);
+                let verification = deps.api.secp256k1_verify(&tx_bytes_hash, sig_bytes, pubkey);
                 if let Ok(ver) = verification {
                     if ver {
                         return Ok(true);
@@ -90,7 +90,7 @@ impl Authenticator {
                 // if the direct verification failed, check to see if they
                 // are signing with signArbitrary (common for cosmos wallets)
                 let verification = sign_arb::verify(
-                    api,
+                    deps.api,
                     tx_bytes.as_slice(),
                     sig_bytes.as_slice(),
                     pubkey.as_slice(),
@@ -99,14 +99,14 @@ impl Authenticator {
             }
             Authenticator::Ed25519 { pubkey } => {
                 let tx_bytes_hash = util::sha256(tx_bytes);
-                match api.ed25519_verify(&tx_bytes_hash, sig_bytes, pubkey) {
+                match deps.api.ed25519_verify(&tx_bytes_hash, sig_bytes, pubkey) {
                     Ok(verification) => Ok(verification),
                     Err(error) => Err(error.into()),
                 }
             }
             Authenticator::EthWallet { address } => {
                 let addr_bytes = hex::decode(&address[2..])?;
-                match eth_crypto::verify(api, tx_bytes, sig_bytes, &addr_bytes) {
+                match eth_crypto::verify(deps.api, tx_bytes, sig_bytes, &addr_bytes) {
                     Ok(_) => Ok(true),
                     Err(error) => Err(error),
                 }
@@ -129,7 +129,14 @@ impl Authenticator {
             }
             Authenticator::Passkey { url, passkey } => {
                 let tx_bytes_hash = util::sha256(tx_bytes);
-                passkey::verify(url.clone(), passkey, sig_bytes, tx_bytes_hash)?;
+                passkey::verify(
+                    deps,
+                    env.clone().contract.address,
+                    url.clone(),
+                    sig_bytes,
+                    tx_bytes_hash,
+                    passkey,
+                )?;
 
                 Ok(true)
             }
