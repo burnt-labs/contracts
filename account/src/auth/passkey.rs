@@ -1,8 +1,9 @@
 use crate::error::ContractResult;
+use crate::proto::{self, QueryWebAuthNVerifyRegisterRequest, QueryWebAuthNVerifyRegisterResponse};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::QueryRequest::Stargate;
+use cosmwasm_std::QueryRequest::{Custom, Stargate};
 use cosmwasm_std::{to_binary, Addr, Binary, Deps};
 
 #[cw_serde]
@@ -27,12 +28,19 @@ pub fn register(deps: Deps, addr: Addr, rp: String, data: Binary) -> ContractRes
     };
     let query_bz = to_binary(&query)?;
 
-    let query_response: QueryRegisterResponse = deps.querier.query(&Stargate {
-        path: "xion.v1.Query/WebAuthNVerifyRegister".to_string(),
-        data: query_bz,
-    })?;
+    let query_msg = proto::QueryWebAuthNVerifyRegisterRequest {
+        addr: addr.into(),
+        challenge: addr.to_string(),
+        rp,
+        data: data.into(),
+    };
+    let query_response = deps
+        .querier
+        .query::<QueryWebAuthNVerifyRegisterResponse>(&Custom::<
+            QueryWebAuthNVerifyRegisterRequest,
+        >(query_msg))?;
 
-    Ok(query_response.credential)
+    Ok(query_response.credential.into())
 }
 
 #[cw_serde]
