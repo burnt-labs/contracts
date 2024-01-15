@@ -30,9 +30,6 @@ pub enum ContractError {
     #[error(transparent)]
     P256EcdsaCurve(#[from] p256::ecdsa::Error),
 
-    #[error(transparent)]
-    WebauthnError(#[from] webauthn_rs_core::error::WebauthnError),
-
     #[error("error rebuilding key")]
     RebuildingKey,
 

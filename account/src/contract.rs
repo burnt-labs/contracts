@@ -6,6 +6,7 @@ use absacc::AccountSudoMsg;
 
 use crate::execute::{add_auth_method, assert_self, remove_auth_method};
 use crate::msg::ExecuteMsg;
+use crate::proto::MyCustomQuery;
 use crate::{
     error::ContractResult,
     execute,
@@ -15,7 +16,7 @@ use crate::{
 
 #[entry_point]
 pub fn instantiate(
-    deps: DepsMut,
+    deps: DepsMut<MyCustomQuery>,
     env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
@@ -25,7 +26,11 @@ pub fn instantiate(
 }
 
 #[entry_point]
-pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Response> {
+pub fn sudo(
+    deps: DepsMut<MyCustomQuery>,
+    env: Env,
+    msg: AccountSudoMsg,
+) -> ContractResult<Response> {
     match msg {
         AccountSudoMsg::BeforeTx {
             tx_bytes,
@@ -45,7 +50,7 @@ pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Resp
 
 #[entry_point]
 pub fn execute(
-    deps: DepsMut,
+    deps: DepsMut<MyCustomQuery>,
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,

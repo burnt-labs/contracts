@@ -34,9 +34,12 @@ mod tests {
     use crate::auth::AddAuthenticator::Secp256K1;
     use crate::contract::instantiate;
     use crate::msg::InstantiateMsg;
+    use crate::proto::MyCustomQuery;
     use base64::{engine::general_purpose, Engine as _};
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{Addr, Api, Binary};
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+    };
+    use cosmwasm_std::{Addr, Api, Binary, OwnedDeps};
 
     #[test]
     fn test_derive_addr() {
@@ -92,7 +95,12 @@ mod tests {
 
     #[test]
     fn test_init_sign_arb() {
-        let mut deps = mock_dependencies();
+        let mut deps = OwnedDeps {
+            storage: MockStorage::default(),
+            api: MockApi::default(),
+            querier: MockQuerier::<MyCustomQuery>::new(&[]),
+            custom_query_type: core::marker::PhantomData::<MyCustomQuery>,
+        };
         let mut env = mock_env();
         let info = mock_info("sender", &[]);
         // This is the local faucet address to simplify reuse

@@ -1,4 +1,7 @@
+use cosmwasm_std::CustomQuery;
 use osmosis_std_derive::CosmwasmExt;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 #[derive(
     Clone,
@@ -10,8 +13,8 @@ use osmosis_std_derive::CosmwasmExt;
     schemars::JsonSchema,
     CosmwasmExt,
 )]
-#[proto_message(type_url = "xion.v1.Query/WebAuthNVerifyRegister")]
-#[proto_query(path = "xion.v1.Query/WebAuthNVerifyRegister", response_type = QueryWebAuthNVerifyRegisterResponse)]
+#[proto_message(type_url = "/xion.v1.Query/WebAuthNVerifyRegister")]
+#[proto_query(path = "/xion.v1.Query/WebAuthNVerifyRegister", response_type = QueryWebAuthNVerifyRegisterResponse)]
 pub struct QueryWebAuthNVerifyRegisterRequest {
     #[prost(string, tag = "1")]
     pub addr: String,
@@ -29,3 +32,10 @@ pub struct QueryWebAuthNVerifyRegisterResponse {
     #[prost(bytes, tag = "1")]
     pub credential: Vec<u8>,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MyCustomQuery {
+    Verify(QueryWebAuthNVerifyRegisterRequest),
+}
+impl CustomQuery for MyCustomQuery {}

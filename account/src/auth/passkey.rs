@@ -1,9 +1,9 @@
 use crate::error::ContractResult;
-use crate::proto::{self, QueryWebAuthNVerifyRegisterRequest, QueryWebAuthNVerifyRegisterResponse};
+use crate::proto::{self, MyCustomQuery};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::QueryRequest::{Custom, Stargate};
+use cosmwasm_std::QueryRequest::Stargate;
 use cosmwasm_std::{to_binary, Addr, Binary, Deps};
 
 #[cw_serde]
@@ -19,28 +19,22 @@ struct QueryRegisterResponse {
     credential: Binary,
 }
 
-pub fn register(deps: Deps, addr: Addr, rp: String, data: Binary) -> ContractResult<Binary> {
-    let query = QueryRegisterRequest {
+pub fn register(
+    deps: Deps<MyCustomQuery>,
+    addr: Addr,
+    rp: String,
+    data: Binary,
+) -> ContractResult<Binary> {
+    let query = proto::QueryWebAuthNVerifyRegisterRequest {
         addr: addr.clone().into(),
         challenge: addr.to_string(),
         rp,
-        data,
+        data: data.to_vec(),
     };
-    let query_bz = to_binary(&query)?;
 
-    let query_msg = proto::QueryWebAuthNVerifyRegisterRequest {
-        addr: addr.into(),
-        challenge: addr.to_string(),
-        rp,
-        data: data.into(),
-    };
-    let query_response = deps
-        .querier
-        .query::<QueryWebAuthNVerifyRegisterResponse>(&Custom::<
-            QueryWebAuthNVerifyRegisterRequest,
-        >(query_msg))?;
+    let query_response = deps.querier.query::<QueryRegisterResponse>(&query.into())?;
 
-    Ok(query_response.credential.into())
+    Ok(query_response.credential)
 }
 
 #[cw_serde]
@@ -53,7 +47,7 @@ struct QueryVerifyRequest {
 }
 
 pub fn verify(
-    deps: Deps,
+    deps: Deps<MyCustomQuery>,
     addr: Addr,
     rp: String,
     signature: &Binary,

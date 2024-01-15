@@ -27,11 +27,8 @@ phf               = { workspace = true }
 rsa               = { workspace = true }
 getrandom         = { workspace = true }
 p256              = { workspace = true }
-webauthn-rs       = { workspace = true }
-webauthn-rs-proto = { workspace = true }
-webauthn-rs-core  = { workspace = true }
-passkey = { git="https://github.com/aptos-labs/passkey-rs.git", branch = "fix-passkey-rs"}
-passkey-authenticator = { git="https://github.com/aptos-labs/passkey-rs.git", branch = "fix-passkey-rs", features = ["testable"] }
+passkey = { git="https://github.com/aptos-labs/passkey-rs.git"}
+passkey-authenticator = { git="https://github.com/aptos-labs/passkey-rs.git", features = ["testable"] }
 url = "2.4.1"
 coset = "0.3.5"
 futures = "0.3.29"
