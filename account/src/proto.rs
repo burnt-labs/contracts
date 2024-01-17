@@ -35,7 +35,7 @@ pub struct QueryWebAuthNVerifyRegisterResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum MyCustomQuery {
+pub enum XionCustomQuery {
     Verify(QueryWebAuthNVerifyRegisterRequest),
 }
-impl CustomQuery for MyCustomQuery {}
+impl CustomQuery for XionCustomQuery {}

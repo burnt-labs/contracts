@@ -1,14 +1,14 @@
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
 use crate::auth::{passkey, AddAuthenticator, Authenticator};
-use crate::proto::MyCustomQuery;
+use crate::proto::XionCustomQuery;
 use crate::{
     error::{ContractError, ContractResult},
     state::AUTHENTICATORS,
 };
 
 pub fn init(
-    deps: DepsMut<MyCustomQuery>,
+    deps: DepsMut<XionCustomQuery>,
     env: Env,
     add_authenticator: AddAuthenticator,
 ) -> ContractResult<Response> {
@@ -27,7 +27,7 @@ pub fn init(
 }
 
 pub fn before_tx(
-    deps: Deps<MyCustomQuery>,
+    deps: Deps<XionCustomQuery>,
     env: &Env,
     tx_bytes: &Binary,
     cred_bytes: Option<&Binary>,
@@ -88,7 +88,7 @@ pub fn after_tx() -> ContractResult<Response> {
 }
 
 pub fn add_auth_method(
-    deps: DepsMut<MyCustomQuery>,
+    deps: DepsMut<XionCustomQuery>,
     env: Env,
     add_authenticator: AddAuthenticator,
 ) -> ContractResult<Response> {
@@ -221,7 +221,7 @@ pub fn add_auth_method(
 }
 
 pub fn remove_auth_method(
-    deps: DepsMut<MyCustomQuery>,
+    deps: DepsMut<XionCustomQuery>,
     env: Env,
     id: u8,
 ) -> ContractResult<Response> {
@@ -258,7 +258,7 @@ mod tests {
 
     use crate::auth::Authenticator;
     use crate::execute::before_tx;
-    use crate::proto::{self, MyCustomQuery, QueryWebAuthNVerifyRegisterResponse};
+    use crate::proto::{self, QueryWebAuthNVerifyRegisterResponse, XionCustomQuery};
     use crate::state::AUTHENTICATORS;
     use cosmwasm_std::QueryRequest::Custom;
 
@@ -268,7 +268,7 @@ mod tests {
         let mut deps = OwnedDeps {
             storage: MockStorage::default(),
             api: MockApi::default(),
-            querier: MockQuerier::<MyCustomQuery>::new(&[]),
+            querier: MockQuerier::<XionCustomQuery>::new(&[]),
             custom_query_type: std::marker::PhantomData,
         };
         let env = mock_env();
@@ -304,12 +304,12 @@ mod tests {
         let mut deps = OwnedDeps {
             storage: MockStorage::default(),
             api: MockApi::default(),
-            querier: MockQuerier::<MyCustomQuery>::new(&[]),
-            custom_query_type: core::marker::PhantomData::<MyCustomQuery>,
+            querier: MockQuerier::<XionCustomQuery>::new(&[]),
+            custom_query_type: core::marker::PhantomData::<XionCustomQuery>,
         };
 
         deps.querier = deps.querier.with_custom_handler(|query| match query {
-            MyCustomQuery::Verify(data) => {
+            XionCustomQuery::Verify(data) => {
                 assert_eq!(data.addr, "mock_address");
                 assert_eq!(data.challenge, "mock_challenge");
                 assert_eq!(data.rp, "mock_rp");
@@ -325,7 +325,7 @@ mod tests {
             }
         });
 
-        let query_msg = MyCustomQuery::Verify(proto::QueryWebAuthNVerifyRegisterRequest {
+        let query_msg = XionCustomQuery::Verify(proto::QueryWebAuthNVerifyRegisterRequest {
             addr: "mock_address".to_string(),
             challenge: "mock_challenge".to_string(),
             rp: "mock_rp".to_string(),

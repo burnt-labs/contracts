@@ -1,5 +1,5 @@
 use crate::error::ContractResult;
-use crate::proto::{self, MyCustomQuery};
+use crate::proto::{self, XionCustomQuery};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use cosmwasm_schema::cw_serde;
@@ -20,7 +20,7 @@ struct QueryRegisterResponse {
 }
 
 pub fn register(
-    deps: Deps<MyCustomQuery>,
+    deps: Deps<XionCustomQuery>,
     addr: Addr,
     rp: String,
     data: Binary,
@@ -47,7 +47,7 @@ struct QueryVerifyRequest {
 }
 
 pub fn verify(
-    deps: Deps<MyCustomQuery>,
+    deps: Deps<XionCustomQuery>,
     addr: Addr,
     rp: String,
     signature: &Binary,

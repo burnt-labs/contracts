@@ -1,5 +1,5 @@
 use crate::error::ContractError;
-use crate::{auth::secp256r1::verify, proto::MyCustomQuery};
+use crate::{auth::secp256r1::verify, proto::XionCustomQuery};
 use cosmwasm_std::{Binary, Deps, Env};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -72,7 +72,7 @@ pub enum Authenticator {
 impl Authenticator {
     pub fn verify(
         &self,
-        deps: Deps<MyCustomQuery>,
+        deps: Deps<XionCustomQuery>,
         env: &Env,
         tx_bytes: &Binary,
         sig_bytes: &Binary,

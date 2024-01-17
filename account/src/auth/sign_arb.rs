@@ -34,7 +34,7 @@ mod tests {
     use crate::auth::AddAuthenticator::Secp256K1;
     use crate::contract::instantiate;
     use crate::msg::InstantiateMsg;
-    use crate::proto::MyCustomQuery;
+    use crate::proto::XionCustomQuery;
     use base64::{engine::general_purpose, Engine as _};
     use cosmwasm_std::testing::{
         mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
@@ -98,8 +98,8 @@ mod tests {
         let mut deps = OwnedDeps {
             storage: MockStorage::default(),
             api: MockApi::default(),
-            querier: MockQuerier::<MyCustomQuery>::new(&[]),
-            custom_query_type: core::marker::PhantomData::<MyCustomQuery>,
+            querier: MockQuerier::<XionCustomQuery>::new(&[]),
+            custom_query_type: core::marker::PhantomData::<XionCustomQuery>,
         };
         let mut env = mock_env();
         let info = mock_info("sender", &[]);
