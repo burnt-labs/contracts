@@ -27,14 +27,13 @@ phf               = { workspace = true }
 rsa               = { workspace = true }
 getrandom         = { workspace = true }
 p256              = { workspace = true }
-webauthn-rs       = { workspace = true }
-webauthn-rs-proto = { workspace = true }
-webauthn-rs-core  = { workspace = true }
-passkey = { git="https://github.com/aptos-labs/passkey-rs.git", branch = "fix-passkey-rs"}
-passkey-authenticator = { git="https://github.com/aptos-labs/passkey-rs.git", branch = "fix-passkey-rs", features = ["testable"] }
 url = "2.4.1"
 coset = "0.3.5"
 futures = "0.3.29"
 async-trait = "0.1.74"
 prost = {version = "0.11.2", default-features = false, features = ["prost-derive"]}
 osmosis-std-derive = "0.13.2"
+bls12_381 = "0.8.0"
+group = "0.13.0"
+pairing = "0.23.0"
+sp-std = "13.0.0"

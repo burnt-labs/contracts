@@ -30,9 +30,6 @@ pub enum ContractError {
     #[error(transparent)]
     P256EcdsaCurve(#[from] p256::ecdsa::Error),
 
-    #[error(transparent)]
-    WebauthnError(#[from] webauthn_rs_core::error::WebauthnError),
-
     #[error("error rebuilding key")]
     RebuildingKey,
 
@@ -71,6 +68,9 @@ pub enum ContractError {
 
     #[error("url parse error: {url}")]
     URLParse { url: String },
+
+    #[error("invalid groth16 verification key")]
+    InvalidGroth16VerificationKey,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
