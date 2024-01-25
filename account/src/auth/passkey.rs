@@ -20,27 +20,28 @@ struct QueryRegisterResponse {
 }
 
 pub fn register(deps: Deps, addr: Addr, rp: String, data: Binary) -> ContractResult<Binary> {
-    let query = QueryRegisterRequest {
-        addr: addr.clone().into(),
-        challenge: addr.to_string(),
-        rp,
-        data,
-    };
-    let query_bz = to_binary(&query)?;
-
-    let query_msg = proto::QueryWebAuthNVerifyRegisterRequest {
-        addr: addr.into(),
-        challenge: addr.to_string(),
-        rp,
-        data: data.into(),
-    };
-    let query_response = deps
-        .querier
-        .query::<QueryWebAuthNVerifyRegisterResponse>(&Custom::<
-            QueryWebAuthNVerifyRegisterRequest,
-        >(query_msg))?;
-
-    Ok(query_response.credential.into())
+    // let query = QueryRegisterRequest {
+    //     addr: addr.clone().into(),
+    //     challenge: addr.to_string(),
+    //     rp,
+    //     data,
+    // };
+    // let query_bz = to_binary(&query)?;
+    //
+    // let query_msg = proto::QueryWebAuthNVerifyRegisterRequest {
+    //     addr: addr.into(),
+    //     challenge: addr.to_string(),
+    //     rp,
+    //     data: data.into(),
+    // };
+    // let query_response = deps
+    //     .querier
+    //     .query::<QueryWebAuthNVerifyRegisterResponse>(&Custom::<
+    //         QueryWebAuthNVerifyRegisterRequest,
+    //     >(query_msg))?;
+    //
+    // Ok(query_response.credential.into())
+    Ok(Binary::from_base64("")?)
 }
 
 #[cw_serde]
