@@ -56,6 +56,9 @@ pub enum ContractError {
 
     #[error("invalid token")]
     InvalidToken,
+
+    #[error("cannot override existing authenticator at index {index}")]
+    OverridingIndex { index: u8 },
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
