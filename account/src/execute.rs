@@ -251,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_before_tx() {
-        let authId = 0;
+        let auth_id = 0;
         let mut deps = mock_dependencies();
         let env = mock_env();
 
@@ -265,13 +265,15 @@ mod tests {
         let sig_arr = general_purpose::STANDARD.decode(signature).unwrap();
 
         // The index of the first authenticator is 0.
-        let credIndex = vec![0u8];
+        let cred_index = vec![0u8];
 
         let mut new_vec = Vec::new();
-        new_vec.extend_from_slice(&credIndex);
+        new_vec.extend_from_slice(&cred_index);
         new_vec.extend_from_slice(&sig_arr);
 
-        AUTHENTICATORS.save(deps.as_mut().storage, authId, &auth);
+        AUTHENTICATORS
+            .save(deps.as_mut().storage, auth_id, &auth)
+            .unwrap();
 
         let sig_bytes = Binary::from(new_vec);
         let tx_bytes = Binary::from(general_purpose::STANDARD.decode("Cp0BCpoBChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEnoKP3hpb24xbTZ2aDIwcHM3NW0ybjZxeHdwandmOGZzM2t4dzc1enN5M3YycnllaGQ5c3BtbnUwcTlyc2g0NnljeRIreGlvbjFlMmZ1d2UzdWhxOHpkOW5ra2s4NzZuYXdyd2R1bGd2NDYwdnpnNxoKCgV1eGlvbhIBMRJTCksKQwodL2Fic3RyYWN0YWNjb3VudC52MS5OaWxQdWJLZXkSIgog3pl1PDD1NqnoBnBk5J0wjYzvUFAkWKGTN2lgHc+PAUcSBAoCCAESBBDgpxIaFHhpb24tbG9jYWwtdGVzdG5ldC0xIAg=").unwrap());
