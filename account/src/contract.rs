@@ -22,7 +22,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    execute::init(deps, env, msg.authenticator)
+    execute::init(deps, env, &mut msg.authenticator.clone())
 }
 
 #[entry_point]
@@ -56,11 +56,12 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> ContractResult<Response> {
     assert_self(&info.sender, &env.contract.address)?;
-    match msg {
+    let mut owned_msg = msg.clone();
+    match &mut owned_msg {
         ExecuteMsg::AddAuthMethod { add_authenticator } => {
             add_auth_method(deps, env, add_authenticator)
         }
-        ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, id),
+        ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, *id),
     }
 }
 

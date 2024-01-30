@@ -1,3 +1,5 @@
+use std::borrow::BorrowMut;
+
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
 use crate::auth::{passkey, AddAuthenticator, Authenticator};
@@ -10,9 +12,9 @@ use crate::{
 pub fn init(
     deps: DepsMut<XionCustomQuery>,
     env: Env,
-    add_authenticator: AddAuthenticator,
+    add_authenticator: &mut AddAuthenticator,
 ) -> ContractResult<Response> {
-    add_auth_method(deps, env.clone(), add_authenticator.clone())?;
+    add_auth_method(deps, env.clone(), add_authenticator)?;
 
     Ok(
         Response::new().add_event(Event::new("create_abstract_account").add_attributes(vec![
@@ -90,27 +92,27 @@ pub fn after_tx() -> ContractResult<Response> {
 pub fn add_auth_method(
     deps: DepsMut<XionCustomQuery>,
     env: Env,
-    add_authenticator: AddAuthenticator,
+    add_authenticator: &mut AddAuthenticator,
 ) -> ContractResult<Response> {
-    match add_authenticator.clone() {
+    match add_authenticator.borrow_mut() {
         AddAuthenticator::Secp256K1 {
             id,
             pubkey,
             signature,
         } => {
             let auth = Authenticator::Secp256K1 {
-                pubkey: pubkey.clone(),
+                pubkey: (*pubkey).clone(),
             };
 
             if !auth.verify(
                 deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
-                &signature,
+                signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
                 Ok(())
             }
         }
@@ -119,17 +121,19 @@ pub fn add_auth_method(
             pubkey,
             signature,
         } => {
-            let auth = Authenticator::Ed25519 { pubkey };
+            let auth = Authenticator::Ed25519 {
+                pubkey: (*pubkey).clone(),
+            };
 
             if !auth.verify(
                 deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
-                &signature,
+                signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
                 Ok(())
             }
         }
@@ -138,17 +142,19 @@ pub fn add_auth_method(
             address,
             signature,
         } => {
-            let auth = Authenticator::EthWallet { address };
+            let auth = Authenticator::EthWallet {
+                address: (*address).clone(),
+            };
 
             if !auth.verify(
                 deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
-                &signature,
+                signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
                 Ok(())
             }
         }
@@ -158,17 +164,20 @@ pub fn add_auth_method(
             sub,
             token,
         } => {
-            let auth = Authenticator::Jwt { aud, sub };
+            let auth = Authenticator::Jwt {
+                aud: (*aud).clone(),
+                sub: (*sub).clone(),
+            };
 
             if !auth.verify(
                 deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
-                &token,
+                token,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
                 Ok(())
             }
         }
@@ -177,17 +186,19 @@ pub fn add_auth_method(
             pubkey,
             signature,
         } => {
-            let auth = Authenticator::Secp256R1 { pubkey };
+            let auth = Authenticator::Secp256R1 {
+                pubkey: (*pubkey).clone(),
+            };
 
             if !auth.verify(
                 deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
-                &signature,
+                signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
                 Ok(())
             }
         }
@@ -199,13 +210,18 @@ pub fn add_auth_method(
             let passkey = passkey::register(
                 deps.as_ref(),
                 env.contract.address.clone(),
-                url.clone(),
-                credential,
+                (*url).clone(),
+                (*credential).clone(),
             )?;
 
-            let auth = Authenticator::Passkey { url, passkey };
-            AUTHENTICATORS.save(deps.storage, id, &auth)?;
-
+            let auth = Authenticator::Passkey {
+                url: (*url).clone(),
+                passkey: passkey.clone(),
+            };
+            AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+            // we replace the sent credential with the passkey for indexers and other
+            // observers to see
+            *(credential) = passkey;
             Ok(())
         }
     }?;
@@ -323,6 +339,7 @@ mod tests {
                     .into(),
                 ))
             }
+            XionCustomQuery::Authenticate(_) => todo!(),
         });
 
         let query_msg = XionCustomQuery::Verify(proto::QueryWebAuthNVerifyRegisterRequest {
