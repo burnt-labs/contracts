@@ -31,7 +31,7 @@ fn wrap_message(msg_bytes: &[u8], signer: Addr) -> Vec<u8> {
 mod tests {
     use crate::auth::sign_arb::wrap_message;
     use crate::auth::util;
-    use crate::auth::AddAuthenticator::Secp256K1;
+    use crate::auth::Authenticator::Secp256K1;
     use crate::contract::instantiate;
     use crate::msg::InstantiateMsg;
     use crate::proto::XionCustomQuery;
@@ -123,7 +123,7 @@ mod tests {
         let signature_bytes = general_purpose::STANDARD.decode(signature).unwrap();
 
         let instantiate_msg = InstantiateMsg {
-            authenticator: Secp256K1 {
+            authenticator: crate::auth::AddAuthenticator::Secp256K1 {
                 id: 0,
                 pubkey: Binary::from(pubkey_bytes),
                 signature: Binary::from(signature_bytes),

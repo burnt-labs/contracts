@@ -3,6 +3,7 @@ use std::borrow::BorrowMut;
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
 use crate::auth::{passkey, AddAuthenticator, Authenticator};
+use crate::error::ContractError::OverridingIndex;
 use crate::proto::XionCustomQuery;
 use crate::{
     error::{ContractError, ContractResult},
@@ -112,7 +113,7 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
                 Ok(())
             }
         }
@@ -133,7 +134,7 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
                 Ok(())
             }
         }
@@ -154,7 +155,7 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
                 Ok(())
             }
         }
@@ -177,7 +178,7 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
                 Ok(())
             }
         }
@@ -234,6 +235,19 @@ pub fn add_auth_method(
             ),
         ])),
     )
+}
+
+pub fn save_authenticator(
+    deps: DepsMut<XionCustomQuery>,
+    id: u8,
+    authenticator: &Authenticator,
+) -> ContractResult<()> {
+    if AUTHENTICATORS.has(deps.storage, id) {
+        return Err(OverridingIndex { index: id });
+    }
+
+    AUTHENTICATORS.save(deps.storage, id, authenticator)?;
+    Ok(())
 }
 
 pub fn remove_auth_method(
