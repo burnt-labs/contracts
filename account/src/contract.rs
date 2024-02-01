@@ -4,7 +4,7 @@ use cosmwasm_std::{
 
 use absacc::AccountSudoMsg;
 
-use crate::execute::{add_auth_method, remove_auth_method};
+use crate::execute::{add_auth_method, assert_self, remove_auth_method};
 use crate::msg::ExecuteMsg;
 use crate::proto::XionCustomQuery;
 use crate::{
@@ -55,7 +55,7 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> ContractResult<Response> {
-    // assert_self(&info.sender, &env.contract.address)?;
+    assert_self(&info.sender, &env.contract.address)?;
     let mut owned_msg = msg.clone();
     match &mut owned_msg {
         ExecuteMsg::AddAuthMethod { add_authenticator } => {
