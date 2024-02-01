@@ -1,6 +1,6 @@
 use crate::error::ContractResult;
 use crate::proto::{self, XionCustomQuery};
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::engine::general_purpose::{self};
 use base64::Engine;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Binary, Deps};
@@ -17,6 +17,9 @@ struct QueryRegisterRequest {
 struct QueryRegisterResponse {
     credential: Binary,
 }
+
+#[cw_serde]
+struct QueryAuthenticateResponse {}
 
 pub fn register(
     deps: Deps<XionCustomQuery>,
@@ -53,7 +56,8 @@ pub fn verify(
     tx_hash: Vec<u8>,
     credential: &Binary,
 ) -> ContractResult<bool> {
-    let challenge = Binary::from(tx_hash).to_base64();
+    let challenge =
+        general_purpose::URL_SAFE_NO_PAD.encode(general_purpose::STANDARD.encode(tx_hash));
 
     let query = proto::QueryWebAuthNVerifyAuthenticateRequest {
         addr: addr.into(),
@@ -63,7 +67,8 @@ pub fn verify(
         data: signature.clone().into(),
     };
 
-    deps.querier.query::<QueryRegisterResponse>(&query.into())?;
+    deps.querier
+        .query::<QueryAuthenticateResponse>(&query.into())?;
 
     Ok(true)
 }
