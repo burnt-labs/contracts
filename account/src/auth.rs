@@ -5,6 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 mod eth_crypto;
+mod groth16;
 mod jwt;
 pub mod passkey;
 mod secp256r1;
