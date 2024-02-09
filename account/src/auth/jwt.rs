@@ -23,7 +23,7 @@ static AUD_KEY_MAP: Map<&'static str, &'static str> = phf_map! {
 };
 
 // The average block time of 2 blocks.
-const AVERAGE_BLOCK_TIME_OF_TWO_BLOCKS: u64 = 12;
+const AVERAGE_SYNC_TIME_OF_TWO_BLOCKS: u64 = 60;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -95,13 +95,13 @@ pub fn verify(
     }
 
     // complete the time checks
-    // because the provided time is the completion of the the last block, we add
-    // the average block time to allow for a more realistic timestamp. this has
-    // implications for the "not before" and "expiration" timestamps, in that we
-    // are more forgiving for "not before" and less forgiving for "expiration"
-    let working_time = &current_time.plus_seconds(AVERAGE_BLOCK_TIME_OF_TWO_BLOCKS);
+    // because the provided time is the completion of the last block, and the
+    // time for it to be synced between blocks, we add a buffer to allow for a
+    // more realistic timestamp. this has implications for the "not before"
+    // timestamp, we do not add this buffer to "expiration"
+    let working_time = &current_time.plus_seconds(AVERAGE_SYNC_TIME_OF_TWO_BLOCKS);
     let expiration = Timestamp::from_seconds(claims.exp as u64);
-    if expiration.lt(working_time) {
+    if expiration.lt(current_time) {
         return Err(InvalidTime {
             current: current_time.seconds(),
             received: expiration.seconds(),
