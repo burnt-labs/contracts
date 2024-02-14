@@ -24,6 +24,15 @@ pub enum ContractError {
     #[error(transparent)]
     Rsa(#[from] rsa::Error),
 
+    #[error(transparent)]
+    P256EllipticCurve(#[from] p256::elliptic_curve::Error),
+
+    #[error(transparent)]
+    P256EcdsaCurve(#[from] p256::ecdsa::Error),
+
+    #[error("error rebuilding key")]
+    RebuildingKey,
+
     #[error("signature is invalid")]
     InvalidSignature,
 

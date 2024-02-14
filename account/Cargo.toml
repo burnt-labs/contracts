@@ -8,21 +8,31 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-absacc           = { git = "https://github.com/larry0x/abstract-account.git" }
-cosmwasm-schema  = { workspace = true }
-cosmwasm-std     = { workspace = true }
-cw2              = { workspace = true }
-cw-storage-plus  = { workspace = true }
-sha2             = { workspace = true }
-thiserror        = { workspace = true }
-serde            = { workspace = true }
-serde_json       = { workspace = true }
-tiny-keccak      = { workspace = true }
-schemars         = { workspace = true }
-hex              = { workspace = true }
-ripemd           = { workspace = true }
-bech32           = { workspace = true }
-base64           = { workspace = true }
-phf              = { workspace = true }
-rsa              = { workspace = true }
-getrandom        = { workspace = true }
+absacc            = { git = "https://github.com/larry0x/abstract-account.git" }
+cosmwasm-schema   = { workspace = true }
+cosmwasm-std      = { workspace = true }
+cw2               = { workspace = true }
+cw-storage-plus   = { workspace = true }
+sha2              = { workspace = true }
+thiserror         = { workspace = true }
+serde             = { workspace = true }
+serde_json        = { workspace = true }
+tiny-keccak       = { workspace = true }
+schemars          = { workspace = true }
+hex               = { workspace = true }
+ripemd            = { workspace = true }
+bech32            = { workspace = true }
+base64            = { workspace = true }
+phf               = { workspace = true }
+rsa               = { workspace = true }
+getrandom         = { workspace = true }
+p256              = { workspace = true }
+#webauthn-rs       = { workspace = true }
+#webauthn-rs-proto = { workspace = true }
+#webauthn-rs-core  = { workspace = true }
+#passkey = { git="https://github.com/aptos-labs/passkey-rs.git", branch = "fix-passkey-rs"}
+#passkey-authenticator = { git="https://github.com/aptos-labs/passkey-rs.git", branch = "fix-passkey-rs", features = ["testable"] }
+url = "2.4.1"
+coset = "0.3.5"
+futures = "0.3.29"
+async-trait = "0.1.74"

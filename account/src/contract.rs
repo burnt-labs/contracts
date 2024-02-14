@@ -4,7 +4,7 @@ use cosmwasm_std::{
 
 use absacc::AccountSudoMsg;
 
-use crate::execute::{add_auth_method, remove_auth_method};
+use crate::execute::{add_auth_method, assert_self, remove_auth_method};
 use crate::msg::ExecuteMsg;
 use crate::{
     error::ContractResult,
@@ -21,7 +21,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    execute::init(deps, env, msg.id, msg.authenticator, &msg.signature)
+    execute::init(deps, env, msg.authenticator)
 }
 
 #[entry_point]
@@ -50,11 +50,12 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> ContractResult<Response> {
+    assert_self(&info.sender, &env.contract.address)?;
     match msg {
         ExecuteMsg::AddAuthMethod { add_authenticator } => {
-            add_auth_method(deps, env, info, add_authenticator)
+            add_auth_method(deps, env, add_authenticator)
         }
-        ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, info, id),
+        ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, id),
     }
 }
 
