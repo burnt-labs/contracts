@@ -2,7 +2,7 @@ use crate::error::ContractResult;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::QueryRequest::{Custom, Stargate};
+use cosmwasm_std::QueryRequest::Stargate;
 use cosmwasm_std::{to_binary, Addr, Binary, Deps};
 
 #[cw_serde]
