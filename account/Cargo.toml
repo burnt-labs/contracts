@@ -42,5 +42,4 @@ num-bigint = "0.4.4"
 ark-circom = { git = "https://github.com/mvid/circom-compat.git" }
 ark-crypto-primitives = { version = "0.4.0" }
 ark-std = "0.4.0"
-mail-auth = { git = "https://github.com/mvid/mail-auth.git" }
 tokio = "1.35.1"
