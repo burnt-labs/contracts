@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Order, Response};
+use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
 use crate::auth::{passkey, AddAuthenticator, Authenticator};
 use crate::{
