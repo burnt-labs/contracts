@@ -109,7 +109,7 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                save_authenticator(deps, id, &auth)?;
                 Ok(())
             }
         }
@@ -128,7 +128,7 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                save_authenticator(deps, id, &auth)?;
                 Ok(())
             }
         }
@@ -147,7 +147,7 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                save_authenticator(deps, id, &auth)?;
                 Ok(())
             }
         }
@@ -167,7 +167,7 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                save_authenticator(deps, id, &auth)?;
                 Ok(())
             }
         }
@@ -217,6 +217,19 @@ pub fn add_auth_method(
             ),
         ])),
     )
+}
+
+pub fn save_authenticator(
+    deps: DepsMut,
+    id: u8,
+    authenticator: &Authenticator,
+) -> ContractResult<()> {
+    if AUTHENTICATORS.has(deps.storage, id) {
+        return Err(ContractError::OverridingIndex { index: id });
+    }
+
+    AUTHENTICATORS.save(deps.storage, id, authenticator)?;
+    Ok(())
 }
 
 pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Response> {
