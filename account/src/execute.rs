@@ -1,9 +1,7 @@
-use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Order, Response};
+use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
-use crate::auth::{AddAuthenticator, Authenticator};
-use crate::error::ContractError::OverridingIndex;
+use crate::auth::{passkey, AddAuthenticator, Authenticator};
 use crate::{
-    auth,
     error::{ContractError, ContractResult},
     state::AUTHENTICATORS,
 };
@@ -11,29 +9,18 @@ use crate::{
 pub fn init(
     deps: DepsMut,
     env: Env,
-    id: u8,
-    authenticator: Authenticator,
-    signature: &Binary,
+    add_authenticator: AddAuthenticator,
 ) -> ContractResult<Response> {
-    if !authenticator.verify(
-        deps.api,
-        &env,
-        &Binary::from(env.contract.address.as_bytes()),
-        signature,
-    )? {
-        return Err(ContractError::InvalidSignature);
-    } else {
-        AUTHENTICATORS.save(deps.storage, id, &authenticator)?;
-    }
+    add_auth_method(deps, env.clone(), add_authenticator.clone())?;
 
     Ok(
         Response::new().add_event(Event::new("create_abstract_account").add_attributes(vec![
             ("contract_address", env.contract.address.to_string()),
             (
                 "authenticator",
-                serde_json::to_string(&authenticator).unwrap(),
+                serde_json::to_string(&add_authenticator).unwrap(),
             ),
-            ("authenticator_id", id.to_string()),
+            ("authenticator_id", add_authenticator.get_id().to_string()),
         ])),
     )
 }
@@ -66,7 +53,9 @@ pub fn before_tx(
         let sig_bytes = &Binary::from(&cred_bytes.as_slice()[1..]);
 
         match authenticator {
-            Authenticator::Secp256K1 { .. } | auth::Authenticator::Ed25519 { .. } => {
+            Authenticator::Secp256K1 { .. }
+            | Authenticator::Ed25519 { .. }
+            | Authenticator::Secp256R1 { .. } => {
                 if sig_bytes.len() != 64 {
                     return Err(ContractError::ShortSignature);
                 }
@@ -79,9 +68,12 @@ pub fn before_tx(
             Authenticator::Jwt { .. } => {
                 // todo: figure out if there are minimum checks for JWTs
             }
+            Authenticator::Passkey { .. } => {
+                // todo: figure out if there are minimum checks for passkeys
+            }
         }
 
-        return match authenticator.verify(deps.api, env, tx_bytes, sig_bytes)? {
+        return match authenticator.verify(deps, env, tx_bytes, sig_bytes)? {
             true => Ok(Response::new().add_attribute("method", "before_tx")),
             false => Err(ContractError::InvalidSignature),
         };
@@ -97,10 +89,8 @@ pub fn after_tx() -> ContractResult<Response> {
 pub fn add_auth_method(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
     add_authenticator: AddAuthenticator,
 ) -> ContractResult<Response> {
-    assert_self(&info.sender, &env.contract.address)?;
     match add_authenticator.clone() {
         AddAuthenticator::Secp256K1 {
             id,
@@ -112,7 +102,7 @@ pub fn add_auth_method(
             };
 
             if !auth.verify(
-                deps.api,
+                deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
@@ -131,7 +121,7 @@ pub fn add_auth_method(
             let auth = Authenticator::Ed25519 { pubkey };
 
             if !auth.verify(
-                deps.api,
+                deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
@@ -150,7 +140,7 @@ pub fn add_auth_method(
             let auth = Authenticator::EthWallet { address };
 
             if !auth.verify(
-                deps.api,
+                deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &signature,
@@ -170,7 +160,7 @@ pub fn add_auth_method(
             let auth = Authenticator::Jwt { aud, sub };
 
             if !auth.verify(
-                deps.api,
+                deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
                 &token,
@@ -181,10 +171,46 @@ pub fn add_auth_method(
                 Ok(())
             }
         }
+        AddAuthenticator::Secp256R1 {
+            id,
+            pubkey,
+            signature,
+        } => {
+            let auth = Authenticator::Secp256R1 { pubkey };
+
+            if !auth.verify(
+                deps.as_ref(),
+                &env,
+                &Binary::from(env.contract.address.as_bytes()),
+                &signature,
+            )? {
+                Err(ContractError::InvalidSignature)
+            } else {
+                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                Ok(())
+            }
+        }
+        AddAuthenticator::Passkey {
+            id,
+            url,
+            credential,
+        } => {
+            let passkey = passkey::register(
+                deps.as_ref(),
+                env.contract.address.clone(),
+                url.clone(),
+                credential,
+            )?;
+
+            let auth = Authenticator::Passkey { url, passkey };
+            AUTHENTICATORS.save(deps.storage, id, &auth)?;
+
+            Ok(())
+        }
     }?;
     Ok(
         Response::new().add_event(Event::new("add_auth_method").add_attributes(vec![
-            ("contract_address", env.contract.address.to_string()),
+            ("contract_address", env.contract.address.clone().to_string()),
             (
                 "authenticator",
                 serde_json::to_string(&add_authenticator).unwrap(),
@@ -199,21 +225,14 @@ pub fn save_authenticator(
     authenticator: &Authenticator,
 ) -> ContractResult<()> {
     if AUTHENTICATORS.has(deps.storage, id) {
-        return Err(OverridingIndex { index: id });
+        return Err(ContractError::OverridingIndex { index: id });
     }
 
     AUTHENTICATORS.save(deps.storage, id, authenticator)?;
     Ok(())
 }
 
-pub fn remove_auth_method(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    id: u8,
-) -> ContractResult<Response> {
-    assert_self(&info.sender, &env.contract.address)?;
-
+pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Response> {
     if AUTHENTICATORS
         .keys(deps.storage, None, None, Order::Ascending)
         .count()

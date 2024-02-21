@@ -1,12 +1,9 @@
-use crate::auth::{AddAuthenticator, Authenticator};
+use crate::auth::AddAuthenticator;
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Binary;
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub id: u8,
-    pub authenticator: Authenticator,
-    pub signature: Binary,
+    pub authenticator: AddAuthenticator,
 }
 
 #[cw_serde]
