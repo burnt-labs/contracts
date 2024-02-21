@@ -22,9 +22,6 @@ static AUD_KEY_MAP: Map<&'static str, &'static str> = phf_map! {
     "integration-test-project" => "olg7TF3aai-wR4HTDe5oR-WRhEsdW3u-O3IJHl0BiHkmR4MLskHG9HzivWoXsloUBnBMrFNxOH0x5cNMI07oi4PeRbHySiogRW9CXPjJaNlTi-pT_IgKFsyJNXsLyzrnajLkDbQU6pRsHmNeL0hAOUv48rtXv8VVWWN8okJehD2q9N7LHoFAOmIUEPg_VTHTt8K__O-9eMZKN4eMjh_4-sxRX6NXPSPT87XRlrK4GZ4pUdp86K0tOFLhwO4Uj0JkMNfI82eVZ1tAbDlqjd8jFnAb8fWm8wtdaTNbL_AAXmbDhswwJOyrw8fARZIhrXSdKBWa6e4k7sLwTIy-OO8saebnlARsjGst7ZCzmw5KCm2ctEVl3hYhHwyXu_A5rOblMrV3H0G7WqeKMCMVSJ11ssrlsmfVhNIwu1Qlt5GYmPTTJiCgGUGRxZkgDyOyjFNHglYpZamCGyJ9oyofsukEGoqMQ6WzjFi_hjVapzXi7Li-Q0OjEopIUUDDgeUrgjbGY0eiHI6sAz5hoaD0Qjc9e3Hk6-y7VcKCTCAanZOlJV0vJkHB98LBLh9qAoVUei_VaLFe2IcfVlrL_43aXlsHhr_SUQY5pHPlUMbQihE_57dpPRh31qDX_w6ye8dilniP8JmpKM2uIwnJ0x7hfJ45Qa0oLHmrGlzY9wi-RGP0YUk;AQAB",
 };
 
-// The average block time of 2 blocks.
-const AVERAGE_SYNC_TIME_OF_TWO_BLOCKS: u64 = 60;
-
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     aud: Box<[String]>, // Optional. Audience
@@ -94,24 +91,18 @@ pub fn verify(
         return Err(InvalidToken);
     }
 
-    // complete the time checks
-    // because the provided time is the completion of the last block, and the
-    // time for it to be synced between blocks, we add a buffer to allow for a
-    // more realistic timestamp. this has implications for the "not before"
-    // timestamp, we do not add this buffer to "expiration"
-    let working_time = &current_time.plus_seconds(AVERAGE_SYNC_TIME_OF_TWO_BLOCKS);
-    let expiration = Timestamp::from_seconds(claims.exp as u64);
+    // complete the time check
+    //
+    // timing in cosmos is unstable to say the least. therefore we have noticed
+    // that the perceived time in the chain can swing quite a bit, and is almost
+    // exclusively in the past. Therefore, NBF (not before) checks, which are
+    // primarily set at time of JWT creation, almost always fail. Knowing this,
+    // we have decided to only check expiration
+    let expiration = Timestamp::from_seconds(claims.exp);
     if expiration.lt(current_time) {
         return Err(InvalidTime {
             current: current_time.seconds(),
             received: expiration.seconds(),
-        });
-    }
-    let not_before = Timestamp::from_seconds(claims.nbf as u64);
-    if not_before.gt(working_time) {
-        return Err(InvalidTime {
-            current: current_time.seconds(),
-            received: not_before.seconds(),
         });
     }
     // make sure the provided hash matches the one from the tx

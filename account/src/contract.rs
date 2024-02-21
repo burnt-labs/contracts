@@ -4,6 +4,7 @@ use cosmwasm_std::{
 
 use absacc::AccountSudoMsg;
 
+use crate::error::ContractError;
 use crate::execute::{add_auth_method, remove_auth_method};
 use crate::msg::{ExecuteMsg, MigrateMsg};
 use crate::{
@@ -69,7 +70,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 #[entry_point]
-pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     // No state migrations performed, just returned a Response
     Ok(Response::default())
 }
