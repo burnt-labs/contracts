@@ -4,8 +4,9 @@ use cosmwasm_std::{
 
 use absacc::AccountSudoMsg;
 
+use crate::error::ContractError;
 use crate::execute::{add_auth_method, assert_self, remove_auth_method};
-use crate::msg::ExecuteMsg;
+use crate::msg::{ExecuteMsg, MigrateMsg};
 use crate::{
     error::ContractResult,
     execute,
@@ -67,4 +68,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_binary(&query::authenticator_by_id(deps.storage, id)?)
         }
     }
+}
+
+#[entry_point]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    // No state migrations performed, just returned a Response
+    Ok(Response::default())
 }
