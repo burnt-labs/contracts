@@ -10,6 +10,7 @@ pub mod passkey;
 mod secp256r1;
 mod sign_arb;
 pub mod util;
+mod zkemail;
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub enum AddAuthenticator {
@@ -44,6 +45,10 @@ pub enum AddAuthenticator {
         url: String,
         credential: Binary,
     },
+    // ZKEmail {
+    //     id: u8,
+    //     sender_sha: Binary, // sha256(sender_email, account_address)
+    // },
 }
 
 impl AddAuthenticator {
@@ -55,6 +60,7 @@ impl AddAuthenticator {
             AddAuthenticator::Jwt { id, .. } => *id,
             AddAuthenticator::Secp256R1 { id, .. } => *id,
             AddAuthenticator::Passkey { id, .. } => *id,
+            // AddAuthenticator::ZKEmail { id, .. } => *id,
         }
     }
 }
@@ -67,6 +73,7 @@ pub enum Authenticator {
     Jwt { aud: String, sub: String },
     Secp256R1 { pubkey: Binary },
     Passkey { url: String, passkey: Binary },
+    // ZKEmail { identifier: Binary }, // sha(sender_email, account_address)
 }
 
 impl Authenticator {
