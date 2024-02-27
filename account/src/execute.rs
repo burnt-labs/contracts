@@ -3,7 +3,6 @@ use std::borrow::BorrowMut;
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
 use crate::auth::{passkey, AddAuthenticator, Authenticator};
-use crate::error::ContractError::OverridingIndex;
 use crate::proto::XionCustomQuery;
 use crate::{
     error::{ContractError, ContractResult},
@@ -243,7 +242,7 @@ pub fn save_authenticator(
     authenticator: &Authenticator,
 ) -> ContractResult<()> {
     if AUTHENTICATORS.has(deps.storage, id) {
-        return Err(OverridingIndex { index: id });
+        return Err(ContractError::OverridingIndex { index: id });
     }
 
     AUTHENTICATORS.save(deps.storage, id, authenticator)?;
