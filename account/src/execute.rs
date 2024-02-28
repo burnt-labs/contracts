@@ -1,17 +1,20 @@
+use std::borrow::BorrowMut;
+
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
 use crate::auth::{passkey, AddAuthenticator, Authenticator};
+use crate::proto::XionCustomQuery;
 use crate::{
     error::{ContractError, ContractResult},
     state::AUTHENTICATORS,
 };
 
 pub fn init(
-    deps: DepsMut,
+    deps: DepsMut<XionCustomQuery>,
     env: Env,
-    add_authenticator: AddAuthenticator,
+    add_authenticator: &mut AddAuthenticator,
 ) -> ContractResult<Response> {
-    add_auth_method(deps, env.clone(), add_authenticator.clone())?;
+    add_auth_method(deps, env.clone(), add_authenticator)?;
 
     Ok(
         Response::new().add_event(Event::new("create_abstract_account").add_attributes(vec![
@@ -26,7 +29,7 @@ pub fn init(
 }
 
 pub fn before_tx(
-    deps: Deps,
+    deps: Deps<XionCustomQuery>,
     env: &Env,
     tx_bytes: &Binary,
     cred_bytes: Option<&Binary>,
@@ -87,29 +90,29 @@ pub fn after_tx() -> ContractResult<Response> {
 }
 
 pub fn add_auth_method(
-    deps: DepsMut,
+    deps: DepsMut<XionCustomQuery>,
     env: Env,
-    add_authenticator: AddAuthenticator,
+    add_authenticator: &mut AddAuthenticator,
 ) -> ContractResult<Response> {
-    match add_authenticator.clone() {
+    match add_authenticator.borrow_mut() {
         AddAuthenticator::Secp256K1 {
             id,
             pubkey,
             signature,
         } => {
             let auth = Authenticator::Secp256K1 {
-                pubkey: pubkey.clone(),
+                pubkey: (*pubkey).clone(),
             };
 
             if !auth.verify(
                 deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
-                &signature,
+                signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                save_authenticator(deps, id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
                 Ok(())
             }
         }
@@ -118,17 +121,19 @@ pub fn add_auth_method(
             pubkey,
             signature,
         } => {
-            let auth = Authenticator::Ed25519 { pubkey };
+            let auth = Authenticator::Ed25519 {
+                pubkey: (*pubkey).clone(),
+            };
 
             if !auth.verify(
                 deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
-                &signature,
+                signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                save_authenticator(deps, id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
                 Ok(())
             }
         }
@@ -137,17 +142,19 @@ pub fn add_auth_method(
             address,
             signature,
         } => {
-            let auth = Authenticator::EthWallet { address };
+            let auth = Authenticator::EthWallet {
+                address: (*address).clone(),
+            };
 
             if !auth.verify(
                 deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
-                &signature,
+                signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                save_authenticator(deps, id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
                 Ok(())
             }
         }
@@ -157,17 +164,20 @@ pub fn add_auth_method(
             sub,
             token,
         } => {
-            let auth = Authenticator::Jwt { aud, sub };
+            let auth = Authenticator::Jwt {
+                aud: (*aud).clone(),
+                sub: (*sub).clone(),
+            };
 
             if !auth.verify(
                 deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
-                &token,
+                token,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                save_authenticator(deps, id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
                 Ok(())
             }
         }
@@ -176,17 +186,19 @@ pub fn add_auth_method(
             pubkey,
             signature,
         } => {
-            let auth = Authenticator::Secp256R1 { pubkey };
+            let auth = Authenticator::Secp256R1 {
+                pubkey: (*pubkey).clone(),
+            };
 
             if !auth.verify(
                 deps.as_ref(),
                 &env,
                 &Binary::from(env.contract.address.as_bytes()),
-                &signature,
+                signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, id, &auth)?;
+                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
                 Ok(())
             }
         }
@@ -198,13 +210,18 @@ pub fn add_auth_method(
             let passkey = passkey::register(
                 deps.as_ref(),
                 env.contract.address.clone(),
-                url.clone(),
-                credential,
+                (*url).clone(),
+                (*credential).clone(),
             )?;
 
-            let auth = Authenticator::Passkey { url, passkey };
-            AUTHENTICATORS.save(deps.storage, id, &auth)?;
-
+            let auth = Authenticator::Passkey {
+                url: (*url).clone(),
+                passkey: passkey.clone(),
+            };
+            AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+            // we replace the sent credential with the passkey for indexers and other
+            // observers to see
+            *(credential) = passkey;
             Ok(())
         }
     }?;
@@ -220,7 +237,7 @@ pub fn add_auth_method(
 }
 
 pub fn save_authenticator(
-    deps: DepsMut,
+    deps: DepsMut<XionCustomQuery>,
     id: u8,
     authenticator: &Authenticator,
 ) -> ContractResult<()> {
@@ -232,7 +249,11 @@ pub fn save_authenticator(
     Ok(())
 }
 
-pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Response> {
+pub fn remove_auth_method(
+    deps: DepsMut<XionCustomQuery>,
+    env: Env,
+    id: u8,
+) -> ContractResult<Response> {
     if AUTHENTICATORS
         .keys(deps.storage, None, None, Order::Ascending)
         .count()
@@ -261,17 +282,24 @@ pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {
 #[cfg(test)]
 mod tests {
     use base64::{engine::general_purpose, Engine as _};
-    use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::Binary;
+    use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
+    use cosmwasm_std::{Binary, OwnedDeps};
 
     use crate::auth::Authenticator;
     use crate::execute::before_tx;
+    use crate::proto::{self, QueryWebAuthNVerifyRegisterResponse, XionCustomQuery};
     use crate::state::AUTHENTICATORS;
+    use cosmwasm_std::QueryRequest::Custom;
 
     #[test]
     fn test_before_tx() {
         let auth_id = 0;
-        let mut deps = mock_dependencies();
+        let mut deps = OwnedDeps {
+            storage: MockStorage::default(),
+            api: MockApi::default(),
+            querier: MockQuerier::<XionCustomQuery>::new(&[]),
+            custom_query_type: std::marker::PhantomData,
+        };
         let env = mock_env();
 
         let pubkey = "Ayrlj6q3WWs91p45LVKwI8JyfMYNmWMrcDinLNEdWYE4";
@@ -298,5 +326,50 @@ mod tests {
         let tx_bytes = Binary::from(general_purpose::STANDARD.decode("Cp0BCpoBChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEnoKP3hpb24xbTZ2aDIwcHM3NW0ybjZxeHdwandmOGZzM2t4dzc1enN5M3YycnllaGQ5c3BtbnUwcTlyc2g0NnljeRIreGlvbjFlMmZ1d2UzdWhxOHpkOW5ra2s4NzZuYXdyd2R1bGd2NDYwdnpnNxoKCgV1eGlvbhIBMRJTCksKQwodL2Fic3RyYWN0YWNjb3VudC52MS5OaWxQdWJLZXkSIgog3pl1PDD1NqnoBnBk5J0wjYzvUFAkWKGTN2lgHc+PAUcSBAoCCAESBBDgpxIaFHhpb24tbG9jYWwtdGVzdG5ldC0xIAg=").unwrap());
 
         before_tx(deps.as_ref(), &env, &tx_bytes, Some(&sig_bytes), false).unwrap();
+    }
+
+    #[test]
+    pub fn test_custom_querier() {
+        let mut deps = OwnedDeps {
+            storage: MockStorage::default(),
+            api: MockApi::default(),
+            querier: MockQuerier::<XionCustomQuery>::new(&[]),
+            custom_query_type: core::marker::PhantomData::<XionCustomQuery>,
+        };
+
+        deps.querier = deps.querier.with_custom_handler(|query| match query {
+            XionCustomQuery::Verify(data) => {
+                assert_eq!(data.addr, "mock_address");
+                assert_eq!(data.challenge, "mock_challenge");
+                assert_eq!(data.rp, "mock_rp");
+                assert_eq!(data.data, vec![0u8]);
+
+                cosmwasm_std::SystemResult::Ok(cosmwasm_std::ContractResult::Ok(
+                    serde_json::to_vec(&QueryWebAuthNVerifyRegisterResponse {
+                        credential: Binary::from("true".as_bytes()).into(),
+                    })
+                    .unwrap()
+                    .into(),
+                ))
+            }
+            XionCustomQuery::Authenticate(_) => todo!(),
+        });
+
+        let query_msg = XionCustomQuery::Verify(proto::QueryWebAuthNVerifyRegisterRequest {
+            addr: "mock_address".to_string(),
+            challenge: "mock_challenge".to_string(),
+            rp: "mock_rp".to_string(),
+            data: vec![0u8],
+        });
+        let query_response = deps
+            .as_ref()
+            .querier
+            .query::<QueryWebAuthNVerifyRegisterResponse>(&Custom(query_msg));
+        assert!(query_response.is_ok());
+
+        assert_eq!(
+            query_response.unwrap().credential,
+            Binary::from("true".as_bytes())
+        );
     }
 }
