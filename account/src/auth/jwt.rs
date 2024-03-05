@@ -21,8 +21,8 @@ pub fn verify(
     let query = proto::QueryValidateJWTRequest {
         aud: aud.to_string(),
         sub: sub.to_string(),
-        sigBytes: String::from_utf8(sig_bytes.into()).unwrap(),
-        txHash: challenge,
+        sig_bytes: String::from_utf8(sig_bytes.into()).unwrap(),
+        tx_hash: challenge,
     };
 
     deps.querier

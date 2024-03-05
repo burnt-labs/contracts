@@ -79,9 +79,9 @@ pub struct QueryValidateJWTRequest {
     #[prost(string, tag = "2")]
     pub sub: String,
     #[prost(string, tag = "3")]
-    pub sigBytes: String,
+    pub sig_bytes: String,
     #[prost(string, tag = "4")]
-    pub txHash: String,
+    pub tx_hash: String,
 }
 
 #[derive(Clone, PartialEq, Eq, ::prost::Message, serde::Serialize, serde::Deserialize)]
