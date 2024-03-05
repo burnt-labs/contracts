@@ -2,7 +2,7 @@ use std::borrow::BorrowMut;
 
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
-use crate::auth::{passkey, AddAuthenticator, Authenticator};
+use crate::auth::{jwt, passkey, AddAuthenticator, Authenticator};
 use crate::proto::XionCustomQuery;
 use crate::{
     error::{ContractError, ContractResult},
@@ -169,17 +169,16 @@ pub fn add_auth_method(
                 sub: (*sub).clone(),
             };
 
-            if !auth.verify(
+            jwt::verify(
                 deps.as_ref(),
-                &env,
-                &Binary::from(env.contract.address.as_bytes()),
-                token,
-            )? {
-                Err(ContractError::InvalidSignature)
-            } else {
-                save_authenticator(deps, *id, &auth)?;
-                Ok(())
-            }
+                &Binary::from(env.contract.address.as_bytes()).to_vec(),
+                &token,
+                &aud,
+                &sub,
+            )?;
+
+            save_authenticator(deps, *id, &auth)?;
+            Ok(())
         }
         AddAuthenticator::Secp256R1 {
             id,
@@ -218,7 +217,7 @@ pub fn add_auth_method(
                 url: (*url).clone(),
                 passkey: passkey.clone(),
             };
-            AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+            save_authenticator(deps, *id, &auth)?;
             // we replace the sent credential with the passkey for indexers and other
             // observers to see
             *(credential) = passkey;
@@ -353,6 +352,7 @@ mod tests {
                 ))
             }
             XionCustomQuery::Authenticate(_) => todo!(),
+            XionCustomQuery::JWTValidate(_) => todo!(),
         });
 
         let query_msg = XionCustomQuery::Verify(proto::QueryWebAuthNVerifyRegisterRequest {
