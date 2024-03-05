@@ -172,9 +172,9 @@ pub fn add_auth_method(
             jwt::verify(
                 deps.as_ref(),
                 &Binary::from(env.contract.address.as_bytes()).to_vec(),
-                &token,
-                &aud,
-                &sub,
+                token,
+                aud,
+                sub,
             )?;
 
             save_authenticator(deps, *id, &auth)?;
