@@ -1,10 +1,24 @@
 use crate::error::ContractResult;
 use crate::proto::{self, XionCustomQuery};
-use base64::engine::general_purpose;
 use base64::Engine as _;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::Deps;
+use cosmwasm_std::{Binary, Deps};
 use std::str;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use serde::{Deserialize, Serialize};
+use crate::error::ContractError::{InvalidSignatureDetail, InvalidToken};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    // aud: Box<[String]>, // Optional. Audience
+    // exp: u64, // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
+    // iat: u64, // Optional. Issued at (as UTC timestamp)
+    // iss: String, // Optional. Issuer
+    // nbf: u64, // Optional. Not Before (as UTC timestamp)
+    // sub: String, // Optional. Subject (whom token refers to)
+
+    transaction_hash: Binary,
+}
 
 #[cw_serde]
 struct QueryValidateJWTResponse {}
@@ -16,17 +30,33 @@ pub fn verify(
     aud: &str,
     sub: &str,
 ) -> ContractResult<bool> {
-    let challenge = general_purpose::STANDARD.encode(tx_hash);
+    // let challenge = general_purpose::STANDARD.encode(tx_hash);
 
     let query = proto::QueryValidateJWTRequest {
         aud: aud.to_string(),
         sub: sub.to_string(),
         sig_bytes: String::from_utf8(sig_bytes.into()).unwrap(),
-        tx_hash: challenge,
+        // tx_hash: challenge,
     };
 
     deps.querier
         .query::<QueryValidateJWTResponse>(&query.into())?;
 
-    Ok(true)
+    // at this point we have validated the JWT. Any custom claims on it's body
+    // can follow
+    let mut components = sig_bytes.split(|&b| b == b'.');
+    components.next().ok_or(InvalidToken)?; // ignore the header, it is not currently used
+    let payload_bytes = components.next().ok_or(InvalidToken)?;
+    let payload = URL_SAFE_NO_PAD.decode(payload_bytes)?;
+    let claims: Claims = cosmwasm_std::from_slice(payload.as_slice())?;
+
+    // make sure the provided hash matches the one from the tx
+    if tx_hash.eq(&claims.transaction_hash) {
+        Ok(true)
+    } else {
+        Err(InvalidSignatureDetail {
+            expected: URL_SAFE_NO_PAD.encode(tx_hash),
+            received: URL_SAFE_NO_PAD.encode(claims.transaction_hash),
+        })
+    }
 }
