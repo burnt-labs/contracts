@@ -16,7 +16,6 @@ struct Claims {
     // iss: String, // Optional. Issuer
     // nbf: u64, // Optional. Not Before (as UTC timestamp)
     // sub: String, // Optional. Subject (whom token refers to)
-
     transaction_hash: Binary,
 }
 
