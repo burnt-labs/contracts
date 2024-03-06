@@ -61,10 +61,37 @@ pub struct QueryWebAuthNVerifyRegisterResponse {
 #[derive(Clone, PartialEq, Eq, ::prost::Message, serde::Serialize, serde::Deserialize)]
 pub struct QueryWebAuthNVerifyAuthenticateResponse {}
 
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    ::prost::Message,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    CosmwasmExt,
+)]
+#[proto_message(type_url = "/xion.jwk.v1.Query/ValidateJWT")]
+#[proto_query(path = "/xion.jwk.v1.Query/ValidateJWT", response_type = QueryValidateJWTResponse)]
+pub struct QueryValidateJWTRequest {
+    #[prost(string, tag = "1")]
+    pub aud: String,
+    #[prost(string, tag = "2")]
+    pub sub: String,
+    #[prost(string, tag = "3")]
+    pub sig_bytes: String,
+    // #[prost(string, tag = "4")]
+    // pub tx_hash: String,
+}
+
+#[derive(Clone, PartialEq, Eq, ::prost::Message, serde::Serialize, serde::Deserialize)]
+pub struct QueryValidateJWTResponse {}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum XionCustomQuery {
     Verify(QueryWebAuthNVerifyRegisterRequest),
     Authenticate(QueryWebAuthNVerifyAuthenticateRequest),
+    JWTValidate(QueryValidateJWTRequest),
 }
 impl CustomQuery for XionCustomQuery {}
