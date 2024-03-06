@@ -1,12 +1,12 @@
+use crate::error::ContractError::{InvalidSignatureDetail, InvalidToken};
 use crate::error::ContractResult;
 use crate::proto::{self, XionCustomQuery};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Binary, Deps};
-use std::str;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::{Deserialize, Serialize};
-use crate::error::ContractError::{InvalidSignatureDetail, InvalidToken};
+use std::str;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
