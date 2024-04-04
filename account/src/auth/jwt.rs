@@ -16,7 +16,7 @@ struct Claims {
     // iss: String, // Optional. Issuer
     // nbf: u64, // Optional. Not Before (as UTC timestamp)
     // sub: String, // Optional. Subject (whom token refers to)
-    transaction_hash: Binary,
+    transaction_hash: Binary, // the only value we actually need
 }
 
 #[cw_serde]
@@ -29,13 +29,11 @@ pub fn verify(
     aud: &str,
     sub: &str,
 ) -> ContractResult<bool> {
-    // let challenge = general_purpose::STANDARD.encode(tx_hash);
 
     let query = proto::QueryValidateJWTRequest {
         aud: aud.to_string(),
         sub: sub.to_string(),
         sig_bytes: String::from_utf8(sig_bytes.into()).unwrap(),
-        // tx_hash: challenge,
     };
 
     deps.querier
