@@ -23,3 +23,6 @@ pub enum QueryMsg {
     #[returns(Binary)]
     AuthenticatorByID { id: u8 },
 }
+
+#[cw_serde]
+pub struct MigrateMsg {}

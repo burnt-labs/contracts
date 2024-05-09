@@ -1,11 +1,11 @@
-use crate::auth::secp256r1::verify;
 use crate::error::ContractError;
+use crate::{auth::secp256r1::verify, proto::XionCustomQuery};
 use cosmwasm_std::{Binary, Deps, Env};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 mod eth_crypto;
-mod jwt;
+pub mod jwt;
 pub mod passkey;
 mod secp256r1;
 mod sign_arb;
@@ -82,7 +82,7 @@ pub enum Authenticator {
 impl Authenticator {
     pub fn verify(
         &self,
-        deps: Deps,
+        deps: Deps<XionCustomQuery>,
         env: &Env,
         tx_bytes: &Binary,
         sig_bytes: &Binary,
@@ -123,13 +123,7 @@ impl Authenticator {
             }
             Authenticator::Jwt { aud, sub } => {
                 let tx_bytes_hash = util::sha256(tx_bytes);
-                return jwt::verify(
-                    &env.block.time,
-                    &tx_bytes_hash,
-                    sig_bytes.as_slice(),
-                    aud,
-                    sub,
-                );
+                jwt::verify(deps, &tx_bytes_hash, sig_bytes.as_slice(), aud, sub)
             }
             Authenticator::Secp256R1 { pubkey } => {
                 let tx_bytes_hash = util::sha256(tx_bytes);

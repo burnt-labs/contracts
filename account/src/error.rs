@@ -66,9 +66,12 @@ pub enum ContractError {
     #[error("invalid token")]
     InvalidToken,
 
+    #[error("url parse error: {url}")]
+    URLParse { url: String },
+
     #[error("r1cs synthesis error")]
     R1CS(#[from] ark_relations::r1cs::SynthesisError),
-    
+
     #[error("ark serialization error")]
     ArkSerialization(#[from] ark_serialize::SerializationError),
 

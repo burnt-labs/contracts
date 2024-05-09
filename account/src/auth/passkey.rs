@@ -1,9 +1,9 @@
 use crate::error::ContractResult;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use crate::proto::{self, XionCustomQuery};
+use base64::engine::general_purpose::{self};
 use base64::Engine;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::QueryRequest::Stargate;
-use cosmwasm_std::{to_binary, Addr, Binary, Deps};
+use cosmwasm_std::{Addr, Binary, Deps};
 
 #[cw_serde]
 struct QueryRegisterRequest {
@@ -18,19 +18,23 @@ struct QueryRegisterResponse {
     credential: Binary,
 }
 
-pub fn register(deps: Deps, addr: Addr, rp: String, data: Binary) -> ContractResult<Binary> {
-    let query = QueryRegisterRequest {
-        addr: addr.clone().into(),
-        challenge: addr.to_string(),
-        rp,
-        data,
-    };
-    let query_bz = to_binary(&query)?;
+#[cw_serde]
+struct QueryAuthenticateResponse {}
 
-    let query_response: QueryRegisterResponse = deps.querier.query(&Stargate {
-        path: "xion.v1.Query/WebAuthNVerifyRegister".to_string(),
-        data: query_bz,
-    })?;
+pub fn register(
+    deps: Deps<XionCustomQuery>,
+    addr: Addr,
+    rp: String,
+    data: Binary,
+) -> ContractResult<Binary> {
+    let query = proto::QueryWebAuthNVerifyRegisterRequest {
+        addr: addr.clone().into(),
+        challenge: Binary::from(addr.as_bytes()).to_base64(),
+        rp,
+        data: data.to_vec(),
+    };
+
+    let query_response = deps.querier.query::<QueryRegisterResponse>(&query.into())?;
 
     Ok(query_response.credential)
 }
@@ -45,28 +49,26 @@ struct QueryVerifyRequest {
 }
 
 pub fn verify(
-    deps: Deps,
+    deps: Deps<XionCustomQuery>,
     addr: Addr,
     rp: String,
     signature: &Binary,
     tx_hash: Vec<u8>,
     credential: &Binary,
 ) -> ContractResult<bool> {
-    let challenge = URL_SAFE_NO_PAD.encode(tx_hash);
+    let challenge =
+        general_purpose::URL_SAFE_NO_PAD.encode(general_purpose::STANDARD.encode(tx_hash));
 
-    let query = QueryVerifyRequest {
+    let query = proto::QueryWebAuthNVerifyAuthenticateRequest {
         addr: addr.into(),
         challenge,
         rp,
-        credential: credential.clone(),
-        data: signature.clone(),
+        credential: credential.clone().into(),
+        data: signature.clone().into(),
     };
-    let query_bz = to_binary(&query)?;
 
-    deps.querier.query(&Stargate {
-        path: "xion.v1.Query/WebAuthNVerifyAuthenticate".to_string(),
-        data: query_bz,
-    })?;
+    deps.querier
+        .query::<QueryAuthenticateResponse>(&query.into())?;
 
     Ok(true)
 }

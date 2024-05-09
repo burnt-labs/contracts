@@ -4,8 +4,10 @@ use cosmwasm_std::{
 
 use absacc::AccountSudoMsg;
 
+use crate::error::ContractError;
 use crate::execute::{add_auth_method, assert_self, remove_auth_method};
-use crate::msg::ExecuteMsg;
+use crate::msg::{ExecuteMsg, MigrateMsg};
+use crate::proto::XionCustomQuery;
 use crate::{
     error::ContractResult,
     execute,
@@ -15,17 +17,21 @@ use crate::{
 
 #[entry_point]
 pub fn instantiate(
-    deps: DepsMut,
+    deps: DepsMut<XionCustomQuery>,
     env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    execute::init(deps, env, msg.authenticator)
+    execute::init(deps, env, &mut msg.authenticator.clone())
 }
 
 #[entry_point]
-pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Response> {
+pub fn sudo(
+    deps: DepsMut<XionCustomQuery>,
+    env: Env,
+    msg: AccountSudoMsg,
+) -> ContractResult<Response> {
     match msg {
         AccountSudoMsg::BeforeTx {
             tx_bytes,
@@ -45,17 +51,18 @@ pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Resp
 
 #[entry_point]
 pub fn execute(
-    deps: DepsMut,
+    deps: DepsMut<XionCustomQuery>,
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> ContractResult<Response> {
     assert_self(&info.sender, &env.contract.address)?;
-    match msg {
+    let mut owned_msg = msg.clone();
+    match &mut owned_msg {
         ExecuteMsg::AddAuthMethod { add_authenticator } => {
             add_auth_method(deps, env, add_authenticator)
         }
-        ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, id),
+        ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, *id),
     }
 }
 
@@ -67,4 +74,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_binary(&query::authenticator_by_id(deps.storage, id)?)
         }
     }
+}
+
+#[entry_point]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    // No state migrations performed, just returned a Response
+    Ok(Response::default())
 }
