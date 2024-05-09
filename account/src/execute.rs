@@ -71,6 +71,12 @@ pub fn before_tx(
             Authenticator::Passkey { .. } => {
                 // todo: figure out if there are minimum checks for passkeys
             }
+            Authenticator::ZKEmail { .. } => {
+                // todo: need to validate this with test data
+                if sig_bytes.len() < 512 {
+                    return Err(ContractError::ShortSignature);
+                }
+            }
         }
 
         return match authenticator.verify(deps, env, tx_bytes, sig_bytes)? {

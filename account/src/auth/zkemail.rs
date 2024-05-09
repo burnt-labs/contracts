@@ -1,406 +1,370 @@
 use crate::error::ContractResult;
-use ark_bn254::{Bn254, Fq2, Fr, G1Affine, G2Affine};
-use ark_ff::MontFp;
-use ark_groth16::{prepare_verifying_key, Groth16, Proof, VerifyingKey};
+use ark_ff::{PrimeField, Zero};
 use ark_serialize::CanonicalDeserialize;
-use num_bigint::BigUint;
+use cosmwasm_std::{Binary, Deps, to_binary};
+use crate::auth::groth16::{GrothBn, GrothBnProof, GrothBnVkey, GrothFp};
+use ark_crypto_primitives::snark::SNARK;
+use base64::Engine;
+use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
+use cosmwasm_schema::cw_serde;
+use cosmwasm_std::QueryRequest::Stargate;
 
-// pub fn verify(tx_hash: &[u8], sig_bytes: &[u8], sender_sha: &[u8]) -> ContractResult<bool> {
-//     let inputs: Vec<Fr> = vec![
-//         BigUint::from_bytes_be(sender_sha).into(),
-//         BigUint::from_bytes_be(tx_hash).into(),
-//     ];
-//
-//     let proof: Proof<Bn254> = Proof::<Bn254>::deserialize_compressed(sig_bytes)?;
-//
-//     let result = verify_proof(&proof, &inputs.as_slice())?;
-//     Ok(result)
-// }
-//
-// pub fn verify_proof(proof: &Proof<Bn254>, inputs: &[Fr]) -> ContractResult<bool> {
-//     let pvk = prepare_verifying_key(&ZKEMAIL_VKEY);
-//
-//     let prepared_inputs = Groth16::<Bn254>::prepare_inputs(&pvk, &inputs)?;
-//     let valid = Groth16::<Bn254>::verify_proof_with_prepared_inputs(&pvk, proof, &prepared_inputs)?;
-//
-//     Ok(valid)
-// }
+const TX_BODY_MAX_BYTES: usize = 512;
 
-// example:
-// verifying key: VerifyingKey
-// { alpha_g1: (3356979867601361447786250792100765672957060966201052209646574323850799208344, 17466151893028561481917576307365866944963252152150943303060386471099700373321),
-// beta_g2: (QuadExtField(21218263024543095071980574661804431835196357506356218310993436390868766951199 + 13796062218209158994652583982323155623327566424755895161204490332316915808662 * u),
-// QuadExtField(20596395402083016965898773297738897303273227509265692650021121286215905798642 + 948371092641857692528403841847671247016761456674467925465155698076744134458 * u)),
-// gamma_g2: (QuadExtField(6643048986116940911703603739348127955208340778346650705610880978081114885934 + 19741466553387936890124642911046098383336120563248099816128345867428062616421 * u),
-// QuadExtField(17289696932325078390130662314603701747039235208527311312279945512013959360287 + 3989411993836723397722053030834979009156139410340969360004433874026299606012 * u)),
-// delta_g2: (QuadExtField(14774234875993971770710290569143538006539063148769716924416235358037149446461 + 4873583766605154891205385293741913379640776573540050607742387590983753688318 * u),
-// QuadExtField(1216766840628060461841621035661789636884339023431578852787542653621145391036 + 9555630967725988609403340639510498041510961936195736551906688136043158133437 * u)),
-// gamma_abc_g1: [(5897283013693239194937815581403415652229077414021523069629454957918292487157, 19604563720895493181410646714415776483462293483696470366688158935621198806925),
-// (9313804524554295846316144597967172025592331872019472144851033704024475927489, 16638710239919669134940698243329039739873422439945287884696595380532732206911),
-// (6955563120943304550237857024952629577583497623472866058049325750846857295196, 14251895385924529558323643886797141735110980773691255055208268752015561860769),
-// (19695148261523278700747810109783837707707304914622116744666595389236938108569, 20468848008649194450757575216183483878900475633293471485864914022197600454533)] }
+fn pad_bytes(bytes: &[u8], length: usize) -> Vec<u8> {
+    let mut padded = bytes.to_vec();
+    let padding = length - bytes.len();
+    for _ in 0..padding {
+        padded.push(0);
+    }
+    padded
+}
+
+fn pack_bytes_into_fields(bytes: Vec<u8>) -> Vec<GrothFp> {
+    // convert each 31 bytes into one field element
+    let mut fields = vec![];
+    bytes.chunks(31).for_each(|chunk| {
+        fields.push(GrothFp::from_le_bytes_mod_order(&chunk));
+    });
+    fields
+}
+pub fn calculate_tx_body_commitment(tx: &str) -> GrothFp {
+    let padded_tx_bytes = pad_bytes(tx.as_bytes(), TX_BODY_MAX_BYTES);
+    let tx = pack_bytes_into_fields(padded_tx_bytes);
+    let poseidon = poseidon_ark::Poseidon::new();
+    let mut commitment = GrothFp::zero(); // Initialize commitment with an initial value
+
+    tx.chunks(16).enumerate().for_each(|(i, chunk)| {
+        let chunk_commitment = poseidon.hash(chunk.to_vec()).unwrap();
+        commitment = if i == 0 {
+            chunk_commitment
+        } else {
+            poseidon.hash(vec![commitment, chunk_commitment]).unwrap()
+        };
+    });
+
+    commitment
+}
+
+#[cw_serde]
+struct QueryDomainHashRequest {
+    domain: String,
+    format: String,
+}
+
+pub fn verify(
+    deps: Deps,
+    tx_bytes: &Binary,
+    sig_bytes: &Binary,
+    vkey_bytes: &Binary,
+    email_hash: &Binary,
+    email_domain: &String,
+) -> ContractResult<bool> {
+    // vkey serialization is checked on submission
+    let vkey = GrothBnVkey::deserialize_compressed_unchecked(vkey_bytes.as_slice())?;
+    // proof submission is from the tx, we can't be sure if it was properly serialized
+    let proof = GrothBnProof::deserialize_compressed(sig_bytes.as_slice())?;
+
+    // inputs are tx body, email hash, and dmarc key hash
+    let mut inputs: [GrothFp; 3] = [GrothFp::zero(); 3];
+
+    // tx body input
+    let tx_input = calculate_tx_body_commitment(URL_SAFE_NO_PAD.encode(tx_bytes).as_str());
+    inputs[0] = tx_input;
+
+    // email hash input, compressed at authenticator registration
+    let email_hash_input = GrothFp::deserialize_compressed_unchecked(email_hash.as_slice())?;
+    inputs[1] = email_hash_input;
+
+    // dns key hash input
+    // todo
+    let query = QueryDomainHashRequest {
+        domain: email_domain.into(),
+        format: "poseidon".into(),
+    };
+    let query_bz = to_binary(&query)?;
+    deps.querier.query(&Stargate {
+        path: "xion.v1.Query/EmailDomainPubkeyHash".to_string(),
+        data: query_bz,
+    })?;
+
+    let verified = GrothBn::verify(&vkey, inputs.as_slice(), &proof)?;
+
+    Ok(verified)
+}
 
 #[cfg(test)]
 mod tests {
-    use ark_bn254::{Bn254, Fq2, G1Affine, G2Affine};
-    use ark_circom::{CircomBuilder, CircomConfig};
-    use ark_crypto_primitives::snark::SNARK;
-    use ark_ff::MontFp;
-    use ark_groth16::{prepare_verifying_key, Groth16, VerifyingKey};
-    use ark_std::rand::thread_rng;
-    use mail_auth::{AuthenticatedMessage, DkimResult, Resolver};
-    use num_bigint::BigUint;
-    use std::{env, fs};
+    use ark_bn254::{Fq2, G1Affine, G2Affine};
+    use ark_groth16::{Proof, VerifyingKey};
+    use crate::auth::groth16::{GrothBn, GrothBnProof, GrothBnVkey, GrothFp};
+    use crate::auth::zkemail::{calculate_tx_body_commitment, pack_bytes_into_fields, pad_bytes, QueryDomainHashRequest};
+    use ark_ff::Fp;
+    use serde::Deserialize;
+    use std::fs;
+    use std::ops::Deref;
+    use std::str::FromStr;
+    use ark_serialize::CanonicalSerialize;
+    use base64::Engine;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use cosmwasm_std::{Binary, to_binary};
+    use cosmwasm_std::QueryRequest::Stargate;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, MockQuerier};
+    use crate::auth::Authenticator::ZKEmail;
 
-    type GrothBn = Groth16<Bn254>;
 
-    #[test]
-    fn test_verify() {
-        let zkemail_vkey: VerifyingKey<Bn254> = VerifyingKey {
-            alpha_g1: G1Affine {
-                x: MontFp!("20491192805390485299153009773594534940189261866228447918068658471970481763042"),
-                y: MontFp!("9383485363053290200918347156157836566562967994039712273449902621266178545958"),
-                infinity: false,
-            },
-            beta_g2: G2Affine {
-                x: Fq2::new(
-                    MontFp!("4252822878758300859123897981450591353533073413197771768651442665752259397132"),
-                    MontFp!("6375614351688725206403948262868962793625744043794305715222011528459656738731"),
-                ),
-                y: Fq2::new(
-                    MontFp!(
-                "21847035105528745403288232691147584728191162732299865338377159692350059136679"
-            ),
-                    MontFp!(
-                "10505242626370262277552901082094356697409835680220590971873171140371331206856"
-            ),
-                ),
-                infinity: false,
-            },
-            gamma_g2: G2Affine {
-                x: Fq2::new(
-                    MontFp!(
-                "11559732032986387107991004021392285783925812861821192530917403151452391805634"
-            ),
-                    MontFp!(
-                "10857046999023057135944570762232829481370756359578518086990519993285655852781"
-            ),
-                ),
-                y: Fq2::new(
-                    MontFp!("4082367875863433681332203403145435568316851327593401208105741076214120093531"),
-                    MontFp!("8495653923123431417604973247489272438418190587263600148770280649306958101930"),
-                ),
-                infinity: false,
-            },
-            delta_g2: G2Affine {
-                x: Fq2::new(
-                    MontFp!("4782157439742382637611488310990600750378115715024578839598927796233083588816"),
-                    MontFp!(
-                "21724796460184090870159661465386313943414917233706810578219572016270214089397"
-            ),
-                ),
-                y: Fq2::new(
-                    MontFp!(
-                "19648160794307550079526537691394455742677186060862984481182460976422044099985"
-            ),
-                    MontFp!("1170304743371924120332631282376765817900929093539433137000160569290112097299"),
-                ),
-                infinity: false,
-            },
-            gamma_abc_g1: vec![
-                G1Affine {
-                    x: MontFp!(
-                "6859010054331630848468967083765435436493863384569969274721848726225977202221"
-            ),
-                    y: MontFp!(
-                "10242300017406806193161834793403901820179996281216190152651296265739614552868"
-            ),
-                    infinity: false,
-                },
-                G1Affine {
-                    x: MontFp!(
-                "13813406490863084206092938061446900717080325405654970574069607640148570522692"
-            ),
-                    y: MontFp!(
-                "17739983704483777721661152271094003122106524171755597673058690749028752371458"
-            ),
-                    infinity: false,
-                },
-                G1Affine {
-                    x: MontFp!(
-                "16328132342858671503433789165066881660930288980972396083606820665099615669139"
-            ),
-                    y: MontFp!(
-                "10872967553924581626488061473226012036184917513404207708716578569944518666845"
-            ),
-                    infinity: false,
-                },
-                G1Affine {
-                    x: MontFp!(
-                "19819018003805484970826899312120056423674066969815841428396605364330979173973"
-            ),
-                    y: MontFp!(
-                "19282358028712194861762875908057285798796179924442560793811014687897560619630"
-            ),
-                    infinity: false,
-                },
-            ],
-        };
-        println!("verifying key: {:?}", zkemail_vkey);
+    const EMAIL_MAX_BYTES: usize = 256;
 
-        let pvk = prepare_verifying_key(&zkemail_vkey);
-
-        // let prepared_inputs = Groth16::<Bn254>::prepare_inputs(&pvk, &inputs)?;
-        // let valid =
-        //     Groth16::<Bn254>::verify_proof_with_prepared_inputs(&pvk, proof, &prepared_inputs)?;
+    pub fn calculate_email_commitment(salt: &str, email: &str) -> GrothFp {
+        let padded_salt_bytes = pad_bytes(salt.as_bytes(), 31);
+        let padded_email_bytes = pad_bytes(email.as_bytes(), EMAIL_MAX_BYTES);
+        let mut salt = pack_bytes_into_fields(padded_salt_bytes);
+        let email = pack_bytes_into_fields(padded_email_bytes);
+        salt.extend(email);
+        let poseidon = poseidon_ark::Poseidon::new();
+        poseidon.hash(salt).unwrap()
     }
+
+    #[derive(Debug, Deserialize)]
+    struct SnarkJsProof {
+        pi_a: [String; 3],
+        pi_b: [[String; 2]; 3],
+        pi_c: [String; 3],
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct SnarkJsVkey {
+        vk_alpha_1: [String; 3],
+        vk_beta_2: [[String; 2]; 3],
+        vk_gamma_2: [[String; 2]; 3],
+        vk_delta_2: [[String; 2]; 3],
+        IC: Vec<[String; 3]>,
+    }
+
+    #[derive(Debug)]
+    pub struct PublicInputs<const N: usize> {
+        inputs: [GrothFp; N],
+    }
+
+    pub trait JsonDecoder {
+        fn from_json(json: &str) -> Self;
+        fn from_json_file(file_path: &str) -> Self
+            where
+                Self: Sized,
+        {
+            let json = fs::read_to_string(file_path).unwrap();
+            Self::from_json(&json)
+        }
+    }
+
+    impl JsonDecoder for GrothBnProof {
+        fn from_json(json: &str) -> Self {
+            let snarkjs_proof: SnarkJsProof = serde_json::from_str(json).unwrap();
+            let a = G1Affine {
+                x: Fp::from_str(snarkjs_proof.pi_a[0].as_str()).unwrap(),
+                y: Fp::from_str(snarkjs_proof.pi_a[1].as_str()).unwrap(),
+                infinity: false,
+            };
+            let b = G2Affine {
+                x: Fq2::new(
+                    Fp::from_str(snarkjs_proof.pi_b[0][0].as_str()).unwrap(),
+                    Fp::from_str(snarkjs_proof.pi_b[0][1].as_str()).unwrap(),
+                ),
+                y: Fq2::new(
+                    Fp::from_str(snarkjs_proof.pi_b[1][0].as_str()).unwrap(),
+                    Fp::from_str(snarkjs_proof.pi_b[1][1].as_str()).unwrap(),
+                ),
+                infinity: false,
+            };
+            let c = G1Affine {
+                x: Fp::from_str(snarkjs_proof.pi_c[0].as_str()).unwrap(),
+                y: Fp::from_str(snarkjs_proof.pi_c[1].as_str()).unwrap(),
+                infinity: false,
+            };
+            Proof { a, b, c }
+        }
+    }
+
+    impl JsonDecoder for GrothBnVkey {
+        fn from_json(json: &str) -> Self {
+            let snarkjs_vkey: SnarkJsVkey = serde_json::from_str(json).unwrap();
+            let vk_alpha_1 = G1Affine {
+                x: Fp::from_str(snarkjs_vkey.vk_alpha_1[0].as_str()).unwrap(),
+                y: Fp::from_str(snarkjs_vkey.vk_alpha_1[1].as_str()).unwrap(),
+                infinity: false,
+            };
+            let vk_beta_2 = G2Affine {
+                x: Fq2::new(
+                    Fp::from_str(snarkjs_vkey.vk_beta_2[0][0].as_str()).unwrap(),
+                    Fp::from_str(snarkjs_vkey.vk_beta_2[0][1].as_str()).unwrap(),
+                ),
+                y: Fq2::new(
+                    Fp::from_str(snarkjs_vkey.vk_beta_2[1][0].as_str()).unwrap(),
+                    Fp::from_str(snarkjs_vkey.vk_beta_2[1][1].as_str()).unwrap(),
+                ),
+                infinity: false,
+            };
+            let vk_gamma_2 = G2Affine {
+                x: Fq2::new(
+                    Fp::from_str(snarkjs_vkey.vk_gamma_2[0][0].as_str()).unwrap(),
+                    Fp::from_str(snarkjs_vkey.vk_gamma_2[0][1].as_str()).unwrap(),
+                ),
+                y: Fq2::new(
+                    Fp::from_str(snarkjs_vkey.vk_gamma_2[1][0].as_str()).unwrap(),
+                    Fp::from_str(snarkjs_vkey.vk_gamma_2[1][1].as_str()).unwrap(),
+                ),
+                infinity: false,
+            };
+            let vk_delta_2 = G2Affine {
+                x: Fq2::new(
+                    Fp::from_str(snarkjs_vkey.vk_delta_2[0][0].as_str()).unwrap(),
+                    Fp::from_str(snarkjs_vkey.vk_delta_2[0][1].as_str()).unwrap(),
+                ),
+                y: Fq2::new(
+                    Fp::from_str(snarkjs_vkey.vk_delta_2[1][0].as_str()).unwrap(),
+                    Fp::from_str(snarkjs_vkey.vk_delta_2[1][1].as_str()).unwrap(),
+                ),
+                infinity: false,
+            };
+
+            let ic = snarkjs_vkey
+                .IC
+                .iter()
+                .map(|ic| G1Affine {
+                    x: Fp::from_str(ic[0].as_str()).unwrap(),
+                    y: Fp::from_str(ic[1].as_str()).unwrap(),
+                    infinity: false,
+                })
+                .collect();
+
+            VerifyingKey {
+                alpha_g1: vk_alpha_1,
+                beta_g2: vk_beta_2,
+                gamma_g2: vk_gamma_2,
+                delta_g2: vk_delta_2,
+                gamma_abc_g1: ic,
+            }
+        }
+    }
+
+    impl<const N: usize> JsonDecoder for PublicInputs<N> {
+        fn from_json(json: &str) -> Self {
+            let inputs: Vec<String> = serde_json::from_str(json).unwrap();
+            let inputs: Vec<GrothFp> = inputs
+                .iter()
+                .map(|input| Fp::from_str(input).unwrap())
+                .collect();
+            Self {
+                inputs: inputs.try_into().unwrap(),
+            }
+        }
+    }
+
+    impl<const N: usize> PublicInputs<N> {
+        pub fn from(inputs: [&str; N]) -> Self {
+            let inputs: Vec<GrothFp> = inputs
+                .iter()
+                .map(|input| Fp::from_str(input).unwrap())
+                .collect();
+            Self {
+                inputs: inputs.try_into().unwrap(),
+            }
+        }
+    }
+
+    impl<const N: usize> Deref for PublicInputs<N> {
+        type Target = [GrothFp];
+
+        fn deref(&self) -> &Self::Target {
+            &self.inputs
+        }
+    }
+
+
     #[test]
-    fn test_proof() {
-        let path = env::current_dir().unwrap();
-        println!("cwd: {}", path.as_path().to_str().unwrap());
+    fn should_verify_body_proof() {
+        assert_verification(
+            "tests/data/body/vkey.json",
+            "tests/data/body/proof.json",
+            "tests/data/body/public.json",
+        );
+    }
 
-        // DKIM verification
-        let email = fs::read("./src/auth/test-vectors/zktestemail_twitter.eml").unwrap();
+    #[test]
+    fn should_verify_header_proof() {
+        assert_verification(
+            "tests/data/subject/vkey.json",
+            "tests/data/subject/proof.json",
+            "tests/data/subject/public.json",
+        );
+    }
 
-        // Create a resolver using Cloudflare DNS
-        let resolver = Resolver::new_google().unwrap();
-        println!("dns resolver created");
+    fn assert_verification(
+        vkey_json_path: &str,
+        proof_json_path: &str,
+        public_inputs_json_path: &str,
+    ) {
+        const SALT: &str = "XRhMS5Nc2dTZW5kEpAB";
+        const EMAIL: &str = "thezdev1@gmail.com";
+        const TX: &str = "CrQBCrEBChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEpABCj94aW9uMWd2cDl5djZndDBwcmdzc3\
+        ZueWNudXpnZWszZmtyeGxsZnhxaG0wNzYwMmt4Zmc4dXI2NHNuMnAycDkSP3hpb24xNGNuMG40ZjM4ODJzZ3B2NWQ5ZzA2dzNxN3hzZ\
+        m51N3B1enltZDk5ZTM3ZHAwemQ4bTZscXpwemwwbRoMCgV1eGlvbhIDMTAwEmEKTQpDCh0vYWJzdHJhY3RhY2NvdW50LnYxLk5pbFB1\
+        YktleRIiCiBDAlIzSFvCNEIMmTE+CRm0U2Gb/0mBfb/aeqxkoPweqxIECgIIARh/EhAKCgoFdXhpb24SATAQwJoMGg54aW9uLXRlc3R\
+        uZXQtMSCLjAo=";
 
-        // Parse message
-        let authenticated_message = AuthenticatedMessage::parse(email.as_slice()).unwrap();
+        let vkey = GrothBnVkey::from_json_file(vkey_json_path);
+        let mut vkey_serialized = Vec::new();
+        vkey.serialize_compressed(&mut vkey_serialized).unwrap();
+        let proof = GrothBnProof::from_json_file(proof_json_path);
+        let mut proof_serialized = Vec::new();
+        proof.serialize_compressed(&mut proof_serialized).unwrap();
 
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
+        let public_inputs: PublicInputs<3> = PublicInputs::from_json_file(public_inputs_json_path);
 
-        let dkim_results =
-            rt.block_on(async { resolver.verify_dkim(&authenticated_message).await });
+        let mut domain_key_hash = Vec::new();
+        public_inputs.inputs[2].serialize_compressed(&mut domain_key_hash).unwrap();
 
-        // Make sure all signatures passed verification
-        assert!(dkim_results.iter().all(|s| s.result() == &DkimResult::Pass));
-        println!("email DKIM validated");
+        let email_hash = calculate_email_commitment(SALT, EMAIL);
+        let mut email_hash_serialized = Vec::new();
+        email_hash.serialize_compressed(&mut email_hash_serialized).unwrap();
 
-        // Load the WASM and R1CS for witness and proof generation
-        let cfg = match CircomConfig::<Bn254>::new(
-            "./src/auth/test-vectors/twitter.wasm",
-            "./src/auth/test-vectors/twitter.r1cs",
-        ) {
-            Ok(x) => x,
-            Err(e) => panic!("err: {}", e),
+        let authenticator = ZKEmail {
+            vkey: Binary::from(vkey_serialized),
+            email_hash: Binary::from(email_hash_serialized),
+            email_domain: "gmail.com".to_string(),
         };
-        println!("circom config built");
 
-        // following code is based on circom-compat example, except for custom
-        // inputs
-        let dkim_result = dkim_results.first().unwrap();
-        let signature = dkim_result.signature().unwrap();
-        let mut builder = CircomBuilder::new(cfg);
-        let in_padded = [
-            100, 97, 116, 101, 58, 70, 114, 105, 44, 32, 49, 55, 32, 78, 111, 118, 32, 50, 48, 50,
-            51, 32, 49, 56, 58, 53, 49, 58, 53, 49, 32, 43, 48, 48, 48, 48, 13, 10, 102, 114, 111,
-            109, 58, 84, 119, 105, 116, 116, 101, 114, 32, 60, 105, 110, 102, 111, 64, 120, 46, 99,
-            111, 109, 62, 13, 10, 116, 111, 58, 122, 107, 95, 112, 114, 97, 99, 116, 105, 99, 101,
-            32, 60, 122, 107, 101, 109, 97, 105, 108, 118, 101, 114, 105, 102, 121, 64, 103, 109,
-            97, 105, 108, 46, 99, 111, 109, 62, 13, 10, 115, 117, 98, 106, 101, 99, 116, 58, 80,
-            97, 115, 115, 119, 111, 114, 100, 32, 114, 101, 115, 101, 116, 32, 114, 101, 113, 117,
-            101, 115, 116, 13, 10, 109, 105, 109, 101, 45, 118, 101, 114, 115, 105, 111, 110, 58,
-            49, 46, 48, 13, 10, 99, 111, 110, 116, 101, 110, 116, 45, 116, 121, 112, 101, 58, 109,
-            117, 108, 116, 105, 112, 97, 114, 116, 47, 97, 108, 116, 101, 114, 110, 97, 116, 105,
-            118, 101, 59, 32, 98, 111, 117, 110, 100, 97, 114, 121, 61, 34, 45, 45, 45, 45, 61, 95,
-            80, 97, 114, 116, 95, 49, 53, 54, 48, 56, 53, 50, 54, 95, 49, 55, 50, 56, 55, 52, 53,
-            49, 53, 53, 46, 49, 55, 48, 48, 50, 52, 55, 49, 49, 49, 49, 51, 55, 34, 13, 10, 109,
-            101, 115, 115, 97, 103, 101, 45, 105, 100, 58, 60, 68, 54, 46, 54, 67, 46, 49, 54, 55,
-            48, 55, 46, 55, 52, 54, 66, 55, 53, 53, 54, 64, 120, 46, 99, 111, 109, 62, 13, 10, 100,
-            107, 105, 109, 45, 115, 105, 103, 110, 97, 116, 117, 114, 101, 58, 118, 61, 49, 59, 32,
-            97, 61, 114, 115, 97, 45, 115, 104, 97, 50, 53, 54, 59, 32, 99, 61, 114, 101, 108, 97,
-            120, 101, 100, 47, 114, 101, 108, 97, 120, 101, 100, 59, 32, 100, 61, 120, 46, 99, 111,
-            109, 59, 32, 115, 61, 100, 107, 105, 109, 45, 50, 48, 50, 51, 48, 56, 59, 32, 116, 61,
-            49, 55, 48, 48, 50, 52, 55, 49, 49, 49, 59, 32, 98, 104, 61, 89, 86, 48, 48, 77, 72,
-            104, 74, 117, 120, 50, 50, 113, 71, 122, 105, 70, 87, 83, 70, 98, 66, 88, 90, 50, 87,
-            49, 84, 102, 88, 116, 81, 111, 117, 99, 104, 84, 106, 114, 66, 87, 106, 89, 61, 59, 32,
-            104, 61, 68, 97, 116, 101, 58, 70, 114, 111, 109, 58, 84, 111, 58, 83, 117, 98, 106,
-            101, 99, 116, 58, 77, 73, 77, 69, 45, 86, 101, 114, 115, 105, 111, 110, 58, 67, 111,
-            110, 116, 101, 110, 116, 45, 84, 121, 112, 101, 58, 77, 101, 115, 115, 97, 103, 101,
-            45, 73, 68, 59, 32, 98, 61, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 112,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ];
-        for (arg) in in_padded {
-            builder.push_input("in_padded", arg);
-        }
-        let pubkey: [i128; 17] = [
-            2042675158572422735167009601580549693,
-            2318426925121163447366268266877478490,
-            1147774667595934040844400996565450529,
-            2585846613753899425173314975383472766,
-            1729550870628631316824527689749144826,
-            1409688764733787577291119235590636170,
-            2653526314989005305308617746718530524,
-            737602834602272445014721319074990651,
-            1108223552850320351953361145401433110,
-            196998911671740026740284042198980922,
-            1810975214051689602006218559773860466,
-            1356973725008685867134185890101517745,
-            1741745429950802523929336578157878155,
-            322242294656712334589977633789887989,
-            1317445847036079731092233939335794482,
-            1737308978482248574701598258817218345,
-            3883364526267798178367189328134785,
-        ];
-        for (arg) in pubkey {
-            builder.push_input("pubkey", arg);
-        }
-        let signature: [i128; 17] = [
-            529834604509754850595508656992419865,
-            1629469343170663192087410736724684367,
-            1600525007903484858329401189662213832,
-            2441039263450645986747514031279933025,
-            1426674673335967544425507480324577168,
-            886793942697511702562028028021716360,
-            1921011448276151646591898225205032241,
-            2285834333812589993741008552286552035,
-            621681251573727179081349782528225506,
-            499001467539964221497775295161226543,
-            502484980229794631572306655831669405,
-            1841792681133411851335819775926210819,
-            142817933076936377527957632587554343,
-            2387494701636359599766695286093619725,
-            2395164734208042411756144940389364864,
-            984536717009574261676938042991458952,
-            3585461764930419187635376787606689,
-        ];
-        for (arg) in signature {
-            builder.push_input("signature", arg);
-        }
-        builder.push_input("in_len_padded_bytes", 512);
-        let precomputed_sha = [
-            84, 127, 138, 246, 180, 138, 171, 130, 4, 229, 199, 129, 81, 163, 14, 26, 13, 116, 50,
-            195, 55, 235, 65, 220, 219, 107, 155, 204, 207, 252, 105, 35,
-        ];
-        for (arg) in precomputed_sha {
-            builder.push_input("precomputed_sha", arg);
-        }
-        builder.push_input("body_hash_idx", 385);
-        let in_body_padded = [
-            119, 101, 98, 107, 105, 116, 61, 13, 10, 45, 102, 111, 110, 116, 45, 115, 109, 111,
-            111, 116, 104, 105, 110, 103, 58, 97, 110, 116, 105, 97, 108, 105, 97, 115, 101, 100,
-            59, 34, 62, 32, 84, 104, 105, 115, 32, 101, 109, 97, 105, 108, 32, 119, 97, 115, 32,
-            109, 101, 97, 110, 116, 32, 102, 111, 114, 32, 64, 122, 107, 116, 101, 115, 116, 101,
-            109, 97, 105, 108, 32, 60, 47, 115, 112, 97, 110, 61, 13, 10, 62, 32, 60, 47, 116, 100,
-            62, 13, 10, 60, 47, 116, 114, 62, 13, 10, 60, 116, 114, 62, 13, 10, 60, 116, 100, 32,
-            104, 101, 105, 103, 104, 116, 61, 51, 68, 34, 54, 34, 32, 115, 116, 121, 108, 101, 61,
-            51, 68, 34, 104, 101, 105, 103, 104, 116, 58, 54, 112, 120, 59, 108, 105, 110, 101, 45,
-            104, 101, 105, 103, 104, 116, 58, 49, 112, 120, 59, 102, 111, 110, 116, 45, 115, 105,
-            122, 101, 58, 49, 112, 120, 59, 112, 97, 100, 100, 105, 110, 103, 58, 61, 13, 10, 48,
-            59, 109, 97, 114, 103, 105, 110, 58, 48, 59, 108, 105, 110, 101, 45, 104, 101, 105,
-            103, 104, 116, 58, 49, 112, 120, 59, 102, 111, 110, 116, 45, 115, 105, 122, 101, 58,
-            49, 112, 120, 59, 34, 62, 60, 47, 116, 100, 62, 13, 10, 60, 47, 116, 114, 62, 13, 10,
-            60, 116, 114, 62, 13, 10, 60, 116, 100, 32, 97, 108, 105, 103, 110, 61, 51, 68, 34, 99,
-            101, 110, 116, 101, 114, 34, 32, 115, 116, 121, 108, 101, 61, 51, 68, 34, 112, 97, 100,
-            100, 105, 110, 103, 58, 48, 59, 109, 97, 114, 103, 105, 110, 58, 48, 59, 108, 105, 110,
-            101, 45, 104, 101, 105, 103, 104, 116, 58, 49, 112, 120, 59, 102, 111, 110, 116, 45,
-            115, 105, 122, 101, 58, 61, 13, 10, 49, 112, 120, 59, 34, 62, 32, 60, 115, 112, 97,
-            110, 32, 99, 108, 97, 115, 115, 61, 51, 68, 34, 97, 100, 100, 114, 101, 115, 115, 34,
-            62, 32, 60, 97, 32, 104, 114, 101, 102, 61, 51, 68, 34, 35, 34, 32, 115, 116, 121, 108,
-            101, 61, 51, 68, 34, 116, 101, 120, 116, 45, 100, 101, 99, 111, 114, 97, 116, 105, 111,
-            110, 58, 110, 111, 110, 101, 61, 13, 10, 59, 98, 111, 114, 100, 101, 114, 45, 115, 116,
-            121, 108, 101, 58, 110, 111, 110, 101, 59, 98, 111, 114, 100, 101, 114, 58, 48, 59,
-            112, 97, 100, 100, 105, 110, 103, 58, 48, 59, 109, 97, 114, 103, 105, 110, 58, 48, 59,
-            102, 111, 110, 116, 45, 102, 97, 109, 105, 108, 121, 58, 39, 72, 101, 108, 118, 101,
-            116, 105, 99, 97, 78, 101, 117, 101, 39, 44, 61, 13, 10, 32, 39, 72, 101, 108, 118,
-            101, 116, 105, 99, 97, 32, 78, 101, 117, 101, 39, 44, 32, 72, 101, 108, 118, 101, 116,
-            105, 99, 97, 44, 32, 65, 114, 105, 97, 108, 44, 32, 115, 97, 110, 115, 45, 115, 101,
-            114, 105, 102, 59, 45, 119, 101, 98, 107, 105, 116, 45, 102, 111, 110, 116, 45, 115,
-            109, 111, 111, 116, 104, 105, 110, 103, 58, 97, 110, 116, 105, 61, 13, 10, 97, 108,
-            105, 97, 115, 101, 100, 59, 99, 111, 108, 111, 114, 58, 35, 56, 56, 57, 57, 65, 54, 59,
-            102, 111, 110, 116, 45, 115, 105, 122, 101, 58, 49, 50, 112, 120, 59, 112, 97, 100,
-            100, 105, 110, 103, 58, 48, 112, 120, 59, 109, 97, 114, 103, 105, 110, 58, 48, 112,
-            120, 59, 102, 111, 110, 116, 45, 119, 101, 105, 103, 104, 116, 58, 110, 111, 114, 61,
-            13, 10, 109, 97, 108, 59, 108, 105, 110, 101, 45, 104, 101, 105, 103, 104, 116, 58, 49,
-            50, 112, 120, 59, 99, 117, 114, 115, 111, 114, 58, 100, 101, 102, 97, 117, 108, 116,
-            59, 34, 62, 88, 32, 67, 111, 114, 112, 46, 32, 49, 51, 53, 53, 32, 77, 97, 114, 107,
-            101, 116, 32, 83, 116, 114, 101, 101, 116, 44, 32, 83, 117, 105, 116, 101, 32, 57, 48,
-            48, 61, 13, 10, 32, 83, 97, 110, 32, 70, 114, 97, 110, 99, 105, 115, 99, 111, 44, 32,
-            67, 65, 32, 57, 52, 49, 48, 51, 60, 47, 97, 62, 32, 60, 47, 115, 112, 97, 110, 62, 32,
-            60, 47, 116, 100, 62, 13, 10, 60, 47, 116, 114, 62, 13, 10, 60, 116, 114, 62, 13, 10,
-            60, 116, 100, 32, 104, 101, 105, 103, 104, 116, 61, 51, 68, 34, 55, 50, 34, 32, 115,
-            116, 121, 108, 101, 61, 51, 68, 34, 104, 101, 105, 103, 104, 116, 58, 55, 50, 112, 120,
-            59, 112, 97, 100, 100, 105, 110, 103, 58, 48, 59, 109, 97, 114, 103, 105, 110, 58, 48,
-            59, 108, 105, 110, 101, 45, 104, 101, 105, 103, 104, 116, 58, 49, 112, 120, 59, 102,
-            61, 13, 10, 111, 110, 116, 45, 115, 105, 122, 101, 58, 49, 112, 120, 59, 34, 62, 60,
-            47, 116, 100, 62, 13, 10, 60, 47, 116, 114, 62, 13, 10, 60, 47, 116, 98, 111, 100, 121,
-            62, 13, 10, 60, 47, 116, 97, 98, 108, 101, 62, 13, 10, 60, 33, 45, 45, 47, 47, 47, 47,
-            47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 32, 101, 110, 100,
-            32, 102, 111, 111, 116, 101, 114, 32, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47,
-            47, 47, 47, 47, 47, 47, 47, 47, 47, 45, 45, 62, 32, 60, 47, 116, 100, 62, 13, 10, 60,
-            47, 116, 114, 62, 13, 10, 60, 47, 116, 98, 111, 100, 121, 62, 13, 10, 60, 47, 116, 97,
-            98, 108, 101, 62, 13, 10, 60, 47, 98, 111, 100, 121, 62, 13, 10, 60, 47, 104, 116, 109,
-            108, 62, 13, 10, 45, 45, 45, 45, 45, 45, 61, 95, 80, 97, 114, 116, 95, 49, 53, 54, 48,
-            56, 53, 50, 54, 95, 49, 55, 50, 56, 55, 52, 53, 49, 53, 53, 46, 49, 55, 48, 48, 50, 52,
-            55, 49, 49, 49, 49, 51, 55, 45, 45, 13, 10, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 1, 187, 80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ];
-        for (arg) in in_body_padded {
-            builder.push_input("in_body_padded", arg);
-        }
-        builder.push_input("in_body_len_padded_bytes", 1088);
-        builder.push_input("twitter_username_idx", 66);
-        builder.push_input("address", 0);
+        let tx_bytes = URL_SAFE_NO_PAD.decode(TX).unwrap();
 
-        // Create an empty instance for setting it up
-        let circom = builder.setup();
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let querier = MockQuerier::new(&[]);
+        let query = QueryDomainHashRequest {
+            domain: "gmail.com".into(),
+            format: "poseidon".into(),
+        };
+        let query_bz = to_binary(&query)?;
 
-        // Run a trusted setup
-        let mut rng = thread_rng();
-        let params = GrothBn::generate_random_parameters_with_reduction(circom, &mut rng).unwrap();
-        println!("trusted setup built\nverifying key: {:?}", params.vk);
+        querier.handle_query(&Stargate {
+            path: "xion.v1.Query/EmailDomainPubkeyHash".to_string(),
+            data: query_bz,
+        });
+        querier.with_custom_handler(() => )
+        deps.querier = querier;
 
-        // Get the populated instance of the circuit with the witness
-        let circom = builder.build().unwrap();
-        println!("circuit built");
+        let result = authenticator.verify(
+            deps.as_ref(),
+            &env.clone(),
+            &Binary::from_base64(TX).unwrap(),
+            &Binary::from(proof_serialized),
+        );
 
-        let inputs = circom.get_public_inputs().unwrap();
-        println!("inputs: {:?}", inputs);
+        let verified = GrothBn::verify(&vkey, &public_inputs, &proof).unwrap();
+        let email_commitment = calculate_email_commitment(SALT, EMAIL);
+        let tx_body_commitment = calculate_tx_body_commitment(TX);
 
-        // Generate the proof
-        let proof = GrothBn::prove(&params, circom, &mut rng).unwrap();
-        println!("proof: {:?}", proof);
-
-        // Check that the proof is valid
-        let pvk = GrothBn::process_vk(&params.vk).unwrap();
-        let verified = GrothBn::verify_with_processed_vk(&pvk, &inputs, &proof).unwrap();
         assert!(verified);
+        assert_eq!(public_inputs[0], tx_body_commitment);
+        assert_eq!(public_inputs[1], email_commitment);
     }
 }
