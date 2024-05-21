@@ -20,7 +20,15 @@ struct Claims {
 }
 
 #[cw_serde]
-struct QueryValidateJWTResponse {}
+struct PrivateClaims {
+    key: String,
+    value: String,
+}
+#[cw_serde]
+#[allow(non_snake_case)]
+struct QueryValidateJWTResponse {
+    privateClaims: Vec<PrivateClaims>,
+}
 
 pub fn verify(
     deps: Deps<XionCustomQuery>,
