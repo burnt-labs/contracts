@@ -33,7 +33,7 @@ futures = "0.3.29"
 async-trait = "0.1.74"
 prost = {version = "0.11.2", default-features = false, features = ["prost-derive"]}
 osmosis-std-derive = "0.13.2"
-num-bigint = "0.4.4"
+#num-bigint = "0.4.5"
 
 # zk deps
 ark-crypto-primitives = { version = "=0.4.0" }
@@ -44,5 +44,6 @@ ark-bn254 = { version = "=0.4.0" }
 ark-groth16 = { version = "=0.4.0", default-features = false }
 ark-relations = { version = "=0.4.0", default-features = false }
 ark-serialize = { version = "=0.4.2", default-features = false }
-ark-poly = { version = "0.4.1", default-features = false }
+ark-poly = { version = "=0.4.2", default-features = false }
+ark-circom = { git = "https://github.com/mvid/circom-compat" }
 poseidon-ark = {git = "https://github.com/arnaucube/poseidon-ark"}

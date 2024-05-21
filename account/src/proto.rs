@@ -1,7 +1,9 @@
-use cosmwasm_std::CustomQuery;
+use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage};
+use cosmwasm_std::{CustomQuery, OwnedDeps};
 use osmosis_std_derive::CosmwasmExt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 
 #[derive(
     Clone,
@@ -87,11 +89,39 @@ pub struct QueryValidateJWTRequest {
 #[derive(Clone, PartialEq, Eq, ::prost::Message, serde::Serialize, serde::Deserialize)]
 pub struct QueryValidateJWTResponse {}
 
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    ::prost::Message,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    CosmwasmExt,
+)]
+#[proto_message(type_url = "/xion.v1.Query/DomainInfo")]
+#[proto_query(path = "/xion.v1.Query/DomainInfo", response_type = QueryDomainInfoResponse)]
+pub struct QueryDomainInfoRequest {
+    #[prost(string, tag = "1")]
+    pub domain: String,
+    #[prost(string, tag = "2")]
+    pub format: String,
+}
+
+#[derive(Clone, PartialEq, Eq, ::prost::Message, serde::Serialize, serde::Deserialize)]
+pub struct QueryDomainInfoResponse {
+    #[prost(string, tag = "1")]
+    pub domain: String,
+    #[prost(string, tag = "2")]
+    pub info: String,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum XionCustomQuery {
     Verify(QueryWebAuthNVerifyRegisterRequest),
     Authenticate(QueryWebAuthNVerifyAuthenticateRequest),
     JWTValidate(QueryValidateJWTRequest),
+    DomainInfo(QueryDomainInfoRequest),
 }
 impl CustomQuery for XionCustomQuery {}

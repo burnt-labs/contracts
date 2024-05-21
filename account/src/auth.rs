@@ -5,13 +5,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 mod eth_crypto;
+mod groth16;
 pub mod jwt;
 pub mod passkey;
 mod secp256r1;
 mod sign_arb;
 pub mod util;
-mod zkemail;
-mod groth16;
+pub(crate) mod zkemail;
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub enum AddAuthenticator {
@@ -51,7 +51,8 @@ pub enum AddAuthenticator {
         vkey: Binary,
         email_hash: Binary,
         email_domain: String,
-    }
+        proof: Binary,
+    },
 }
 
 impl AddAuthenticator {
@@ -70,13 +71,31 @@ impl AddAuthenticator {
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub enum Authenticator {
-    Secp256K1 { pubkey: Binary },
-    Ed25519 { pubkey: Binary },
-    EthWallet { address: String },
-    Jwt { aud: String, sub: String },
-    Secp256R1 { pubkey: Binary },
-    Passkey { url: String, passkey: Binary },
-    ZKEmail { vkey: Binary, email_hash: Binary, email_domain: String }
+    Secp256K1 {
+        pubkey: Binary,
+    },
+    Ed25519 {
+        pubkey: Binary,
+    },
+    EthWallet {
+        address: String,
+    },
+    Jwt {
+        aud: String,
+        sub: String,
+    },
+    Secp256R1 {
+        pubkey: Binary,
+    },
+    Passkey {
+        url: String,
+        passkey: Binary,
+    },
+    ZKEmail {
+        vkey: Binary,
+        email_hash: Binary,
+        email_domain: String,
+    },
 }
 
 impl Authenticator {
@@ -144,15 +163,13 @@ impl Authenticator {
 
                 Ok(true)
             }
-            Authenticator::ZKEmail { vkey, email_hash, email_domain } => {
-                let verification = zkemail::verify(
-                    deps, 
-                    tx_bytes,
-                    sig_bytes,
-                    vkey,
-                    email_hash,
-                    email_domain
-                )?;
+            Authenticator::ZKEmail {
+                vkey,
+                email_hash,
+                email_domain,
+            } => {
+                let verification =
+                    zkemail::verify(deps, tx_bytes, sig_bytes, vkey, email_hash, email_domain)?;
                 Ok(verification)
             }
         }

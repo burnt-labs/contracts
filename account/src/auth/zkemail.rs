@@ -1,13 +1,14 @@
+use crate::auth::groth16::{GrothBn, GrothBnProof, GrothBnVkey, GrothFp};
 use crate::error::ContractResult;
+use crate::proto::XionCustomQuery;
+use ark_crypto_primitives::snark::SNARK;
 use ark_ff::{PrimeField, Zero};
 use ark_serialize::CanonicalDeserialize;
-use cosmwasm_std::{Binary, Deps, to_binary};
-use crate::auth::groth16::{GrothBn, GrothBnProof, GrothBnVkey, GrothFp};
-use ark_crypto_primitives::snark::SNARK;
+use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
-use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::QueryRequest::Stargate;
+use cosmwasm_std::{to_binary, Binary, Deps};
 
 const TX_BODY_MAX_BYTES: usize = 512;
 
@@ -53,7 +54,7 @@ struct QueryDomainHashRequest {
 }
 
 pub fn verify(
-    deps: Deps,
+    deps: Deps<XionCustomQuery>,
     tx_bytes: &Binary,
     sig_bytes: &Binary,
     vkey_bytes: &Binary,
@@ -69,7 +70,7 @@ pub fn verify(
     let mut inputs: [GrothFp; 3] = [GrothFp::zero(); 3];
 
     // tx body input
-    let tx_input = calculate_tx_body_commitment(URL_SAFE_NO_PAD.encode(tx_bytes).as_str());
+    let tx_input = calculate_tx_body_commitment(STANDARD_NO_PAD.encode(tx_bytes).as_str());
     inputs[0] = tx_input;
 
     // email hash input, compressed at authenticator registration
@@ -95,23 +96,21 @@ pub fn verify(
 
 #[cfg(test)]
 mod tests {
+    use crate::auth::groth16::{GrothBnProof, GrothBnVkey, GrothFp};
+    use crate::auth::zkemail::{pack_bytes_into_fields, pad_bytes};
+    use crate::auth::Authenticator::ZKEmail;
+    use crate::proto::mock_custom_dependencies;
+    use crate::testing::mock_dependencies_with_custom_querier;
     use ark_bn254::{Fq2, G1Affine, G2Affine};
-    use ark_groth16::{Proof, VerifyingKey};
-    use crate::auth::groth16::{GrothBn, GrothBnProof, GrothBnVkey, GrothFp};
-    use crate::auth::zkemail::{calculate_tx_body_commitment, pack_bytes_into_fields, pad_bytes, QueryDomainHashRequest};
     use ark_ff::Fp;
+    use ark_groth16::{Proof, VerifyingKey};
+    use ark_serialize::CanonicalSerialize;
+    use cosmwasm_std::testing::mock_env;
+    use cosmwasm_std::Binary;
     use serde::Deserialize;
     use std::fs;
     use std::ops::Deref;
     use std::str::FromStr;
-    use ark_serialize::CanonicalSerialize;
-    use base64::Engine;
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    use cosmwasm_std::{Binary, to_binary};
-    use cosmwasm_std::QueryRequest::Stargate;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, MockQuerier};
-    use crate::auth::Authenticator::ZKEmail;
-
 
     const EMAIL_MAX_BYTES: usize = 256;
 
@@ -149,8 +148,8 @@ mod tests {
     pub trait JsonDecoder {
         fn from_json(json: &str) -> Self;
         fn from_json_file(file_path: &str) -> Self
-            where
-                Self: Sized,
+        where
+            Self: Sized,
         {
             let json = fs::read_to_string(file_path).unwrap();
             Self::from_json(&json)
@@ -280,22 +279,21 @@ mod tests {
         }
     }
 
-
     #[test]
     fn should_verify_body_proof() {
         assert_verification(
-            "tests/data/body/vkey.json",
-            "tests/data/body/proof.json",
-            "tests/data/body/public.json",
+            "src/auth/tests/data/body/vkey.json",
+            "src/auth/tests/data/body/proof.json",
+            "src/auth/tests/data/body/public.json",
         );
     }
 
     #[test]
     fn should_verify_header_proof() {
         assert_verification(
-            "tests/data/subject/vkey.json",
-            "tests/data/subject/proof.json",
-            "tests/data/subject/public.json",
+            "src/auth/tests/data/subject/vkey.json",
+            "src/auth/tests/data/subject/proof.json",
+            "src/auth/tests/data/subject/public.json",
         );
     }
 
@@ -322,11 +320,15 @@ mod tests {
         let public_inputs: PublicInputs<3> = PublicInputs::from_json_file(public_inputs_json_path);
 
         let mut domain_key_hash = Vec::new();
-        public_inputs.inputs[2].serialize_compressed(&mut domain_key_hash).unwrap();
+        public_inputs.inputs[2]
+            .serialize_compressed(&mut domain_key_hash)
+            .unwrap();
 
         let email_hash = calculate_email_commitment(SALT, EMAIL);
         let mut email_hash_serialized = Vec::new();
-        email_hash.serialize_compressed(&mut email_hash_serialized).unwrap();
+        email_hash
+            .serialize_compressed(&mut email_hash_serialized)
+            .unwrap();
 
         let authenticator = ZKEmail {
             vkey: Binary::from(vkey_serialized),
@@ -334,23 +336,20 @@ mod tests {
             email_domain: "gmail.com".to_string(),
         };
 
-        let tx_bytes = URL_SAFE_NO_PAD.decode(TX).unwrap();
-
-        let mut deps = mock_dependencies();
+        let mut deps = mock_dependencies_with_custom_querier(&[]);
         let env = mock_env();
-        let querier = MockQuerier::new(&[]);
         let query = QueryDomainHashRequest {
             domain: "gmail.com".into(),
             format: "poseidon".into(),
         };
         let query_bz = to_binary(&query)?;
-
-        querier.handle_query(&Stargate {
-            path: "xion.v1.Query/EmailDomainPubkeyHash".to_string(),
-            data: query_bz,
-        });
-        querier.with_custom_handler(() => )
-        deps.querier = querier;
+        //
+        // querier.handle_query(&Stargate {
+        //     path: "xion.v1.Query/EmailDomainPubkeyHash".to_string(),
+        //     data: query_bz,
+        // });
+        // querier.with_custom_handler(() => )
+        // deps.querier = querier;
 
         let result = authenticator.verify(
             deps.as_ref(),
@@ -358,13 +357,14 @@ mod tests {
             &Binary::from_base64(TX).unwrap(),
             &Binary::from(proof_serialized),
         );
+        assert!(result.unwrap())
 
-        let verified = GrothBn::verify(&vkey, &public_inputs, &proof).unwrap();
-        let email_commitment = calculate_email_commitment(SALT, EMAIL);
-        let tx_body_commitment = calculate_tx_body_commitment(TX);
-
-        assert!(verified);
-        assert_eq!(public_inputs[0], tx_body_commitment);
-        assert_eq!(public_inputs[1], email_commitment);
+        // let verified = GrothBn::verify(&vkey, &public_inputs, &proof).unwrap();
+        // let email_commitment = calculate_email_commitment(SALT, EMAIL);
+        // let tx_body_commitment = calculate_tx_body_commitment(TX);
+        //
+        // assert!(verified);
+        // assert_eq!(public_inputs[0], tx_body_commitment);
+        // assert_eq!(public_inputs[1], email_commitment);
     }
 }
