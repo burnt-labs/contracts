@@ -69,6 +69,12 @@ pub enum ContractError {
     #[error("url parse error: {url}")]
     URLParse { url: String },
 
+    #[error("r1cs synthesis error")]
+    R1CS(#[from] ark_relations::r1cs::SynthesisError),
+
+    #[error("ark serialization error")]
+    ArkSerialization(#[from] ark_serialize::SerializationError),
+
     #[error("cannot override existing authenticator at index {index}")]
     OverridingIndex { index: u8 },
 }

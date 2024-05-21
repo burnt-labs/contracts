@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "account"
+    "account",
 ]
 
 [profile.release]

@@ -2,7 +2,7 @@ use std::borrow::BorrowMut;
 
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
-use crate::auth::{jwt, passkey, AddAuthenticator, Authenticator};
+use crate::auth::{jwt, passkey, zkemail, AddAuthenticator, Authenticator};
 use crate::proto::XionCustomQuery;
 use crate::{
     error::{ContractError, ContractResult},
@@ -73,6 +73,12 @@ pub fn before_tx(
             }
             Authenticator::Passkey { .. } => {
                 // todo: figure out if there are minimum checks for passkeys
+            }
+            Authenticator::ZKEmail { .. } => {
+                // todo: need to validate this with test data
+                if sig_bytes.len() < 512 {
+                    return Err(ContractError::ShortSignature);
+                }
             }
         }
 
@@ -197,7 +203,7 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
                 Ok(())
             }
         }
@@ -221,6 +227,30 @@ pub fn add_auth_method(
             // we replace the sent credential with the passkey for indexers and other
             // observers to see
             *(credential) = passkey;
+            Ok(())
+        }
+        AddAuthenticator::ZKEmail {
+            id,
+            vkey,
+            email_hash,
+            email_domain,
+            proof,
+        } => {
+            zkemail::verify(
+                deps.as_ref(),
+                &Binary::from(env.contract.address.as_bytes()),
+                proof,
+                vkey,
+                email_hash,
+                email_domain,
+            )?;
+
+            let auth = Authenticator::ZKEmail {
+                vkey: vkey.clone(),
+                email_hash: email_hash.clone(),
+                email_domain: email_domain.clone(),
+            };
+            save_authenticator(deps, *id, &auth)?;
             Ok(())
         }
     }?;
