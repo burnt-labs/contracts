@@ -1,8 +1,7 @@
 use cosmos_sdk_proto::Any;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{ Binary, StdResult};
-use cw_storage_plus::{Key, PrimaryKey, KeyDeserialize, Prefixer};
-
+use cosmwasm_std::{Binary, StdResult};
+use cw_storage_plus::{Key, KeyDeserialize, Prefixer, PrimaryKey};
 
 impl<'a> PrimaryKey<'a> for Authorization {
     type Prefix = ();
@@ -40,7 +39,7 @@ impl KeyDeserialize for &Authorization {
 }
 
 #[cw_serde]
-pub struct Authorization(Binary);
+pub struct Authorization(pub Binary);
 
 #[cw_serde]
 pub struct GrantConfig {

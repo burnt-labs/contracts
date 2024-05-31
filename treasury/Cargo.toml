@@ -18,3 +18,4 @@ serde_json        = { workspace = true }
 schemars          = { workspace = true }
 cosmos-sdk-proto = "0.21.1"
 prost = "0.12.6"
+osmosis-std-derive = "0.13.2"

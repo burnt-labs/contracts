@@ -1,9 +1,8 @@
-use cosmos_sdk_proto::cosmos::authz::v1beta1::MsgGrant;
-use cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgGrantAllowance;
-use cosmwasm_std::{entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, CosmosMsg};
-use crate::error::ContractResult;
 use crate::execute::deploy_fee_grant;
 use crate::msg::ExecuteMsg;
+use crate::proto::XionCustomQuery;
+use crate::{error::ContractResult, grant::Authorization};
+use cosmwasm_std::{entry_point, DepsMut, Env, MessageInfo, Response};
 
 // #[entry_point]
 // pub fn instantiate(
@@ -18,14 +17,26 @@ use crate::msg::ExecuteMsg;
 
 #[entry_point]
 pub fn execute(
-    deps: DepsMut,
+    deps: DepsMut<XionCustomQuery>,
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> ContractResult<Response> {
-    
-    match msg { 
-        ExecuteMsg::DeployFeeGrant { authz_granter, authz_grantee, msg_type_url, authorization } => deploy_fee_grant(deps, env, info, authz_granter, authz_grantee, msg_type_url, authorization),
+    match msg {
+        ExecuteMsg::DeployFeeGrant {
+            authz_granter,
+            authz_grantee,
+            msg_type_url,
+            authorization,
+        } => deploy_fee_grant(
+            deps,
+            env,
+            info,
+            authz_granter,
+            authz_grantee,
+            msg_type_url,
+            Authorization(authorization),
+        ),
     }
 }
 
