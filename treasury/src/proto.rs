@@ -1,3 +1,4 @@
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::CustomQuery;
 use osmosis_std_derive::CosmwasmExt;
 use schemars::JsonSchema;
@@ -13,8 +14,8 @@ use serde::{Deserialize, Serialize};
     schemars::JsonSchema,
     CosmwasmExt,
 )]
-#[proto_message(type_url = "/xion.v1.Query/WebAuthNVerifyAuthenticate")]
-#[proto_query(path = "/xion.v1.Query/WebAuthNVerifyAuthenticate", response_type = QueryGrantsResponse)]
+#[proto_message(type_url = "/cosmos.auth.v1beta1.Query/Grants")]
+#[proto_query(path = "/cosmos.auth.v1beta1.Query/Grants", response_type = QueryGrantsResponse)]
 pub struct QueryGrantsRequest {
     #[prost(string, tag = "1", optional)]
     pub granter: Option<String>,
@@ -50,10 +51,10 @@ pub struct Grant {
 #[derive(Clone, PartialEq, ::prost::Message, serde::Serialize, serde::Deserialize)]
 pub struct Any {
     #[prost(string, tag = "1")]
-    pub type_url: ::prost::alloc::string::String,
-    /// Must be a valid serialized protocol buffer of the above specified type.
+    pub type_url: String,
+    /// Must be a valid, serialized protocol buffer of the above specified type.
     #[prost(bytes = "vec", tag = "2")]
-    pub value: ::prost::alloc::vec::Vec<u8>,
+    pub value: Vec<u8>,
 }
 
 #[allow(clippy::derive_partial_eq_without_eq)]
