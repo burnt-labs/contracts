@@ -1,5 +1,5 @@
 use crate::error::ContractError::{
-    AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
+    AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized,
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
@@ -34,6 +34,52 @@ pub fn init(
         Event::new("create_treasury_instance")
             .add_attributes(vec![("admin", treasury_admin.into_string())]),
     ))
+}
+
+pub fn update_admin(
+    deps: DepsMut<XionCustomQuery>,
+    info: MessageInfo,
+    new_admin: Addr,
+) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    ADMIN.save(deps.storage, &new_admin)?;
+
+    Ok(Response::new())
+}
+
+pub fn update_grant_config(
+    deps: DepsMut<XionCustomQuery>,
+    info: MessageInfo,
+    msg_type_url: String,
+    grant_config: GrantConfig,
+) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    GRANT_CONFIGS.save(deps.storage, msg_type_url, &grant_config)?;
+
+    Ok(Response::new())
+}
+
+pub fn remove_grant_config(
+    deps: DepsMut<XionCustomQuery>,
+    info: MessageInfo,
+    msg_type_url: String,
+) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    GRANT_CONFIGS.remove(deps.storage, msg_type_url);
+
+    Ok(Response::new())
 }
 
 pub fn deploy_fee_grant(

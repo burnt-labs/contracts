@@ -11,6 +11,16 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
+    UpdateAdmin {
+        new_admin: Addr,
+    },
+    UpdateGrantConfig {
+        msg_type_url: String,
+        grant_config: GrantConfig,
+    },
+    RemoveGrantConfig {
+        msg_type_url: String,
+    },
     DeployFeeGrant {
         authz_granter: Addr,
         authz_grantee: Addr,

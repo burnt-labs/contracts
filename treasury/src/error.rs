@@ -23,6 +23,9 @@ pub enum ContractError {
 
     #[error("config mismatch")]
     ConfigurationMismatch,
+
+    #[error("unauthorized")]
+    Unauthorized,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;

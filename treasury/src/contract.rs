@@ -1,8 +1,7 @@
 use crate::error::ContractResult;
-use crate::execute::deploy_fee_grant;
-use crate::msg::{ExecuteMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::proto::XionCustomQuery;
-use crate::query;
+use crate::{execute, query, CONTRACT_NAME, CONTRACT_VERSION};
 use cosmwasm_std::{
     entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
@@ -10,19 +9,19 @@ use cosmwasm_std::{
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut<XionCustomQuery>,
-    env: Env,
-    _info: MessageInfo,
+    _env: Env,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    execute::init(deps, env, &mut msg.authenticator.clone())
+    execute::init(deps, info, msg.admin, msg.type_urls, msg.grant_configs)
 }
 
 #[entry_point]
 pub fn execute(
     deps: DepsMut<XionCustomQuery>,
     env: Env,
-    _: MessageInfo,
+    info: MessageInfo,
     msg: ExecuteMsg,
 ) -> ContractResult<Response> {
     match msg {
@@ -30,7 +29,15 @@ pub fn execute(
             authz_granter,
             authz_grantee,
             authorization,
-        } => deploy_fee_grant(deps, env, authz_granter, authz_grantee, authorization),
+        } => execute::deploy_fee_grant(deps, env, authz_granter, authz_grantee, authorization),
+        ExecuteMsg::UpdateAdmin { new_admin } => execute::update_admin(deps, info, new_admin),
+        ExecuteMsg::UpdateGrantConfig {
+            msg_type_url,
+            grant_config,
+        } => execute::update_grant_config(deps, info, msg_type_url, grant_config),
+        ExecuteMsg::RemoveGrantConfig { msg_type_url } => {
+            execute::remove_grant_config(deps, info, msg_type_url)
+        }
     }
 }
 
