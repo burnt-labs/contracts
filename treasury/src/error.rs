@@ -20,6 +20,9 @@ pub enum ContractError {
 
     #[error("allowance unset")]
     AllowanceUnset,
+
+    #[error("config mismatch")]
+    ConfigurationMismatch,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;

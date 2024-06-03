@@ -4,7 +4,7 @@ use crate::grant::Any;
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{
     AllowedMsgAllowance, BasicAllowance, PeriodicAllowance,
 };
-use cosmwasm_std::{Addr};
+use cosmwasm_std::Addr;
 use pbjson_types::Timestamp;
 
 pub fn format_allowance(

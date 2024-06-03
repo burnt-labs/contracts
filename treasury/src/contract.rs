@@ -1,19 +1,22 @@
 use crate::error::ContractResult;
 use crate::execute::deploy_fee_grant;
-use crate::msg::ExecuteMsg;
+use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::proto::XionCustomQuery;
-use cosmwasm_std::{entry_point, DepsMut, Env, MessageInfo, Response};
+use crate::query;
+use cosmwasm_std::{
+    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+};
 
-// #[entry_point]
-// pub fn instantiate(
-//     deps: DepsMut<XionCustomQuery>,
-//     env: Env,
-//     _info: MessageInfo,
-//     msg: InstantiateMsg,
-// ) -> ContractResult<Response> {
-//     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-//     execute::init(deps, env, &mut msg.authenticator.clone())
-// }
+#[entry_point]
+pub fn instantiate(
+    deps: DepsMut<XionCustomQuery>,
+    env: Env,
+    _info: MessageInfo,
+    msg: InstantiateMsg,
+) -> ContractResult<Response> {
+    cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    execute::init(deps, env, &mut msg.authenticator.clone())
+}
 
 #[entry_point]
 pub fn execute(
@@ -31,8 +34,14 @@ pub fn execute(
     }
 }
 
-// #[entry_point]
-// pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-//     match msg {
-//     }
-// }
+#[entry_point]
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::GrantConfigByTypeURL { msg_type_url } => to_binary(
+            &query::grant_config_by_type_url(deps.storage, msg_type_url)?,
+        ),
+        QueryMsg::GrantConfigTypeURLs {} => {
+            to_binary(&query::grant_config_type_urls(deps.storage)?)
+        }
+    }
+}

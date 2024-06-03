@@ -1,11 +1,40 @@
-use crate::error::ContractError::{AuthzGrantNoAuthorization, AuthzGrantNotFound};
+use crate::error::ContractError::{
+    AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
+};
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
-use crate::grant::Any;
+use crate::grant::{Any, GrantConfig};
 use crate::proto::XionCustomQuery;
-use crate::state::GRANT_CONFIGS;
+use crate::state::{ADMIN, GRANT_CONFIGS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
-use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Response};
+use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Response};
+
+pub fn init(
+    deps: DepsMut<XionCustomQuery>,
+    info: MessageInfo,
+    admin: Option<Addr>,
+    type_urls: Vec<String>,
+    grant_configs: Vec<GrantConfig>,
+) -> ContractResult<Response> {
+    let treasury_admin = match admin {
+        None => info.sender,
+        Some(adm) => adm,
+    };
+    ADMIN.save(deps.storage, &treasury_admin)?;
+
+    if type_urls.len().ne(&grant_configs.len()) {
+        return Err(ConfigurationMismatch);
+    }
+
+    for i in 0..type_urls.len() {
+        GRANT_CONFIGS.save(deps.storage, type_urls[i].clone(), &grant_configs[i])?;
+    }
+
+    Ok(Response::new().add_event(
+        Event::new("create_treasury_instance")
+            .add_attributes(vec![("admin", treasury_admin.into_string())]),
+    ))
+}
 
 pub fn deploy_fee_grant(
     deps: DepsMut<XionCustomQuery>,
