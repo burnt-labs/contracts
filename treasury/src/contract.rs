@@ -1,7 +1,7 @@
+use crate::error::ContractResult;
 use crate::execute::deploy_fee_grant;
 use crate::msg::ExecuteMsg;
 use crate::proto::XionCustomQuery;
-use crate::{error::ContractResult, grant::Authorization};
 use cosmwasm_std::{entry_point, DepsMut, Env, MessageInfo, Response};
 
 // #[entry_point]
@@ -19,24 +19,15 @@ use cosmwasm_std::{entry_point, DepsMut, Env, MessageInfo, Response};
 pub fn execute(
     deps: DepsMut<XionCustomQuery>,
     env: Env,
-    info: MessageInfo,
+    _: MessageInfo,
     msg: ExecuteMsg,
 ) -> ContractResult<Response> {
     match msg {
         ExecuteMsg::DeployFeeGrant {
             authz_granter,
             authz_grantee,
-            msg_type_url,
             authorization,
-        } => deploy_fee_grant(
-            deps,
-            env,
-            info,
-            authz_granter,
-            authz_grantee,
-            msg_type_url,
-            Authorization(authorization),
-        ),
+        } => deploy_fee_grant(deps, env, authz_granter, authz_grantee, authorization),
     }
 }
 

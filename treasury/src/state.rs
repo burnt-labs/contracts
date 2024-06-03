@@ -1,5 +1,5 @@
-use cosmos_sdk_proto::Any;
-use cw_storage_plus::{Map};
-use crate::grant::{Authorization, GrantConfig};
+use crate::grant::GrantConfig;
+use cw_storage_plus::Map;
 
-pub const GRANTS: Map<Authorization, GrantConfig> = Map::new("grants");
+// msg_type_url to grant config
+pub const GRANT_CONFIGS: Map<String, GrantConfig> = Map::new("grant_configs");
