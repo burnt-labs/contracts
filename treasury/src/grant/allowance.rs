@@ -59,10 +59,9 @@ pub fn format_allowance(
                 value: allowance_bz,
             }
         }
-        
+
         "/xion.v1.AuthzAllowance" => {
-            let mut allowance: AuthzAllowance =
-                cosmwasm_std::from_binary(&allowance_any.value)?;
+            let mut allowance: AuthzAllowance = cosmwasm_std::from_binary(&allowance_any.value)?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
                 granter,
