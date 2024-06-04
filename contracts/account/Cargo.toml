@@ -27,9 +27,5 @@ phf               = { workspace = true }
 rsa               = { workspace = true }
 getrandom         = { workspace = true }
 p256              = { workspace = true }
-#url = "2.4.1"
-#coset = "0.3.5"
-#futures = "0.3.29"
-#async-trait = "0.1.74"
-prost = {version = "0.11.2", default-features = false, features = ["prost-derive"]}
-osmosis-std-derive = "0.13.2"
+prost = { workspace = true }
+osmosis-std-derive = { workspace = true }

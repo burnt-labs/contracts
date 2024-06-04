@@ -7,7 +7,6 @@ use crate::grant::allowance::format_allowance;
 use crate::grant::{Any, GrantConfig};
 use crate::state::{ADMIN, GRANT_CONFIGS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
-use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Response};
 
 pub fn init(
