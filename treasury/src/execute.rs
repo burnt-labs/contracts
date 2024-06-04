@@ -145,6 +145,7 @@ pub fn deploy_fee_grant(
                 grantee: authz_grantee.into_string(),
                 allowance: Some(formatted_allowance.into()),
             };
+            // todo: what if a feegrant already exists?
             let cosmos_msg = CosmosMsg::Stargate {
                 type_url: "/cosmos.auth.v1beta1.Msg/MsgGrantAllowance".to_string(),
                 value: cosmwasm_std::to_binary(&feegrant_msg)?,
