@@ -4,6 +4,7 @@ use crate::grant::Any;
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{
     AllowedMsgAllowance, BasicAllowance, PeriodicAllowance,
 };
+use cosmos_sdk_proto::xion::v1::{AuthzAllowance, ContractsAllowance};
 use cosmwasm_std::Addr;
 use pbjson_types::Timestamp;
 
@@ -58,8 +59,41 @@ pub fn format_allowance(
                 value: allowance_bz,
             }
         }
+        
+        "/xion.v1.AuthzAllowance" => {
+            let mut allowance: AuthzAllowance =
+                cosmwasm_std::from_binary(&allowance_any.value)?;
+            let inner_allowance = format_allowance(
+                allowance.allowance.ok_or(AllowanceUnset)?.into(),
+                granter,
+                grantee.clone(),
+                expiration,
+            )?;
+            allowance.allowance = Some(inner_allowance.into());
+            allowance.authz_grantee = grantee.into_string();
+            let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
+            Any {
+                msg_type_url: allowance_any.msg_type_url,
+                value: allowance_bz,
+            }
+        }
 
-        // todo: implement new feegrant types
+        "/xion.v1.ContractsAllowance" => {
+            let mut allowance: ContractsAllowance =
+                cosmwasm_std::from_binary(&allowance_any.value)?;
+            let inner_allowance = format_allowance(
+                allowance.allowance.ok_or(AllowanceUnset)?.into(),
+                granter,
+                grantee.clone(),
+                expiration,
+            )?;
+            allowance.allowance = Some(inner_allowance.into());
+            let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
+            Any {
+                msg_type_url: allowance_any.msg_type_url,
+                value: allowance_bz,
+            }
+        }
         _ => {
             return Err(InvalidAllowanceType {
                 msg_type_url: allowance_any.msg_type_url,
