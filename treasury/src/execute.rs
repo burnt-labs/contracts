@@ -4,14 +4,13 @@ use crate::error::ContractError::{
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
 use crate::grant::{Any, GrantConfig};
-use crate::proto::XionCustomQuery;
 use crate::state::{ADMIN, GRANT_CONFIGS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Response};
 
 pub fn init(
-    deps: DepsMut<XionCustomQuery>,
+    deps: DepsMut,
     info: MessageInfo,
     admin: Option<Addr>,
     type_urls: Vec<String>,
@@ -37,11 +36,7 @@ pub fn init(
     ))
 }
 
-pub fn update_admin(
-    deps: DepsMut<XionCustomQuery>,
-    info: MessageInfo,
-    new_admin: Addr,
-) -> ContractResult<Response> {
+pub fn update_admin(deps: DepsMut, info: MessageInfo, new_admin: Addr) -> ContractResult<Response> {
     let admin = ADMIN.load(deps.storage)?;
     if admin != info.sender {
         return Err(Unauthorized);
@@ -58,7 +53,7 @@ pub fn update_admin(
 }
 
 pub fn update_grant_config(
-    deps: DepsMut<XionCustomQuery>,
+    deps: DepsMut,
     info: MessageInfo,
     msg_type_url: String,
     grant_config: GrantConfig,
@@ -81,7 +76,7 @@ pub fn update_grant_config(
 }
 
 pub fn remove_grant_config(
-    deps: DepsMut<XionCustomQuery>,
+    deps: DepsMut,
     info: MessageInfo,
     msg_type_url: String,
 ) -> ContractResult<Response> {
@@ -99,7 +94,7 @@ pub fn remove_grant_config(
 }
 
 pub fn deploy_fee_grant(
-    deps: DepsMut<XionCustomQuery>,
+    deps: DepsMut,
     env: Env,
     authz_granter: Addr,
     authz_grantee: Addr,

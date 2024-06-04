@@ -1,6 +1,5 @@
 use crate::error::ContractResult;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::proto::XionCustomQuery;
 use crate::{execute, query, CONTRACT_NAME, CONTRACT_VERSION};
 use cosmwasm_std::{
     entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
@@ -8,7 +7,7 @@ use cosmwasm_std::{
 
 #[entry_point]
 pub fn instantiate(
-    deps: DepsMut<XionCustomQuery>,
+    deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
@@ -19,7 +18,7 @@ pub fn instantiate(
 
 #[entry_point]
 pub fn execute(
-    deps: DepsMut<XionCustomQuery>,
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,

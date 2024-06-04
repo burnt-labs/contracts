@@ -4,7 +4,6 @@ mod contract;
 mod error;
 mod execute;
 mod msg;
-mod proto;
 mod state;
 
 mod grant;
