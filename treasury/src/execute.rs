@@ -7,6 +7,7 @@ use crate::grant::{Any, GrantConfig};
 use crate::proto::XionCustomQuery;
 use crate::state::{ADMIN, GRANT_CONFIGS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
+use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Response};
 
 pub fn init(
@@ -114,9 +115,12 @@ pub fn deploy_fee_grant(
         msg_type_url: authorization.msg_type_url,
         pagination: None,
     };
-    let grants = deps
-        .querier
-        .query::<QueryGrantsResponse>(&query_msg.into())?;
+    let grants =
+        deps.querier
+            .query::<QueryGrantsResponse>(&cosmwasm_std::QueryRequest::Stargate {
+                path: "/cosmos.authz.v1beta1.Query/Grants".to_string(),
+                data: query_msg.to_bytes().unwrap().into(),
+            })?;
     // grant queries with a granter, grantee and type_url should always result
     // in only one result
     if grants.grants.len() == 0 {
