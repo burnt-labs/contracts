@@ -1,4 +1,7 @@
-use crate::error::ContractError::{AuthzGrantMistmatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized};
+use crate::error::ContractError::{
+    AuthzGrantMistmatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
+    Unauthorized,
+};
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
 use crate::grant::{Any, GrantConfig};
@@ -112,7 +115,7 @@ pub fn deploy_fee_grant(
         deps.querier
             .query::<QueryGrantsResponse>(&cosmwasm_std::QueryRequest::Stargate {
                 path: "/cosmos.authz.v1beta1.Query/Grants".to_string(),
-                data: query_msg.to_bytes().unwrap().into(),
+                data: cosmwasm_std::to_binary(&query_msg)?,
             })?;
     // grant queries with a granter, grantee and type_url should always result
     // in only one result
@@ -142,10 +145,9 @@ pub fn deploy_fee_grant(
                 grantee: authz_grantee.into_string(),
                 allowance: Some(formatted_allowance.into()),
             };
-            let feegrant_msg_bz = cosmwasm_std::to_binary(&feegrant_msg)?;
             let cosmos_msg = CosmosMsg::Stargate {
                 type_url: "/cosmos.auth.v1beta1.Msg/MsgGrantAllowance".to_string(),
-                value: feegrant_msg_bz,
+                value: cosmwasm_std::to_binary(&feegrant_msg)?,
             };
             Ok(Response::new().add_message(cosmos_msg))
         }
