@@ -48,7 +48,12 @@ pub fn update_admin(
 
     ADMIN.save(deps.storage, &new_admin)?;
 
-    Ok(Response::new())
+    Ok(
+        Response::new().add_event(Event::new("updated_treasury_admin").add_attributes(vec![
+            ("old admin", admin.into_string()),
+            ("new admin", new_admin.into_string()),
+        ])),
+    )
 }
 
 pub fn update_grant_config(
@@ -62,9 +67,16 @@ pub fn update_grant_config(
         return Err(Unauthorized);
     }
 
-    GRANT_CONFIGS.save(deps.storage, msg_type_url, &grant_config)?;
+    let existed = GRANT_CONFIGS.has(deps.storage, msg_type_url.clone());
 
-    Ok(Response::new())
+    GRANT_CONFIGS.save(deps.storage, msg_type_url.clone(), &grant_config)?;
+
+    Ok(Response::new().add_event(
+        Event::new("updated_treasury_grant_config").add_attributes(vec![
+            ("msg type url", msg_type_url),
+            ("overwritten", existed.to_string()),
+        ]),
+    ))
 }
 
 pub fn remove_grant_config(
@@ -77,9 +89,11 @@ pub fn remove_grant_config(
         return Err(Unauthorized);
     }
 
-    GRANT_CONFIGS.remove(deps.storage, msg_type_url);
+    GRANT_CONFIGS.remove(deps.storage, msg_type_url.clone());
 
-    Ok(Response::new())
+    Ok(Response::new().add_event(Event::new("removed_treasury_grant_config").add_attributes(vec![
+        ("msg type url", msg_type_url),
+    ])))
 }
 
 pub fn deploy_fee_grant(
