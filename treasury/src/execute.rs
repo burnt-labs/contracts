@@ -1,6 +1,4 @@
-use crate::error::ContractError::{
-    AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized,
-};
+use crate::error::ContractError::{AuthzGrantMistmatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized};
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
 use crate::grant::{Any, GrantConfig};
@@ -118,13 +116,13 @@ pub fn deploy_fee_grant(
             })?;
     // grant queries with a granter, grantee and type_url should always result
     // in only one result
-    if grants.grants.len() == 0 {
+    if grants.grants.is_empty() {
         return Err(AuthzGrantNotFound);
     }
     let grant = grants.grants[0].clone();
     let auth_any: Any = grant.authorization.ok_or(AuthzGrantNoAuthorization)?.into();
     if grant_config.authorization.ne(&auth_any) {
-        return Err(AuthzGrantNoAuthorization);
+        return Err(AuthzGrantMistmatch);
     }
     // todo: do we allow authorizations without expiry?
 
