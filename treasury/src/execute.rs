@@ -91,9 +91,10 @@ pub fn remove_grant_config(
 
     GRANT_CONFIGS.remove(deps.storage, msg_type_url.clone());
 
-    Ok(Response::new().add_event(Event::new("removed_treasury_grant_config").add_attributes(vec![
-        ("msg type url", msg_type_url),
-    ])))
+    Ok(Response::new().add_event(
+        Event::new("removed_treasury_grant_config")
+            .add_attributes(vec![("msg type url", msg_type_url)]),
+    ))
 }
 
 pub fn deploy_fee_grant(
