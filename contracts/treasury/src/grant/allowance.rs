@@ -10,7 +10,7 @@ use pbjson_types::Timestamp;
 
 pub fn format_allowance(
     allowance_any: Any,
-    granter: Addr,
+    _granter: Addr,
     grantee: Addr,
     expiration: Option<Timestamp>,
 ) -> ContractResult<Any> {
@@ -50,7 +50,7 @@ pub fn format_allowance(
                 cosmwasm_std::from_binary(&allowance_any.value)?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
-                granter,
+                _granter,
                 grantee,
                 expiration,
             )?;
@@ -66,7 +66,7 @@ pub fn format_allowance(
             let mut allowance: AuthzAllowance = cosmwasm_std::from_binary(&allowance_any.value)?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
-                granter,
+                _granter,
                 grantee.clone(),
                 expiration,
             )?;
@@ -84,7 +84,7 @@ pub fn format_allowance(
                 cosmwasm_std::from_binary(&allowance_any.value)?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
-                granter,
+                _granter,
                 grantee.clone(),
                 expiration,
             )?;

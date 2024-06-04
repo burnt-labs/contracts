@@ -1,6 +1,7 @@
 extern crate core;
 
-mod contract;
+#[cfg(not(feature = "library"))]
+pub mod contract;
 mod error;
 mod execute;
 mod msg;
