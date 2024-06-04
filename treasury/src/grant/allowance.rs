@@ -34,7 +34,9 @@ pub fn format_allowance(
             Some(_) => {
                 let mut allowance: PeriodicAllowance =
                     cosmwasm_std::from_binary(&allowance_any.value)?;
-                allowance.basic.ok_or(AllowanceUnset)?.expiration = expiration;
+                let mut inner_basic = allowance.basic.clone().ok_or(AllowanceUnset)?;
+                inner_basic.expiration = expiration;
+                allowance.basic = Some(inner_basic);
                 let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
                 Any {
                     msg_type_url: allowance_any.msg_type_url,
