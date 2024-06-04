@@ -16,7 +16,7 @@ thiserror         = { workspace = true }
 serde             = { workspace = true }
 serde_json        = { workspace = true }
 schemars          = { workspace = true }
-cosmos-sdk-proto = {git = "https://github.com/burnt-labs/cosmos-rust.git", rev = "5ebab1c7b986b71036a220de2e912beca43d3019", features = ["cosmwasm"]}
+cosmos-sdk-proto = {git = "https://github.com/burnt-labs/cosmos-rust.git", rev = "c1e813ba9b47aa268c5d4ea13178018dfb7cd44f", features = ["cosmwasm"]}
 prost = "0.12.6"
 osmosis-std-derive = "0.13.2"
 prost-types = "0.12.6"
