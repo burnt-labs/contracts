@@ -1,4 +1,7 @@
-use crate::error::ContractError::{AuthzGrantMistmatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized};
+use crate::error::ContractError::{
+    AuthzGrantMistmatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
+    Unauthorized,
+};
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
 use crate::grant::{Any, GrantConfig};
@@ -96,16 +99,16 @@ pub fn deploy_fee_grant(
     env: Env,
     authz_granter: Addr,
     authz_grantee: Addr,
-    authorization: Any,
+    msg_type_url: String,
 ) -> ContractResult<Response> {
     // check if grant exists in patterns on contract
-    let grant_config = GRANT_CONFIGS.load(deps.storage, authorization.msg_type_url.clone())?;
+    let grant_config = GRANT_CONFIGS.load(deps.storage, msg_type_url.clone())?;
 
     // check if grant exists on chain
     let query_msg = QueryGrantsRequest {
         granter: authz_granter.to_string(),
         grantee: authz_grantee.to_string(),
-        msg_type_url: authorization.msg_type_url,
+        msg_type_url: msg_type_url.clone(),
         pagination: None,
     };
     let grants =

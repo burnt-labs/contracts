@@ -24,7 +24,7 @@ pub enum ExecuteMsg {
     DeployFeeGrant {
         authz_granter: Addr,
         authz_grantee: Addr,
-        authorization: Any,
+        msg_type_url: String,
     },
 }
 
