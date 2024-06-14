@@ -10,11 +10,11 @@ use pbjson_types::Timestamp;
 
 pub fn format_allowance(
     allowance_any: Any,
-    granter: Addr,
+    _granter: Addr,
     grantee: Addr,
     expiration: Option<Timestamp>,
 ) -> ContractResult<Any> {
-    let formatted_allowance: Any = match allowance_any.msg_type_url.as_str() {
+    let formatted_allowance: Any = match allowance_any.type_url.as_str() {
         "/cosmos.feegrant.v1beta1.BasicAllowance" => match expiration.clone() {
             None => allowance_any,
             Some(_) => {
@@ -23,7 +23,7 @@ pub fn format_allowance(
                 allowance.expiration = expiration;
                 let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
                 Any {
-                    msg_type_url: allowance_any.msg_type_url,
+                    type_url: allowance_any.type_url,
                     value: allowance_bz,
                 }
             }
@@ -39,7 +39,7 @@ pub fn format_allowance(
                 allowance.basic = Some(inner_basic);
                 let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
                 Any {
-                    msg_type_url: allowance_any.msg_type_url,
+                    type_url: allowance_any.type_url,
                     value: allowance_bz,
                 }
             }
@@ -50,14 +50,14 @@ pub fn format_allowance(
                 cosmwasm_std::from_binary(&allowance_any.value)?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
-                granter,
+                _granter,
                 grantee,
                 expiration,
             )?;
             allowance.allowance = Some(inner_allowance.into());
             let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
             Any {
-                msg_type_url: allowance_any.msg_type_url,
+                type_url: allowance_any.type_url,
                 value: allowance_bz,
             }
         }
@@ -66,7 +66,7 @@ pub fn format_allowance(
             let mut allowance: AuthzAllowance = cosmwasm_std::from_binary(&allowance_any.value)?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
-                granter,
+                _granter,
                 grantee.clone(),
                 expiration,
             )?;
@@ -74,7 +74,7 @@ pub fn format_allowance(
             allowance.authz_grantee = grantee.into_string();
             let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
             Any {
-                msg_type_url: allowance_any.msg_type_url,
+                type_url: allowance_any.type_url,
                 value: allowance_bz,
             }
         }
@@ -84,20 +84,20 @@ pub fn format_allowance(
                 cosmwasm_std::from_binary(&allowance_any.value)?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
-                granter,
+                _granter,
                 grantee.clone(),
                 expiration,
             )?;
             allowance.allowance = Some(inner_allowance.into());
             let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
             Any {
-                msg_type_url: allowance_any.msg_type_url,
+                type_url: allowance_any.type_url,
                 value: allowance_bz,
             }
         }
         _ => {
             return Err(InvalidAllowanceType {
-                msg_type_url: allowance_any.msg_type_url,
+                msg_type_url: allowance_any.type_url,
             })
         }
     };

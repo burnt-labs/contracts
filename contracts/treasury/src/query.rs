@@ -13,5 +13,5 @@ pub fn grant_config_by_type_url(
     store: &dyn Storage,
     msg_type_url: String,
 ) -> StdResult<GrantConfig> {
-    Ok(GRANT_CONFIGS.load(store, msg_type_url)?)
+    GRANT_CONFIGS.load(store, msg_type_url)
 }
