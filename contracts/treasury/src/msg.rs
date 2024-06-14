@@ -1,4 +1,4 @@
-use crate::grant::{Any, GrantConfig};
+use crate::grant::GrantConfig;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Binary};
 
