@@ -1,12 +1,13 @@
 use crate::error::ContractError::{
-    AuthzGrantMistmatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
-    Unauthorized,
+    self, AuthzGrantMistmatch, AuthzGrantNoAuthorization, AuthzGrantNotFound,
+    ConfigurationMismatch, Unauthorized,
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
 use crate::grant::{Any, GrantConfig};
 use crate::state::{ADMIN, GRANT_CONFIGS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
+use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Response};
 
 pub fn init(
@@ -110,11 +111,20 @@ pub fn deploy_fee_grant(
         msg_type_url: msg_type_url.clone(),
         pagination: None,
     };
+    let query_msg_bytes = match query_msg.to_bytes() {
+        Ok(bz) => bz,
+        Err(_) => {
+            return Err(ContractError::Std(cosmwasm_std::StdError::SerializeErr {
+                source_type: String::from("QueryGrantsRequest"),
+                msg: "Unable to serialize QueryGrantsRequest".to_string(),
+            }))
+        }
+    };
     let grants =
         deps.querier
             .query::<QueryGrantsResponse>(&cosmwasm_std::QueryRequest::Stargate {
                 path: "/cosmos.authz.v1beta1.Query/Grants".to_string(),
-                data: cosmwasm_std::to_binary(&query_msg)?,
+                data: query_msg_bytes.into(),
             })?;
     // grant queries with a granter, grantee and type_url should always result
     // in only one result
@@ -144,10 +154,19 @@ pub fn deploy_fee_grant(
                 grantee: authz_grantee.into_string(),
                 allowance: Some(formatted_allowance.into()),
             };
+            let feegrant_msg_bytes = match feegrant_msg.to_bytes() {
+                Ok(bz) => bz,
+                Err(_) => {
+                    return Err(ContractError::Std(cosmwasm_std::StdError::SerializeErr {
+                        source_type: String::from("FeeGrantMsg"),
+                        msg: "Unable to serialize FeeGrantMsg".to_string(),
+                    }))
+                }
+            };
             // todo: what if a feegrant already exists?
             let cosmos_msg = CosmosMsg::Stargate {
                 type_url: "/cosmos.auth.v1beta1.Msg/MsgGrantAllowance".to_string(),
-                value: cosmwasm_std::to_binary(&feegrant_msg)?,
+                value: feegrant_msg_bytes.into(),
             };
             Ok(Response::new().add_message(cosmos_msg))
         }

@@ -8,7 +8,6 @@ use prost::bytes::Bytes;
 pub struct GrantConfig {
     description: String,
     pub authorization: Any,
-    pub msg_type: String,
     pub allowance: Option<Any>,
 }
 
