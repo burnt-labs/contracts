@@ -10,7 +10,7 @@ pub enum ContractError {
     AuthzGrantNoAuthorization,
 
     #[error("authz grant did not match config")]
-    AuthzGrantMistmatch,
+    AuthzGrantMismatch,
 
     #[error("invalid allowance type: {msg_type_url}")]
     InvalidAllowanceType { msg_type_url: String },

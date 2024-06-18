@@ -1,14 +1,18 @@
 use crate::error::ContractError::{
-    self, AuthzGrantMistmatch, AuthzGrantNoAuthorization, AuthzGrantNotFound,
-    ConfigurationMismatch, Unauthorized,
+    self, AuthzGrantMismatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
+    Unauthorized,
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
-use crate::grant::{Any, GrantConfig};
+use crate::grant::GrantConfig;
 use crate::state::{ADMIN, GRANT_CONFIGS};
-use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
+use cosmos_sdk_proto::cosmos::authz::v1beta1::QueryGrantsRequest;
+use cosmos_sdk_proto::tendermint::serializers::timestamp;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Response};
+use pbjson_types::Timestamp;
+use serde::de::value::{Error, StringDeserializer};
+use serde_json::Value;
 
 pub fn init(
     deps: DepsMut,
@@ -120,21 +124,31 @@ pub fn deploy_fee_grant(
             }))
         }
     };
-    let grants =
-        deps.querier
-            .query::<QueryGrantsResponse>(&cosmwasm_std::QueryRequest::Stargate {
-                path: "/cosmos.authz.v1beta1.Query/Grants".to_string(),
-                data: query_msg_bytes.into(),
-            })?;
+    let query_res = deps
+        .querier
+        .query::<Value>(&cosmwasm_std::QueryRequest::Stargate {
+            path: "/cosmos.authz.v1beta1.Query/Grants".to_string(),
+            data: query_msg_bytes.into(),
+        })?;
+
+    let grants = &query_res["grants"];
     // grant queries with a granter, grantee and type_url should always result
     // in only one result
-    if grants.grants.is_empty() {
+    if !grants.is_array() {
         return Err(AuthzGrantNotFound);
     }
-    let grant = grants.grants[0].clone();
-    let auth_any: Any = grant.authorization.ok_or(AuthzGrantNoAuthorization)?.into();
-    if grant_config.authorization.ne(&auth_any) {
-        return Err(AuthzGrantMistmatch);
+    let grant = grants[0].clone();
+    if grant.is_null() {
+        return Err(AuthzGrantNotFound);
+    }
+
+    let auth = &grant["authorization"];
+    if auth.is_null() {
+        return Err(AuthzGrantNoAuthorization);
+    }
+
+    if grant_config.authorization.ne(auth) {
+        return Err(AuthzGrantMismatch);
     }
     // todo: do we allow authorizations without expiry?
 
@@ -143,11 +157,21 @@ pub fn deploy_fee_grant(
         None => Ok(Response::new()),
         // allowance should be stored as a prost proto from the feegrant definition
         Some(allowance) => {
+            let expiration = grant["expiration"].as_str().map(|t| {
+                match timestamp::deserialize(StringDeserializer::<Error>::new(t.to_string())) {
+                    Ok(tm) => Timestamp {
+                        seconds: tm.seconds,
+                        nanos: tm.nanos,
+                    },
+                    Err(_) => Timestamp::default(),
+                }
+            });
+
             let formatted_allowance = format_allowance(
                 allowance,
                 env.contract.address.clone(),
                 authz_grantee.clone(),
-                grant.expiration,
+                expiration,
             )?;
             let feegrant_msg = cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgGrantAllowance {
                 granter: env.contract.address.into_string(),
@@ -165,7 +189,7 @@ pub fn deploy_fee_grant(
             };
             // todo: what if a feegrant already exists?
             let cosmos_msg = CosmosMsg::Stargate {
-                type_url: "/cosmos.auth.v1beta1.Msg/MsgGrantAllowance".to_string(),
+                type_url: "/cosmos.feegrant.v1beta1.MsgGrantAllowance".to_string(),
                 value: feegrant_msg_bytes.into(),
             };
             Ok(Response::new().add_message(cosmos_msg))

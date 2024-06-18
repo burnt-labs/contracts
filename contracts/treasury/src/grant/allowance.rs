@@ -1,9 +1,10 @@
-use crate::error::ContractError::{AllowanceUnset, InvalidAllowanceType};
+use crate::error::ContractError::{self, AllowanceUnset, InvalidAllowanceType};
 use crate::error::ContractResult;
 use crate::grant::Any;
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{
     AllowedMsgAllowance, BasicAllowance, PeriodicAllowance,
 };
+use cosmos_sdk_proto::traits::MessageExt;
 use cosmos_sdk_proto::xion::v1::{AuthzAllowance, ContractsAllowance};
 use cosmwasm_std::Addr;
 use pbjson_types::Timestamp;
@@ -21,10 +22,18 @@ pub fn format_allowance(
                 let mut allowance: BasicAllowance =
                     cosmwasm_std::from_binary(&allowance_any.value)?;
                 allowance.expiration = expiration;
-                let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
+                let allowance_bz = match allowance.to_bytes() {
+                    Ok(bz) => bz,
+                    Err(_) => {
+                        return Err(ContractError::Std(cosmwasm_std::StdError::SerializeErr {
+                            source_type: String::from("BasicAllowance"),
+                            msg: "unable to serialize basic allowance".to_string(),
+                        }))
+                    }
+                };
                 Any {
                     type_url: allowance_any.type_url,
-                    value: allowance_bz,
+                    value: allowance_bz.into(),
                 }
             }
         },
@@ -37,10 +46,18 @@ pub fn format_allowance(
                 let mut inner_basic = allowance.basic.clone().ok_or(AllowanceUnset)?;
                 inner_basic.expiration = expiration;
                 allowance.basic = Some(inner_basic);
-                let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
+                let allowance_bz = match allowance.to_bytes() {
+                    Ok(bz) => bz,
+                    Err(_) => {
+                        return Err(ContractError::Std(cosmwasm_std::StdError::SerializeErr {
+                            source_type: String::from("PeriodicAllowance"),
+                            msg: "unable to serialize periodic allowance".to_string(),
+                        }))
+                    }
+                };
                 Any {
                     type_url: allowance_any.type_url,
-                    value: allowance_bz,
+                    value: allowance_bz.into(),
                 }
             }
         },
@@ -55,10 +72,18 @@ pub fn format_allowance(
                 expiration,
             )?;
             allowance.allowance = Some(inner_allowance.into());
-            let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
+            let allowance_bz = match allowance.to_bytes() {
+                Ok(bz) => bz,
+                Err(_) => {
+                    return Err(ContractError::Std(cosmwasm_std::StdError::SerializeErr {
+                        source_type: String::from("AllowedMsgAllowance"),
+                        msg: "unable to serialize allowed msg allowance".to_string(),
+                    }))
+                }
+            };
             Any {
                 type_url: allowance_any.type_url,
-                value: allowance_bz,
+                value: allowance_bz.into(),
             }
         }
 
@@ -72,10 +97,18 @@ pub fn format_allowance(
             )?;
             allowance.allowance = Some(inner_allowance.into());
             allowance.authz_grantee = grantee.into_string();
-            let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
+            let allowance_bz = match allowance.to_bytes() {
+                Ok(bz) => bz,
+                Err(_) => {
+                    return Err(ContractError::Std(cosmwasm_std::StdError::SerializeErr {
+                        source_type: String::from("AuthzAllowance"),
+                        msg: "unable to serialize authz allowance".to_string(),
+                    }))
+                }
+            };
             Any {
                 type_url: allowance_any.type_url,
-                value: allowance_bz,
+                value: allowance_bz.into(),
             }
         }
 
@@ -89,10 +122,18 @@ pub fn format_allowance(
                 expiration,
             )?;
             allowance.allowance = Some(inner_allowance.into());
-            let allowance_bz = cosmwasm_std::to_binary(&allowance)?;
+            let allowance_bz = match allowance.to_bytes() {
+                Ok(bz) => bz,
+                Err(_) => {
+                    return Err(ContractError::Std(cosmwasm_std::StdError::SerializeErr {
+                        source_type: String::from("ContractAllowance"),
+                        msg: "unable to serialize contract allowance".to_string(),
+                    }))
+                }
+            };
             Any {
                 type_url: allowance_any.type_url,
-                value: allowance_bz,
+                value: allowance_bz.into(),
             }
         }
         _ => {
