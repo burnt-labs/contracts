@@ -101,6 +101,7 @@ pub fn remove_grant_config(
 pub fn deploy_fee_grant(
     deps: DepsMut,
     env: Env,
+    info: MessageInfo,
     authz_granter: Addr,
     authz_grantee: Addr,
     msg_type_url: String,
@@ -150,22 +151,47 @@ pub fn deploy_fee_grant(
     if grant_config.authorization.ne(auth) {
         return Err(AuthzGrantMismatch);
     }
-    // todo: do we allow authorizations without expiry?
 
     // create feegrant, if needed
     match grant_config.allowance {
         None => Ok(Response::new()),
         // allowance should be stored as a prost proto from the feegrant definition
         Some(allowance) => {
-            let expiration = grant["expiration"].as_str().map(|t| {
-                match timestamp::deserialize(StringDeserializer::<Error>::new(t.to_string())) {
-                    Ok(tm) => Timestamp {
-                        seconds: tm.seconds,
-                        nanos: tm.nanos,
-                    },
-                    Err(_) => Timestamp::default(),
+            let grant_expiration =
+                grant["expiration"].as_str().map(|t| {
+                    match timestamp::deserialize(StringDeserializer::<Error>::new(t.to_string())) {
+                        Ok(tm) => Timestamp {
+                            seconds: tm.seconds,
+                            nanos: tm.nanos,
+                        },
+                        Err(_) => Timestamp::default(),
+                    }
+                });
+
+            let max_expiration = match grant_config.max_duration {
+                None => None,
+                Some(duration) => {
+                    let max_timestamp = env.block.time.plus_seconds(duration as u64);
+                    Some(Timestamp {
+                        seconds: max_timestamp.seconds() as i64,
+                        nanos: max_timestamp.nanos() as i32,
+                    })
                 }
-            });
+            };
+
+            let expiration = match grant_expiration {
+                None => max_expiration,
+                Some(grant_expiration) => match max_expiration {
+                    None => Some(grant_expiration),
+                    Some(max_expiration) => {
+                        if max_expiration.seconds < grant_expiration.seconds {
+                            Some(max_expiration)
+                        } else {
+                            Some(grant_expiration)
+                        }
+                    }
+                },
+            };
 
             let formatted_allowance = format_allowance(
                 allowance,
