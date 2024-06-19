@@ -4,6 +4,7 @@ use crate::grant::Any;
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{
     AllowedMsgAllowance, BasicAllowance, PeriodicAllowance,
 };
+use cosmos_sdk_proto::prost::Message;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmos_sdk_proto::xion::v1::{AuthzAllowance, ContractsAllowance};
 use cosmwasm_std::Addr;
@@ -19,8 +20,13 @@ pub fn format_allowance(
         "/cosmos.feegrant.v1beta1.BasicAllowance" => match expiration.clone() {
             None => allowance_any,
             Some(_) => {
-                let mut allowance: BasicAllowance =
-                    cosmwasm_std::from_binary(&allowance_any.value)?;
+                let mut allowance = BasicAllowance::decode::<&[u8]>(allowance_any.value.as_slice())
+                    .map_err(|err| {
+                        ContractError::Std(cosmwasm_std::StdError::ParseErr {
+                            target_type: "Basic Allowance".to_string(),
+                            msg: err.to_string(),
+                        })
+                    })?;
                 allowance.expiration = expiration;
                 let allowance_bz = match allowance.to_bytes() {
                     Ok(bz) => bz,
@@ -41,8 +47,15 @@ pub fn format_allowance(
         "/cosmos.feegrant.v1beta1.PeriodicAllowance" => match expiration.clone() {
             None => allowance_any,
             Some(_) => {
-                let mut allowance: PeriodicAllowance =
-                    cosmwasm_std::from_binary(&allowance_any.value)?;
+                let mut allowance = PeriodicAllowance::decode::<&[u8]>(
+                    allowance_any.value.as_slice(),
+                )
+                .map_err(|err| {
+                    ContractError::Std(cosmwasm_std::StdError::ParseErr {
+                        target_type: "Periodic Allowance".to_string(),
+                        msg: err.to_string(),
+                    })
+                })?;
                 let mut inner_basic = allowance.basic.clone().ok_or(AllowanceUnset)?;
                 inner_basic.expiration = expiration;
                 allowance.basic = Some(inner_basic);
@@ -63,8 +76,15 @@ pub fn format_allowance(
         },
 
         "/cosmos.feegrant.v1beta1.AllowedMsgAllowance" => {
-            let mut allowance: AllowedMsgAllowance =
-                cosmwasm_std::from_binary(&allowance_any.value)?;
+            let mut allowance = AllowedMsgAllowance::decode::<&[u8]>(
+                allowance_any.value.as_slice(),
+            )
+            .map_err(|err| {
+                ContractError::Std(cosmwasm_std::StdError::ParseErr {
+                    target_type: "Allowed Msg Allowance".to_string(),
+                    msg: err.to_string(),
+                })
+            })?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
                 _granter,
@@ -88,7 +108,13 @@ pub fn format_allowance(
         }
 
         "/xion.v1.AuthzAllowance" => {
-            let mut allowance: AuthzAllowance = cosmwasm_std::from_binary(&allowance_any.value)?;
+            let mut allowance = AuthzAllowance::decode::<&[u8]>(allowance_any.value.as_slice())
+                .map_err(|err| {
+                    ContractError::Std(cosmwasm_std::StdError::ParseErr {
+                        target_type: "Authz Allowance".to_string(),
+                        msg: err.to_string(),
+                    })
+                })?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
                 _granter,
@@ -113,8 +139,13 @@ pub fn format_allowance(
         }
 
         "/xion.v1.ContractsAllowance" => {
-            let mut allowance: ContractsAllowance =
-                cosmwasm_std::from_binary(&allowance_any.value)?;
+            let mut allowance = ContractsAllowance::decode::<&[u8]>(allowance_any.value.as_slice())
+                .map_err(|err| {
+                    ContractError::Std(cosmwasm_std::StdError::ParseErr {
+                        target_type: "Contract Allowance".to_string(),
+                        msg: err.to_string(),
+                    })
+                })?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
                 _granter,
