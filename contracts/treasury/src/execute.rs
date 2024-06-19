@@ -178,15 +178,7 @@ pub fn deploy_fee_grant(
                 grantee: authz_grantee.into_string(),
                 allowance: Some(formatted_allowance.into()),
             };
-            let feegrant_msg_bytes = match feegrant_msg.to_bytes() {
-                Ok(bz) => bz,
-                Err(_) => {
-                    return Err(ContractError::Std(cosmwasm_std::StdError::SerializeErr {
-                        source_type: String::from("FeeGrantMsg"),
-                        msg: "Unable to serialize FeeGrantMsg".to_string(),
-                    }))
-                }
-            };
+            let feegrant_msg_bytes = feegrant_msg.to_bytes()?;
             // todo: what if a feegrant already exists?
             let cosmos_msg = CosmosMsg::Stargate {
                 type_url: "/cosmos.feegrant.v1beta1.MsgGrantAllowance".to_string(),

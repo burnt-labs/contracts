@@ -2,6 +2,9 @@
 pub enum ContractError {
     #[error(transparent)]
     Std(#[from] cosmwasm_std::StdError),
+    
+    #[error(transparent)]
+    Encode(#[from] cosmos_sdk_proto::prost::EncodeError),
 
     #[error("authz grant not found")]
     AuthzGrantNotFound,
