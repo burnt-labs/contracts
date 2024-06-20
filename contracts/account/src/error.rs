@@ -71,6 +71,12 @@ pub enum ContractError {
 
     #[error("cannot override existing authenticator at index {index}")]
     OverridingIndex { index: u8 },
+
+    #[error(transparent)]
+    SerdeJSON(#[from] serde_json::Error),
+
+    #[error(transparent)]
+    FromUTF8(#[from] std::string::FromUtf8Error),
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
