@@ -101,7 +101,6 @@ pub fn remove_grant_config(
 pub fn deploy_fee_grant(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
     authz_granter: Addr,
     authz_grantee: Addr,
     msg_type_url: String,

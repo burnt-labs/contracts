@@ -4,7 +4,6 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Binary;
 use prost::bytes::Bytes;
 use serde_json::Value;
-use std::time::Duration;
 
 #[cw_serde]
 pub struct GrantConfig {
