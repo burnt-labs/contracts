@@ -43,10 +43,10 @@ pub fn execute(
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GrantConfigByTypeURL { msg_type_url } => to_binary(
+        QueryMsg::GrantConfigByTypeUrl { msg_type_url } => to_binary(
             &query::grant_config_by_type_url(deps.storage, msg_type_url)?,
         ),
-        QueryMsg::GrantConfigTypeURLs {} => {
+        QueryMsg::GrantConfigTypeUrls {} => {
             to_binary(&query::grant_config_type_urls(deps.storage)?)
         }
     }

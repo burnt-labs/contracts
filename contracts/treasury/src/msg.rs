@@ -33,8 +33,8 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     /// Query the grant config by type url
     #[returns(Binary)]
-    GrantConfigByTypeURL { msg_type_url: String },
+    GrantConfigByTypeUrl { msg_type_url: String },
 
     #[returns(Binary)]
-    GrantConfigTypeURLs {},
+    GrantConfigTypeUrls {},
 }
