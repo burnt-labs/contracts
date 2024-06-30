@@ -19,10 +19,7 @@ pub fn init(
     Ok(
         Response::new().add_event(Event::new("create_abstract_account").add_attributes(vec![
             ("contract_address", env.contract.address.to_string()),
-            (
-                "authenticator",
-                serde_json::to_string(&add_authenticator).unwrap(),
-            ),
+            ("authenticator", serde_json::to_string(&add_authenticator)?),
             ("authenticator_id", add_authenticator.get_id().to_string()),
         ])),
     )
@@ -227,10 +224,7 @@ pub fn add_auth_method(
     Ok(
         Response::new().add_event(Event::new("add_auth_method").add_attributes(vec![
             ("contract_address", env.contract.address.clone().to_string()),
-            (
-                "authenticator",
-                serde_json::to_string(&add_authenticator).unwrap(),
-            ),
+            ("authenticator", serde_json::to_string(&add_authenticator)?),
         ])),
     )
 }

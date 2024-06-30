@@ -42,7 +42,7 @@ pub fn verify(
     let query = proto::QueryValidateJWTRequest {
         aud: aud.to_string(),
         sub: sub.to_string(),
-        sig_bytes: String::from_utf8(sig_bytes.into()).unwrap(),
+        sig_bytes: String::from_utf8(sig_bytes.into())?,
         // tx_hash: challenge,
     };
 
