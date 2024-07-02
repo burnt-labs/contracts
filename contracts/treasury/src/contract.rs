@@ -2,7 +2,7 @@ use crate::error::ContractResult;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::{execute, query, CONTRACT_NAME, CONTRACT_VERSION};
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
 
 #[entry_point]
@@ -43,11 +43,11 @@ pub fn execute(
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GrantConfigByTypeUrl { msg_type_url } => to_binary(
+        QueryMsg::GrantConfigByTypeUrl { msg_type_url } => to_json_binary(
             &query::grant_config_by_type_url(deps.storage, msg_type_url)?,
         ),
         QueryMsg::GrantConfigTypeUrls {} => {
-            to_binary(&query::grant_config_type_urls(deps.storage)?)
+            to_json_binary(&query::grant_config_type_urls(deps.storage)?)
         }
     }
 }

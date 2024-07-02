@@ -55,7 +55,7 @@ pub fn verify(
     components.next().ok_or(InvalidToken)?; // ignore the header, it is not currently used
     let payload_bytes = components.next().ok_or(InvalidToken)?;
     let payload = URL_SAFE_NO_PAD.decode(payload_bytes)?;
-    let claims: Claims = cosmwasm_std::from_slice(payload.as_slice())?;
+    let claims: Claims = cosmwasm_std::from_json(payload.as_slice())?;
 
     // make sure the provided hash matches the one from the tx
     if tx_hash.eq(&claims.transaction_hash) {
