@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
 
 use absacc::AccountSudoMsg;
@@ -69,9 +69,9 @@ pub fn execute(
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::AuthenticatorIDs {} => to_binary(&query::authenticator_ids(deps.storage)?),
+        QueryMsg::AuthenticatorIDs {} => to_json_binary(&query::authenticator_ids(deps.storage)?),
         QueryMsg::AuthenticatorByID { id } => {
-            to_binary(&query::authenticator_by_id(deps.storage, id)?)
+            to_json_binary(&query::authenticator_by_id(deps.storage, id)?)
         }
     }
 }
