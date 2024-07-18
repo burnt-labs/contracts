@@ -1,4 +1,5 @@
 use crate::error::ContractResult;
+use crate::execute::update_fee_config;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::{execute, query, CONTRACT_NAME, CONTRACT_VERSION};
 use cosmwasm_std::{
@@ -36,7 +37,7 @@ pub fn execute(
         ExecuteMsg::RemoveGrantConfig { msg_type_url } => {
             execute::remove_grant_config(deps, info, msg_type_url)
         }
-        ExecuteMsg::UpdateFeeConfig { fee_config } => {}
+        ExecuteMsg::UpdateFeeConfig { fee_config } => update_fee_config(deps, info, fee_config),
     }
 }
 
@@ -49,5 +50,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GrantConfigTypeUrls {} => {
             to_json_binary(&query::grant_config_type_urls(deps.storage)?)
         }
+        QueryMsg::FeeConfig {} => to_json_binary(&query::fee_config(deps.storage)?),
+        QueryMsg::Admin {} => to_json_binary(&query::admin(deps.storage)?),
     }
 }

@@ -4,7 +4,7 @@ use crate::error::ContractError::{
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
-use crate::grant::GrantConfig;
+use crate::grant::{FeeConfig, GrantConfig};
 use crate::state::{ADMIN, FEE_CONFIG, GRANT_CONFIGS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{QueryAllowanceRequest, QueryAllowanceResponse};
@@ -97,6 +97,21 @@ pub fn remove_grant_config(
         Event::new("removed_treasury_grant_config")
             .add_attributes(vec![("msg type url", msg_type_url)]),
     ))
+}
+
+pub fn update_fee_config(
+    deps: DepsMut,
+    info: MessageInfo,
+    fee_config: FeeConfig,
+) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    FEE_CONFIG.save(deps.storage, &fee_config)?;
+
+    Ok(Response::new().add_event(Event::new("updated_treasury_fee_config")))
 }
 
 pub fn deploy_fee_grant(
