@@ -1,4 +1,4 @@
-use crate::grant::GrantConfig;
+use crate::grant::{FeeConfig, GrantConfig};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Binary};
 
@@ -7,6 +7,7 @@ pub struct InstantiateMsg {
     pub admin: Option<Addr>,
     pub type_urls: Vec<String>,
     pub grant_configs: Vec<GrantConfig>,
+    pub fee_config: FeeConfig,
 }
 
 #[cw_serde]
@@ -21,10 +22,13 @@ pub enum ExecuteMsg {
     RemoveGrantConfig {
         msg_type_url: String,
     },
+    UpdateFeeConfig {
+        fee_config: FeeConfig,
+    },
     DeployFeeGrant {
         authz_granter: Addr,
         authz_grantee: Addr,
-        msg_type_url: String,
+        update: bool,
     },
 }
 
@@ -37,4 +41,10 @@ pub enum QueryMsg {
 
     #[returns(Binary)]
     GrantConfigTypeUrls {},
+
+    #[returns(Binary)]
+    FeeConfig {},
+
+    #[returns(Binary)]
+    Admin {},
 }
