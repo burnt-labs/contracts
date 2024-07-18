@@ -1,16 +1,16 @@
-use crate::error::ContractError::{
-    self, AuthzGrantMismatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
-    Unauthorized,
-};
-use crate::error::ContractResult;
-use crate::grant::allowance::format_allowance;
-use crate::grant::{FeeConfig, GrantConfig};
-use crate::state::{ADMIN, FEE_CONFIG, GRANT_CONFIGS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{QueryAllowanceRequest, QueryAllowanceResponse};
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response};
 use pbjson_types::Timestamp;
+
+use crate::error::ContractError::{
+    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized,
+};
+use crate::error::ContractResult;
+use crate::grant::allowance::format_allowance;
+use crate::grant::{FeeConfig, GrantConfig};
+use crate::state::{ADMIN, FEE_CONFIG, GRANT_CONFIGS};
 
 pub fn init(
     deps: DepsMut,
@@ -124,13 +124,13 @@ pub fn deploy_fee_grant(
         let grant_config = GRANT_CONFIGS.load(deps.storage, msg_type_url.clone())?;
 
         // check if grant exists on chain
-        let authz_query_msg = QueryGrantsRequest {
+        let authz_query_msg_bytes = QueryGrantsRequest {
             granter: authz_granter.to_string(),
             grantee: authz_grantee.to_string(),
             msg_type_url: msg_type_url.clone(),
             pagination: None,
-        };
-        let authz_query_msg_bytes = authz_query_msg.to_bytes()?;
+        }
+        .to_bytes()?;
         let authz_query_res =
             deps.querier
                 .query::<QueryGrantsResponse>(&cosmwasm_std::QueryRequest::Stargate {
@@ -187,23 +187,24 @@ pub fn deploy_fee_grant(
                 authz_grantee.clone(),
                 expiration,
             )?;
-            let feegrant_msg = cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgGrantAllowance {
-                granter: env.contract.address.clone().into_string(),
-                grantee: authz_grantee.clone().into_string(),
-                allowance: Some(formatted_allowance.into()),
-            };
-            let feegrant_msg_bytes = feegrant_msg.to_bytes()?;
+            let feegrant_msg_bytes =
+                cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgGrantAllowance {
+                    granter: env.contract.address.clone().into_string(),
+                    grantee: authz_grantee.clone().into_string(),
+                    allowance: Some(formatted_allowance.into()),
+                }
+                .to_bytes()?;
             let cosmos_feegrant_msg = CosmosMsg::Stargate {
                 type_url: "/cosmos.feegrant.v1beta1.MsgGrantAllowance".to_string(),
                 value: feegrant_msg_bytes.into(),
             };
 
             // check to see if the user already has an existing feegrant
-            let feegrant_query_msg = QueryAllowanceRequest {
+            let feegrant_query_msg_bytes = QueryAllowanceRequest {
                 granter: authz_granter.to_string(),
                 grantee: authz_grantee.to_string(),
-            };
-            let feegrant_query_msg_bytes = feegrant_query_msg.to_bytes()?;
+            }
+            .to_bytes()?;
             let feegrant_query_res = deps.querier.query::<QueryAllowanceResponse>(
                 &cosmwasm_std::QueryRequest::Stargate {
                     path: "/cosmos.feegrant.v1beta1.Query/Allowance".to_string(),
@@ -213,12 +214,12 @@ pub fn deploy_fee_grant(
 
             let mut msgs: Vec<CosmosMsg> = Vec::new();
             if feegrant_query_res.allowance.is_some() {
-                let feegrant_revoke_msg =
+                let feegrant_revoke_msg_bytes =
                     cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgRevokeAllowance {
                         granter: env.contract.address.clone().into_string(),
                         grantee: authz_grantee.clone().into_string(),
-                    };
-                let feegrant_revoke_msg_bytes = feegrant_revoke_msg.to_bytes()?;
+                    }
+                    .to_bytes()?;
                 let cosmos_revoke_msg = CosmosMsg::Stargate {
                     type_url: "/cosmos.feegrant.v1beta1.MsgRevokeAllowance".to_string(),
                     value: feegrant_revoke_msg_bytes.into(),
@@ -242,11 +243,12 @@ pub fn revoke_allowance(
         return Err(Unauthorized);
     }
 
-    let feegrant_revoke_msg = cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgRevokeAllowance {
-        granter: env.contract.address.into_string(),
-        grantee: grantee.clone().into_string(),
-    };
-    let feegrant_revoke_msg_bytes = feegrant_revoke_msg.to_bytes()?;
+    let feegrant_revoke_msg_bytes =
+        cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgRevokeAllowance {
+            granter: env.contract.address.into_string(),
+            grantee: grantee.clone().into_string(),
+        }
+        .to_bytes()?;
     let cosmos_feegrant_revoke_msg = CosmosMsg::Stargate {
         type_url: "/cosmos.feegrant.v1beta1.MsgRevokeAllowance".to_string(),
         value: feegrant_revoke_msg_bytes.into(),
