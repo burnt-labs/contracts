@@ -27,8 +27,7 @@ pub fn execute(
         ExecuteMsg::DeployFeeGrant {
             authz_granter,
             authz_grantee,
-            update,
-        } => execute::deploy_fee_grant(deps, env, authz_granter, authz_grantee, update),
+        } => execute::deploy_fee_grant(deps, env, authz_granter, authz_grantee),
         ExecuteMsg::UpdateAdmin { new_admin } => execute::update_admin(deps, info, new_admin),
         ExecuteMsg::UpdateGrantConfig {
             msg_type_url,

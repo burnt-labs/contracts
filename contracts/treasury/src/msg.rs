@@ -28,7 +28,6 @@ pub enum ExecuteMsg {
     DeployFeeGrant {
         authz_granter: Addr,
         authz_grantee: Addr,
-        update: bool,
     },
 }
 

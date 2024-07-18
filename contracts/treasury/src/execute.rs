@@ -7,6 +7,7 @@ use crate::grant::allowance::format_allowance;
 use crate::grant::GrantConfig;
 use crate::state::{ADMIN, FEE_CONFIG, GRANT_CONFIGS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
+use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{QueryAllowanceRequest, QueryAllowanceResponse};
 use cosmos_sdk_proto::tendermint::serializers::timestamp;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response};
@@ -103,7 +104,6 @@ pub fn deploy_fee_grant(
     env: Env,
     authz_granter: Addr,
     authz_grantee: Addr,
-    update: bool,
 ) -> ContractResult<Response> {
     // iterate through all grant configs to validate user has correct permissions
     // we must iterate, because calling for the list of grants doesn't return msg_type_urls
@@ -156,6 +156,20 @@ pub fn deploy_fee_grant(
         None => Ok(Response::new()),
         // allowance should be stored as a prost proto from the feegrant definition
         Some(allowance) => {
+            // check to see if the user already has an existing feegrant
+            let feegrant_query_msg = QueryAllowanceRequest {
+                granter: authz_granter.to_string(),
+                grantee: authz_grantee.to_string(),
+            };
+            let feegrant_query_msg_bytes = feegrant_query_msg.to_bytes()?;
+            let feegrant_query_res =
+                deps.querier
+                    .query::<QueryAllowanceResponse>(&cosmwasm_std::QueryRequest::Stargate {
+                        path: "/cosmos.feegrant.v1beta1.Query/Allowance".to_string(),
+                        data: feegrant_query_msg_bytes.into(),
+                    })?;
+            let update = feegrant_query_res.allowance.is_some();
+            
             // build the new allowance based on expiration
             let expiration = match fee_config.expiration {
                 None => None,
@@ -187,6 +201,7 @@ pub fn deploy_fee_grant(
             let response = Response::new();
             if update {
                 // the submitter claims a feegrant already exists, so we must revoke the existing one
+                // perhaps in a future version we will make this check dynamic, but it seems expensive
                 let feegrant_revoke_msg =
                     cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgRevokeAllowance {
                         granter: env.contract.address.clone().into_string(),
