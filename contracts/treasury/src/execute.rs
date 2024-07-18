@@ -8,12 +8,9 @@ use crate::grant::{FeeConfig, GrantConfig};
 use crate::state::{ADMIN, FEE_CONFIG, GRANT_CONFIGS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{QueryAllowanceRequest, QueryAllowanceResponse};
-use cosmos_sdk_proto::tendermint::serializers::timestamp;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response};
-use pbjson_types::{Any, Timestamp};
-use serde::de::value::{Error, StringDeserializer};
-use serde_json::Value;
+use pbjson_types::Timestamp;
 
 pub fn init(
     deps: DepsMut,
@@ -191,8 +188,8 @@ pub fn deploy_fee_grant(
                 expiration,
             )?;
             let feegrant_msg = cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgGrantAllowance {
-                granter: env.contract.address.into_string(),
-                grantee: authz_grantee.into_string(),
+                granter: env.contract.address.clone().into_string(),
+                grantee: authz_grantee.clone().into_string(),
                 allowance: Some(formatted_allowance.into()),
             };
             let feegrant_msg_bytes = feegrant_msg.to_bytes()?;
@@ -200,7 +197,6 @@ pub fn deploy_fee_grant(
                 type_url: "/cosmos.feegrant.v1beta1.MsgGrantAllowance".to_string(),
                 value: feegrant_msg_bytes.into(),
             };
-            let response = Response::new();
 
             // check to see if the user already has an existing feegrant
             let feegrant_query_msg = QueryAllowanceRequest {
@@ -215,6 +211,7 @@ pub fn deploy_fee_grant(
                 },
             )?;
 
+            let mut msgs: Vec<CosmosMsg> = Vec::new();
             if feegrant_query_res.allowance.is_some() {
                 let feegrant_revoke_msg =
                     cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgRevokeAllowance {
@@ -226,9 +223,39 @@ pub fn deploy_fee_grant(
                     type_url: "/cosmos.feegrant.v1beta1.MsgRevokeAllowance".to_string(),
                     value: feegrant_revoke_msg_bytes.into(),
                 };
-                response.add_message(cosmos_revoke_msg);
+                msgs.push(cosmos_revoke_msg);
             }
-            Ok(response.clone().add_message(cosmos_feegrant_msg))
+            msgs.push(cosmos_feegrant_msg);
+            Ok(Response::new().add_messages(msgs))
         }
     }
+}
+
+pub fn revoke_allowance(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    grantee: Addr,
+) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    let feegrant_revoke_msg = cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgRevokeAllowance {
+        granter: env.contract.address.into_string(),
+        grantee: grantee.clone().into_string(),
+    };
+    let feegrant_revoke_msg_bytes = feegrant_revoke_msg.to_bytes()?;
+    let cosmos_feegrant_revoke_msg = CosmosMsg::Stargate {
+        type_url: "/cosmos.feegrant.v1beta1.MsgRevokeAllowance".to_string(),
+        value: feegrant_revoke_msg_bytes.into(),
+    };
+
+    Ok(Response::new()
+        .add_message(cosmos_feegrant_revoke_msg)
+        .add_event(
+            Event::new("revoked_treasury_allowance")
+                .add_attributes(vec![("grantee", grantee.into_string())]),
+        ))
 }

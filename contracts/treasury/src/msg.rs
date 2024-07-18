@@ -29,6 +29,9 @@ pub enum ExecuteMsg {
         authz_granter: Addr,
         authz_grantee: Addr,
     },
+    RevokeAllowance {
+        grantee: Addr,
+    },
 }
 
 #[cw_serde]
