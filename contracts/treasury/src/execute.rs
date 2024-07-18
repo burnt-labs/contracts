@@ -153,23 +153,10 @@ pub fn deploy_fee_grant(
     let fee_config = FEE_CONFIG.load(deps.storage)?;
     // create feegrant, if needed
     match fee_config.allowance {
+        // this treasury doesn't deploy any fees, and can return
         None => Ok(Response::new()),
         // allowance should be stored as a prost proto from the feegrant definition
         Some(allowance) => {
-            // check to see if the user already has an existing feegrant
-            let feegrant_query_msg = QueryAllowanceRequest {
-                granter: authz_granter.to_string(),
-                grantee: authz_grantee.to_string(),
-            };
-            let feegrant_query_msg_bytes = feegrant_query_msg.to_bytes()?;
-            let feegrant_query_res =
-                deps.querier
-                    .query::<QueryAllowanceResponse>(&cosmwasm_std::QueryRequest::Stargate {
-                        path: "/cosmos.feegrant.v1beta1.Query/Allowance".to_string(),
-                        data: feegrant_query_msg_bytes.into(),
-                    })?;
-            let update = feegrant_query_res.allowance.is_some();
-            
             // build the new allowance based on expiration
             let expiration = match fee_config.expiration {
                 None => None,
@@ -199,9 +186,21 @@ pub fn deploy_fee_grant(
                 value: feegrant_msg_bytes.into(),
             };
             let response = Response::new();
-            if update {
-                // the submitter claims a feegrant already exists, so we must revoke the existing one
-                // perhaps in a future version we will make this check dynamic, but it seems expensive
+
+            // check to see if the user already has an existing feegrant
+            let feegrant_query_msg = QueryAllowanceRequest {
+                granter: authz_granter.to_string(),
+                grantee: authz_grantee.to_string(),
+            };
+            let feegrant_query_msg_bytes = feegrant_query_msg.to_bytes()?;
+            let feegrant_query_res = deps.querier.query::<QueryAllowanceResponse>(
+                &cosmwasm_std::QueryRequest::Stargate {
+                    path: "/cosmos.feegrant.v1beta1.Query/Allowance".to_string(),
+                    data: feegrant_query_msg_bytes.into(),
+                },
+            )?;
+
+            if feegrant_query_res.allowance.is_some() {
                 let feegrant_revoke_msg =
                     cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgRevokeAllowance {
                         granter: env.contract.address.clone().into_string(),
