@@ -14,7 +14,14 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    execute::init(deps, info, msg.admin, msg.type_urls, msg.grant_configs, msg.fee_config)
+    execute::init(
+        deps,
+        info,
+        msg.admin,
+        msg.type_urls,
+        msg.grant_configs,
+        msg.fee_config,
+    )
 }
 
 #[entry_point]

@@ -3,9 +3,11 @@ use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{QueryAllowanceRequest, QueryAl
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response};
 use pbjson_types::Timestamp;
+use serde_json::Value;
 
 use crate::error::ContractError::{
-    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized,
+    AuthzGrantMismatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
+    Unauthorized,
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
@@ -34,6 +36,8 @@ pub fn init(
         GRANT_CONFIGS.save(deps.storage, type_urls[i].clone(), &grant_configs[i])?;
     }
     
+    FEE_CONFIG.save(deps.storage, &fee_config)?;
+
     FEE_CONFIG.save(deps.storage, &fee_config)?;
 
     Ok(Response::new().add_event(
@@ -136,32 +140,46 @@ pub fn deploy_fee_grant(
         .to_bytes()?;
         let authz_query_res =
             deps.querier
-                .query::<QueryGrantsResponse>(&cosmwasm_std::QueryRequest::Stargate {
+                .query::<Value>(&cosmwasm_std::QueryRequest::Stargate {
                     path: "/cosmos.authz.v1beta1.Query/Grants".to_string(),
                     data: authz_query_msg_bytes.into(),
                 })?;
 
-        let grants = &authz_query_res.grants;
+        let grants = &authz_query_res["grants"];
         // grant queries with a granter, grantee and type_url should always result
         // in only one result, unless the grant is optional
-        if grants.clone().is_empty() && !grant_config.optional {
+        if !grants.is_array() {
             return Err(AuthzGrantNotFound { msg_type_url });
-        } else {
-            match grants.first() {
-                None => return Err(AuthzGrantNotFound { msg_type_url }),
-                Some(grant) => {
-                    match grant.clone().authorization {
-                        None => return Err(AuthzGrantNotFound { msg_type_url }),
-                        Some(auth) => {
-                            // the authorization must match the one in the config
-                            if grant_config.authorization.ne(&auth.into()) {
-                                return Err(AuthzGrantMismatch);
-                            }
-                        }
-                    }
-                }
-            }
         }
+        let grant = grants[0].clone();
+        if grant.is_null() {
+            return Err(AuthzGrantNotFound { msg_type_url });
+        }
+        let auth = &grant["authorization"];
+        if auth.is_null() {
+            return Err(AuthzGrantNoAuthorization);
+        }
+        if grant_config.authorization.ne(auth) {
+            return Err(AuthzGrantMismatch);
+        }
+        // if grants.clone().is_empty() && !grant_config.optional {
+        //     return Err(AuthzGrantNotFound { msg_type_url });
+        // } else {
+        //     match grants.first() {
+        //         None => return Err(AuthzGrantNotFound { msg_type_url }),
+        //         Some(grant) => {
+        //             match grant.clone().authorization {
+        //                 None => return Err(AuthzGrantNotFound { msg_type_url }),
+        //                 Some(auth) => {
+        //                     // the authorization must match the one in the config
+        //                     if grant_config.authorization.ne(&auth.into()) {
+        //                         return Err(AuthzGrantMismatch);
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }
     // at this point, all the authz grants in the grant_config are verified
 
@@ -179,7 +197,7 @@ pub fn deploy_fee_grant(
                     let expiration_time = env.block.time.plus_seconds(seconds as u64);
                     Some(Timestamp {
                         seconds: expiration_time.seconds() as i64,
-                        nanos: expiration_time.nanos() as i32,
+                        nanos: expiration_time.subsec_nanos() as i32,
                     })
                 }
             };
@@ -208,12 +226,13 @@ pub fn deploy_fee_grant(
                 grantee: authz_grantee.to_string(),
             }
             .to_bytes()?;
-            let feegrant_query_res = deps.querier.query::<QueryAllowanceResponse>(
-                &cosmwasm_std::QueryRequest::Stargate {
+            let feegrant_query_res = deps
+                .querier
+                .query::<QueryAllowanceResponse>(&cosmwasm_std::QueryRequest::Stargate {
                     path: "/cosmos.feegrant.v1beta1.Query/Allowance".to_string(),
                     data: feegrant_query_msg_bytes.into(),
-                },
-            )?;
+                })
+                .unwrap_or_default();
 
             let mut msgs: Vec<CosmosMsg> = Vec::new();
             if feegrant_query_res.allowance.is_some() {
