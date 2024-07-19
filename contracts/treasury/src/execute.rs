@@ -18,6 +18,7 @@ pub fn init(
     admin: Option<Addr>,
     type_urls: Vec<String>,
     grant_configs: Vec<GrantConfig>,
+    fee_config: FeeConfig,
 ) -> ContractResult<Response> {
     let treasury_admin = match admin {
         None => info.sender,
@@ -32,6 +33,8 @@ pub fn init(
     for i in 0..type_urls.len() {
         GRANT_CONFIGS.save(deps.storage, type_urls[i].clone(), &grant_configs[i])?;
     }
+    
+    FEE_CONFIG.save(deps.storage, &fee_config)?;
 
     Ok(Response::new().add_event(
         Event::new("create_treasury_instance")
