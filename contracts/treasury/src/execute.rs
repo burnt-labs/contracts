@@ -35,8 +35,6 @@ pub fn init(
     for i in 0..type_urls.len() {
         GRANT_CONFIGS.save(deps.storage, type_urls[i].clone(), &grant_configs[i])?;
     }
-    
-    FEE_CONFIG.save(deps.storage, &fee_config)?;
 
     FEE_CONFIG.save(deps.storage, &fee_config)?;
 
