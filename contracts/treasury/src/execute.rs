@@ -220,20 +220,20 @@ pub fn deploy_fee_grant(
 
             // check to see if the user already has an existing feegrant
             let feegrant_query_msg_bytes = QueryAllowanceRequest {
-                granter: authz_granter.to_string(),
+                granter: env.contract.address.to_string(),
                 grantee: authz_grantee.to_string(),
             }
             .to_bytes()?;
             let feegrant_query_res = deps
                 .querier
-                .query::<QueryAllowanceResponse>(&cosmwasm_std::QueryRequest::Stargate {
+                .query::<Value>(&cosmwasm_std::QueryRequest::Stargate {
                     path: "/cosmos.feegrant.v1beta1.Query/Allowance".to_string(),
                     data: feegrant_query_msg_bytes.into(),
                 })
-                .unwrap_or_default();
+                .unwrap_or_else(|_| serde_json::json!({"allowance": null}));
 
             let mut msgs: Vec<CosmosMsg> = Vec::new();
-            if feegrant_query_res.allowance.is_some() {
+            if !feegrant_query_res["allowance"].is_null() {
                 let feegrant_revoke_msg_bytes =
                     cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgRevokeAllowance {
                         granter: env.contract.address.clone().into_string(),
