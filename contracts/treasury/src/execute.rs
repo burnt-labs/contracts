@@ -38,7 +38,6 @@ pub fn init(
     
     FEE_CONFIG.save(deps.storage, &fee_config)?;
 
-    FEE_CONFIG.save(deps.storage, &fee_config)?;
 
     Ok(Response::new().add_event(
         Event::new("create_treasury_instance")
