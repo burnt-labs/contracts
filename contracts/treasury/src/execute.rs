@@ -1,5 +1,5 @@
-use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest};
-use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{QueryAllowanceRequest};
+use cosmos_sdk_proto::cosmos::authz::v1beta1::QueryGrantsRequest;
+use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response};
 use pbjson_types::Timestamp;
