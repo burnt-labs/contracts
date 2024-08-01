@@ -3,18 +3,17 @@ pub mod allowance;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Binary;
 use prost::bytes::Bytes;
-use serde_json::Value;
 
 #[cw_serde]
 pub struct GrantConfig {
-    description: String,
-    pub authorization: Value,
+    pub description: String,
+    pub authorization: Any,
     pub optional: bool,
 }
 
 #[cw_serde]
 pub struct FeeConfig {
-    description: String,
+    pub description: String,
     pub allowance: Option<Any>,
     pub expiration: Option<u32>,
 }

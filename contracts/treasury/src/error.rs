@@ -4,6 +4,9 @@ pub enum ContractError {
     Std(#[from] cosmwasm_std::StdError),
 
     #[error(transparent)]
+    System(#[from] cosmwasm_std::SystemError),
+
+    #[error(transparent)]
     Encode(#[from] cosmos_sdk_proto::prost::EncodeError),
 
     #[error(transparent)]
