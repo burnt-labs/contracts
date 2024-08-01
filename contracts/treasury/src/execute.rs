@@ -1,13 +1,16 @@
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
-use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{QueryAllowanceRequest, QueryAllowanceResponse};
+use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
+use cosmos_sdk_proto::prost::Message;
 use cosmos_sdk_proto::traits::MessageExt;
-use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response};
+use cosmwasm_std::{
+    to_json_vec, Addr, CosmosMsg, DepsMut, Empty, Env, Event, MessageInfo, Order, Response,
+    SystemResult,
+};
 use pbjson_types::Timestamp;
 use serde_json::Value;
 
 use crate::error::ContractError::{
-    AuthzGrantMismatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
-    Unauthorized,
+    self, AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized,
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
@@ -136,48 +139,62 @@ pub fn deploy_fee_grant(
             pagination: None,
         }
         .to_bytes()?;
-        let authz_query_res =
-            deps.querier
-                .query::<Value>(&cosmwasm_std::QueryRequest::Stargate {
-                    path: "/cosmos.authz.v1beta1.Query/Grants".to_string(),
-                    data: authz_query_msg_bytes.into(),
-                })?;
+        let query_req = to_json_vec(&cosmwasm_std::QueryRequest::<Empty>::Stargate {
+            path: "/cosmos.authz.v1beta1.Query/Grants".to_string(),
+            data: authz_query_msg_bytes.into(),
+        })?;
+        let authz_query_res = deps.querier.raw_query(&query_req);
 
-        let grants = &authz_query_res["grants"];
+        let grants = match authz_query_res {
+            SystemResult::Ok(cosmwasm_std::ContractResult::Ok(res)) => {
+                let res = QueryGrantsResponse::decode::<&[u8]>(res.as_slice());
+                match res {
+                    Ok(res) => res.grants,
+                    Err(err) => Err(err)?,
+                }
+            }
+            SystemResult::Ok(cosmwasm_std::ContractResult::Err(err)) => {
+                Err(ContractError::Std(cosmwasm_std::StdError::GenericErr {
+                    msg: err,
+                }))?
+            }
+            SystemResult::Err(err) => Err(ContractError::System(err))?,
+        };
+
         // grant queries with a granter, grantee and type_url should always result
         // in only one result, unless the grant is optional
-        if !grants.is_array() {
-            return Err(AuthzGrantNotFound { msg_type_url });
-        }
-        let grant = grants[0].clone();
-        if grant.is_null() {
-            return Err(AuthzGrantNotFound { msg_type_url });
-        }
-        let auth = &grant["authorization"];
-        if auth.is_null() {
-            return Err(AuthzGrantNoAuthorization);
-        }
-        if grant_config.authorization.ne(auth) {
-            return Err(AuthzGrantMismatch);
-        }
-        // if grants.clone().is_empty() && !grant_config.optional {
+        // if !grants.is_array() {
         //     return Err(AuthzGrantNotFound { msg_type_url });
-        // } else {
-        //     match grants.first() {
-        //         None => return Err(AuthzGrantNotFound { msg_type_url }),
-        //         Some(grant) => {
-        //             match grant.clone().authorization {
-        //                 None => return Err(AuthzGrantNotFound { msg_type_url }),
-        //                 Some(auth) => {
-        //                     // the authorization must match the one in the config
-        //                     if grant_config.authorization.ne(&auth.into()) {
-        //                         return Err(AuthzGrantMismatch);
-        //                     }
-        //                 }
-        //             }
-        //         }
-        //     }
         // }
+        // let grant = grants[0].clone();
+        // if grant.is_null() {
+        //     return Err(AuthzGrantNotFound { msg_type_url });
+        // }
+        // let auth = &grant["authorization"];
+        // if auth.is_null() {
+        //     return Err(AuthzGrantNoAuthorization);
+        // }
+        // if grant_config.authorization.ne(auth) {
+        //     return Err(AuthzGrantMismatch);
+        // }
+        if grants.clone().is_empty() && !grant_config.optional {
+            return Err(AuthzGrantNotFound { msg_type_url });
+        } else {
+            match grants.first() {
+                None => return Err(AuthzGrantNotFound { msg_type_url }),
+                Some(grant) => {
+                    match grant.clone().authorization {
+                        None => return Err(AuthzGrantNotFound { msg_type_url }),
+                        Some(auth) => {
+                            // the authorization must match the one in the config
+                            if grant_config.authorization.ne(&auth.into()) {
+                                return Err(AuthzGrantMismatch);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     // at this point, all the authz grants in the grant_config are verified
 
