@@ -2,7 +2,8 @@ use crate::error::ContractError::{InvalidSignatureDetail, InvalidToken};
 use crate::error::ContractResult;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
-use cosmos_sdk_proto::xion::v1::QueryValidateJwtRequest;
+use cosmos_sdk_proto::traits::MessageExt;
+use cosmos_sdk_proto::xion::v1::jwk::QueryValidateJwtRequest;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Binary, Deps};
 use serde::{Deserialize, Serialize};
@@ -46,8 +47,9 @@ pub fn verify(
         // tx_hash: challenge,
     };
 
+    let query_bz = query.to_bytes()?;
     deps.querier
-        .query::<QueryValidateJWTResponse>(&query.into())?;
+        .query_grpc(String::from("path"), Binary::new(query_bz))?;
 
     // at this point we have validated the JWT. Any custom claims on it's body
     // can follow
