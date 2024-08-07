@@ -3,7 +3,6 @@ pub mod allowance;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Binary;
 use prost::bytes::Bytes;
-use serde_json::Value;
 
 #[cw_serde]
 pub struct GrantConfig {
