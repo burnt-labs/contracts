@@ -5,7 +5,7 @@ use base64::Engine as _;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmos_sdk_proto::xion::v1::jwk::QueryValidateJwtRequest;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Binary, Deps};
+use cosmwasm_std::{to_json_binary, Binary, Deps};
 use serde::{Deserialize, Serialize};
 use std::str;
 
@@ -38,8 +38,6 @@ pub fn verify(
     aud: &str,
     sub: &str,
 ) -> ContractResult<bool> {
-    // let challenge = general_purpose::STANDARD.encode(tx_hash);
-
     let query = QueryValidateJwtRequest {
         aud: aud.to_string(),
         sub: sub.to_string(),
@@ -48,8 +46,10 @@ pub fn verify(
     };
 
     let query_bz = query.to_bytes()?;
-    deps.querier
-        .query_grpc(String::from("path"), Binary::new(query_bz))?;
+    deps.querier.query_grpc(
+        String::from("/xion.jwk.v1.Query/ValidateJWT".to_string()),
+        Binary::new(query_bz),
+    )?;
 
     // at this point we have validated the JWT. Any custom claims on it's body
     // can follow
