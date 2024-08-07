@@ -8,7 +8,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-absacc             = { git = "https://github.com/larry0x/abstract-account.git" }
+absacc             = { git = "https://github.com/burnt-labs/abstract-account.git", rev = "575d2d3121df58a76139fe66f2bbbd6e1656b886" }
 cosmwasm-schema    = { workspace = true }
 cosmwasm-std       = { workspace = true }
 cw2                = { workspace = true }
