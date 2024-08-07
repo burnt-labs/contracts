@@ -1,13 +1,11 @@
+use absacc::AccountSudoMsg;
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
 
-use absacc::AccountSudoMsg;
-
 use crate::error::ContractError;
 use crate::execute::{add_auth_method, assert_self, remove_auth_method};
 use crate::msg::{ExecuteMsg, MigrateMsg};
-use crate::proto::XionCustomQuery;
 use crate::{
     error::ContractResult,
     execute,
@@ -17,7 +15,7 @@ use crate::{
 
 #[entry_point]
 pub fn instantiate(
-    deps: DepsMut<XionCustomQuery>,
+    deps: DepsMut,
     env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
@@ -27,31 +25,30 @@ pub fn instantiate(
 }
 
 #[entry_point]
-pub fn sudo(
-    deps: DepsMut<XionCustomQuery>,
-    env: Env,
-    msg: AccountSudoMsg,
-) -> ContractResult<Response> {
+pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Response> {
     match msg {
         AccountSudoMsg::BeforeTx {
             tx_bytes,
             cred_bytes,
             simulate,
             ..
-        } => execute::before_tx(
-            deps.as_ref(),
-            &env,
-            &tx_bytes,
-            cred_bytes.as_ref(),
-            simulate,
-        ),
+        } => {
+            let cred_bytes = cred_bytes.ok_or(ContractError::EmptySignature)?;
+            execute::before_tx(
+                deps.as_ref(),
+                &env,
+                &Binary::from(tx_bytes.as_slice()),
+                Some(Binary::from(cred_bytes.as_slice())).as_ref(),
+                simulate,
+            )
+        }
         AccountSudoMsg::AfterTx { .. } => execute::after_tx(),
     }
 }
 
 #[entry_point]
 pub fn execute(
-    deps: DepsMut<XionCustomQuery>,
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,

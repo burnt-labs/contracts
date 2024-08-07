@@ -76,12 +76,7 @@ pub fn format_allowance(
             allowance.authz_grantee = grantee.into_string();
             let allowance_bz = match allowance.to_bytes() {
                 Ok(bz) => bz,
-                Err(_) => {
-                    return Err(ContractError::Std(cosmwasm_std::StdError::SerializeErr {
-                        source_type: String::from("AuthzAllowance"),
-                        msg: "unable to serialize authz allowance".to_string(),
-                    }))
-                }
+                Err(err) => Err(err)?,
             };
             Any {
                 type_url: allowance_any.type_url,

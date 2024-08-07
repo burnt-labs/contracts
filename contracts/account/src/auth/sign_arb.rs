@@ -32,8 +32,8 @@ mod tests {
     use crate::auth::sign_arb::wrap_message;
     use crate::auth::util;
     use crate::contract::instantiate;
+    use crate::execute::tests::XionCustomQuery;
     use crate::msg::InstantiateMsg;
-    use crate::proto::XionCustomQuery;
     use base64::{engine::general_purpose, Engine as _};
     use cosmwasm_std::testing::{
         mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
@@ -129,6 +129,12 @@ mod tests {
             },
         };
 
-        instantiate(deps.as_mut(), env.clone(), info, instantiate_msg).unwrap();
+        instantiate(
+            deps.as_mut().into_empty(),
+            env.clone(),
+            info,
+            instantiate_msg,
+        )
+        .unwrap();
     }
 }

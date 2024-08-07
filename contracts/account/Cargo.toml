@@ -28,4 +28,4 @@ rsa                = { workspace = true }
 getrandom          = { workspace = true }
 p256               = { workspace = true }
 prost              = { workspace = true }
-osmosis-std-derive = { workspace = true }
+cosmos-sdk-proto   = { workspace = true }

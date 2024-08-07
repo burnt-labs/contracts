@@ -8,7 +8,7 @@ use serde_json::Value;
 #[cw_serde]
 pub struct GrantConfig {
     description: String,
-    pub authorization: Value,
+    pub authorization: Any,
     pub optional: bool,
 }
 

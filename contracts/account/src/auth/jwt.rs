@@ -1,8 +1,8 @@
 use crate::error::ContractError::{InvalidSignatureDetail, InvalidToken};
 use crate::error::ContractResult;
-use crate::proto::{self, XionCustomQuery};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use cosmos_sdk_proto::xion::v1::QueryValidateJwtRequest;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Binary, Deps};
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,7 @@ struct QueryValidateJWTResponse {
 }
 
 pub fn verify(
-    deps: Deps<XionCustomQuery>,
+    deps: Deps,
     tx_hash: &Vec<u8>,
     sig_bytes: &[u8],
     aud: &str,
@@ -39,7 +39,7 @@ pub fn verify(
 ) -> ContractResult<bool> {
     // let challenge = general_purpose::STANDARD.encode(tx_hash);
 
-    let query = proto::QueryValidateJWTRequest {
+    let query = QueryValidateJwtRequest {
         aud: aud.to_string(),
         sub: sub.to_string(),
         sig_bytes: String::from_utf8(sig_bytes.into())?,
