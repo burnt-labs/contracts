@@ -6,10 +6,8 @@ pub use cw_controllers::ClaimsResponse;
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    /// name of the derivative token
-    pub creator: String,
-    /// symbol / ticker of the derivative token
-    pub subdenom: String,
+    /// full string of the x/tokenfactory denom
+    pub denom: String,
 }
 
 #[cw_serde]

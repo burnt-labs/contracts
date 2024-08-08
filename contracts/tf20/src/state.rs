@@ -4,8 +4,7 @@ use cw_storage_plus::Item;
 
 #[cw_serde]
 pub struct TokenInfo {
-    pub creator: String,
-    pub subdenom: String,
+    pub denom: String,
     pub admin: Option<Addr>,
 }
 

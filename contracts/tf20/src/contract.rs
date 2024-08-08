@@ -25,11 +25,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn denom(deps: Deps) -> StdResult<String> {
     let token_info = TOKEN_INFO.load(deps.storage)?;
-    Ok(format!(
-        "tokenfactory/{creator}/{subdenom}",
-        creator = token_info.creator,
-        subdenom = token_info.subdenom
-    ))
+    Ok(token_info.denom)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -41,12 +37,23 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // todo who is minter, do we handle new and existing tokens
+    // This initializes a new contract which acts as a wrapper and admin of a 
+    // token that has previously been created in x/tokenfactory
+    // The recommended flow is:
+    // 1. creator creates a new token in x/tokenfactory, setting themselves as the token admin
+    // 2. creator creates an instance of this contract with the relevant information set
+    // 3. creator transfers token admin control in x/tokenfactory from themselves, to this contract
 
+    // because this contract needs to be the admin of the TF denom, it acts as a
+    // passthrough admin for the admin of the contract. The contract admin can 
+    // do all the same things the TF admin can. 
+    // Similar to TF denom admin, you can choose to remove the admin value and 
+    // have the token be admin-free, which means that tokens can no longer be 
+    // minted or "forced" via the admin commands.
+    
     // store token info using cw20-base format
     let data = TokenInfo {
-        creator: msg.creator,
-        subdenom: msg.subdenom,
+        denom: msg.denom,
         admin: Some(info.sender),
     };
     TOKEN_INFO.save(deps.storage, &data)?;
@@ -124,6 +131,8 @@ pub fn execute(
 }
 
 pub fn assert_admin(deps: Deps, sender: Addr) -> ContractResult<()> {
+    // asserts that the sender is the contract admin for this instance
+    // if an admin is not set, always fail
     let token_info = TOKEN_INFO.load(deps.storage)?;
     match token_info.admin {
         None => Err(ContractError::Unauthorized),
@@ -287,7 +296,7 @@ pub fn modify_metadata(
     };
 
     let any_msg = AnyMsg {
-        type_url: String::from("/osmosis.tokenfactory.v1beta1.Msg/ChangeAdmin"),
+        type_url: String::from("/osmosis.tokenfactory.v1beta1.Msg/SetDenomMetadata"),
         value: to_json_binary(&change_admin_msg)?,
     };
 
