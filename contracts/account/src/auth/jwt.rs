@@ -4,7 +4,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use cosmos_sdk_proto::xion::v1::jwk::QueryValidateJwtRequest;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Binary, Deps, to_json_binary};
+use cosmwasm_std::{to_json_binary, Binary, Deps};
 use serde::{Deserialize, Serialize};
 use std::str;
 
@@ -43,7 +43,7 @@ pub fn verify(
         sig_bytes: String::from_utf8(sig_bytes.into())?,
         // tx_hash: challenge,
     };
-    let grpc_query = cosmwasm_std::GrpcQuery{
+    let grpc_query = cosmwasm_std::GrpcQuery {
         path: String::from("/xion.jwk.v1.Query/ValidateJWT"),
         data: to_json_binary(&query)?,
     };

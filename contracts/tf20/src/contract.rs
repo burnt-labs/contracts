@@ -1,18 +1,23 @@
-use std::ptr::metadata;
-use cosmos_sdk_proto::cosmos::bank::v1beta1::Metadata;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
-use cw2::set_contract_version;
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, CosmosMsg, AnyMsg, to_json_binary, BankMsg, DenomUnit, Addr};
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
+use cosmwasm_std::{
+    from_json, to_json_binary, Addr, AnyMsg, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    Response, StdResult, Uint128,
+};
+use cw2::set_contract_version;
 
-use cw20_base::allowances::{deduct_allowance, execute_decrease_allowance, execute_increase_allowance, query_allowance};
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::error::{ContractError, ContractResult};
-use cosmos_sdk_proto::tokenfactory::v1beta1::{MsgBurn, MsgChangeAdmin, MsgForceTransfer, MsgMint, MsgSetDenomMetadata};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::state::{TokenInfo, TOKEN_INFO};
+use cosmos_sdk_proto::osmosis::tokenfactory::v1beta1::{
+    MsgBurn, MsgChangeAdmin, MsgForceTransfer, MsgMint, MsgSetDenomMetadata,
+};
 use cw20::{BalanceResponse, Cw20ReceiveMsg, TokenInfoResponse};
-use crate::state::{TOKEN_INFO, TokenInfo};
+use cw20_base::allowances::{
+    deduct_allowance, execute_decrease_allowance, execute_increase_allowance, query_allowance,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:tf20";
@@ -20,7 +25,11 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn denom(deps: Deps) -> StdResult<String> {
     let token_info = TOKEN_INFO.load(deps.storage)?;
-    Ok(format!("tokenfactory/{creator}/{subdenom}", creator = token_info.creator, subdenom = token_info.subdenom))
+    Ok(format!(
+        "tokenfactory/{creator}/{subdenom}",
+        creator = token_info.creator,
+        subdenom = token_info.subdenom
+    ))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -54,27 +63,26 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         // admin functions for the contract to control the tokenfactory denom
-        ExecuteMsg::Mint { recipient, amount } => {
-            Ok(mint(deps, env, info, recipient, amount)?)
-        }
-        ExecuteMsg::ForceTransfer { owner, recipient, amount } => {
-            Ok(force_transfer(deps, env, info, owner, recipient, amount)?)
-        }
-        ExecuteMsg::ForceBurn { owner , amount } => {
-            Ok(force_burn(deps, env, info, owner, amount)?)
-        }
-        ExecuteMsg::ForceSend { owner, contract, amount, msg} => {
-            Ok(force_send(deps, env, info, owner, contract, amount, msg)?)
-        }
+        ExecuteMsg::Mint { recipient, amount } => Ok(mint(deps, env, info, recipient, amount)?),
+        ExecuteMsg::ForceTransfer {
+            owner,
+            recipient,
+            amount,
+        } => Ok(force_transfer(deps, env, info, owner, recipient, amount)?),
+        ExecuteMsg::ForceBurn { owner, amount } => Ok(force_burn(deps, env, info, owner, amount)?),
+        ExecuteMsg::ForceSend {
+            owner,
+            contract,
+            amount,
+            msg,
+        } => Ok(force_send(deps, env, info, owner, contract, amount, msg)?),
         ExecuteMsg::UpdateContractAdmin { new_admin } => {
             Ok(update_contract_admin(deps, env, info, new_admin)?)
         }
         ExecuteMsg::UpdateTokenFactoryAdmin { new_admin } => {
             Ok(update_tokenfactory_admin(deps, env, info, new_admin)?)
         }
-        ExecuteMsg::ModifyMetadata { metadata } => {
-            Ok(modify_metadata(deps, env, info, metadata)?)
-        }
+        ExecuteMsg::ModifyMetadata { metadata } => Ok(modify_metadata(deps, env, info, metadata)?),
 
         // these all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
@@ -104,20 +112,14 @@ pub fn execute(
             owner,
             recipient,
             amount,
-        } => Ok(transfer_from(
-            deps, env, info, owner, recipient, amount,
-        )?),
-        ExecuteMsg::BurnFrom { owner, amount } => {
-            Ok(burn_from(deps, env, info, owner, amount)?)
-        }
+        } => Ok(transfer_from(deps, env, info, owner, recipient, amount)?),
+        ExecuteMsg::BurnFrom { owner, amount } => Ok(burn_from(deps, env, info, owner, amount)?),
         ExecuteMsg::SendFrom {
             owner,
             contract,
             amount,
             msg,
-        } => Ok(send_from(
-            deps, env, info, owner, contract, amount, msg,
-        )?),
+        } => Ok(send_from(deps, env, info, owner, contract, amount, msg)?),
     }
 }
 
@@ -142,11 +144,14 @@ pub fn mint(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     assert_admin(deps.as_ref(), info.sender)?;
-    
+
     deps.api.addr_validate(&recipient)?;
 
     let denom = denom(deps.as_ref())?;
-    let coin = Coin { denom, amount: amount.clone().to_string() };
+    let coin = Coin {
+        denom,
+        amount: amount.clone().to_string(),
+    };
 
     let force_transfer_msg = MsgMint {
         sender: env.contract.address.into_string(),
@@ -178,7 +183,7 @@ pub fn force_transfer(
 
     deps.api.addr_validate(&owner)?;
     deps.api.addr_validate(&recipient)?;
-    
+
     _transfer(deps, env, owner, recipient, amount)
 }
 
@@ -221,14 +226,13 @@ pub fn update_contract_admin(
     let old_admin = info.sender.into_string();
 
     let admin = match new_admin.is_empty() {
-        true => {None}
+        true => None,
         false => {
             let addr = deps.api.addr_validate(&new_admin)?;
             Some(addr)
         }
     };
-    
-    
+
     let mut token_info = TOKEN_INFO.load(deps.storage)?;
     token_info.admin = admin;
     TOKEN_INFO.save(deps.storage, &token_info)?;
@@ -246,20 +250,20 @@ pub fn update_tokenfactory_admin(
 ) -> Result<Response, ContractError> {
     assert_admin(deps.as_ref(), info.sender.clone())?;
     let old_admin = info.sender.clone().into_string();
-    
+
     let denom = denom(deps.as_ref())?;
-    
-    let change_admin_msg = MsgChangeAdmin{
+
+    let change_admin_msg = MsgChangeAdmin {
         sender: info.sender.into_string(),
         denom,
         new_admin: new_admin.clone(),
     };
-    
-    let any_msg = AnyMsg{
+
+    let any_msg = AnyMsg {
         type_url: String::from("/osmosis.tokenfactory.v1beta1.Msg/ChangeAdmin"),
         value: to_json_binary(&change_admin_msg)?,
     };
-    
+
     Ok(Response::new()
         .add_attribute("action", "update_tokenfactory_admin")
         .add_attribute("old_admin", old_admin)
@@ -271,26 +275,26 @@ pub fn modify_metadata(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    metadata: Metadata,
+    metadata: Binary,
 ) -> Result<Response, ContractError> {
     assert_admin(deps.as_ref(), info.sender.clone())?;
-    
-    let change_admin_msg = MsgSetDenomMetadata{
+
+    let deserialized_metadata = from_json(metadata)?;
+
+    let change_admin_msg = MsgSetDenomMetadata {
         sender: info.sender.into_string(),
-        metadata: Some(metadata.clone()),
+        metadata: Some(deserialized_metadata),
     };
 
-    let any_msg = AnyMsg{
+    let any_msg = AnyMsg {
         type_url: String::from("/osmosis.tokenfactory.v1beta1.Msg/ChangeAdmin"),
         value: to_json_binary(&change_admin_msg)?,
     };
 
     Ok(Response::new()
         .add_attribute("action", "modify_metadata")
-        .add_attribute("metadata", metadata.to_string())
         .add_message(CosmosMsg::Any(any_msg)))
 }
-
 
 pub fn transfer(
     deps: DepsMut,
@@ -324,9 +328,13 @@ pub fn _transfer(
     env: Env,
     sender: String,
     recipient: String,
-    amount: Uint128) -> Result<Response, ContractError> {
+    amount: Uint128,
+) -> Result<Response, ContractError> {
     let denom = denom(deps.as_ref())?;
-    let coin = Coin { denom, amount: amount.clone().to_string() };
+    let coin = Coin {
+        denom,
+        amount: amount.clone().to_string(),
+    };
 
     let force_transfer_msg = MsgForceTransfer {
         sender: env.contract.address.into_string(),
@@ -388,9 +396,11 @@ pub fn _send(
 ) -> Result<Response, ContractError> {
     deps.api.addr_validate(&contract)?;
 
-    let token_info = TOKEN_INFO.load(deps.storage)?;
     let denom = denom(deps.as_ref())?;
-    let coin = Coin { denom, amount: amount.clone().to_string() };
+    let coin = Coin {
+        denom,
+        amount: amount.clone().to_string(),
+    };
 
     let force_transfer_msg = MsgForceTransfer {
         sender: env.contract.address.into_string(),
@@ -414,12 +424,11 @@ pub fn _send(
                 amount,
                 msg,
             }
-                .into_cosmos_msg(contract)?,
+            .into_cosmos_msg(contract)?,
         )
         .add_message(CosmosMsg::Any(any_msg));
     Ok(res)
 }
-
 
 pub fn burn(
     deps: DepsMut,
@@ -452,7 +461,10 @@ pub fn _burn(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     let denom = denom(deps.as_ref())?;
-    let coin = Coin { denom, amount: amount.clone().to_string() };
+    let coin = Coin {
+        denom,
+        amount: amount.clone().to_string(),
+    };
 
     let burn_msg = MsgBurn {
         sender: env.contract.address.into_string(),
@@ -472,7 +484,6 @@ pub fn _burn(
     Ok(res)
 }
 
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -490,11 +501,18 @@ pub fn query_token_info(deps: Deps) -> StdResult<TokenInfoResponse> {
     let metadata = deps.querier.query_denom_metadata(denom.clone())?;
     let supply = deps.querier.query_supply(denom)?;
 
-    let base_denom_unit = metadata.denom_units.iter().find(|&d| d.denom == metadata.base).unwrap_or_default();
+    let exponent = match metadata
+        .denom_units
+        .iter()
+        .find(|&d| d.denom == metadata.base)
+    {
+        None => 0,
+        Some(denom_unit) => denom_unit.exponent,
+    };
     let res = TokenInfoResponse {
         name: metadata.name,
         symbol: metadata.symbol,
-        decimals: base_denom_unit.exponent as u8,
+        decimals: exponent as u8,
         total_supply: supply.amount,
     };
     Ok(res)
@@ -506,5 +524,7 @@ pub fn query_balance(deps: Deps, address: String) -> StdResult<BalanceResponse> 
     let denom = denom(deps)?;
     let coin = deps.querier.query_balance(address, denom)?;
 
-    Ok(BalanceResponse { balance: coin.amount })
+    Ok(BalanceResponse {
+        balance: coin.amount,
+    })
 }

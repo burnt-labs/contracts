@@ -1,9 +1,7 @@
-use cosmos_sdk_proto::cosmos::bank::v1beta1::Metadata;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
-use cosmwasm_std::{Binary, Coin, Decimal, Uint128};
+use cosmwasm_std::{Binary, Uint128};
 use cw20::Expiration;
-use cw20::{AllowanceResponse, BalanceResponse, TokenInfoResponse};
 pub use cw_controllers::ClaimsResponse;
 
 #[cw_serde]
@@ -18,11 +16,21 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// Admin functionality to mirror TokenFactory
     /// Creates more tokens to the specified account
-    Mint { recipient: String, amount: Uint128 },
-    
+    Mint {
+        recipient: String,
+        amount: Uint128,
+    },
+
     /// The following are admin overrides of their matching named commands
-    ForceTransfer { owner: String, recipient: String, amount: Uint128 },
-    ForceBurn { owner: String, amount: Uint128 },
+    ForceTransfer {
+        owner: String,
+        recipient: String,
+        amount: Uint128,
+    },
+    ForceBurn {
+        owner: String,
+        amount: Uint128,
+    },
     ForceSend {
         owner: String,
         contract: String,
@@ -32,18 +40,29 @@ pub enum ExecuteMsg {
 
     /// Allows current admin of the contract to select a new admin for the contract, or set it to empty.
     /// if the admin is set to empty, no admin commands can be called again
-    UpdateContractAdmin { new_admin: String },
+    UpdateContractAdmin {
+        new_admin: String,
+    },
     /// Allows the current admin to select a new admin of the TokenFactory denom, or set it to empty.
     /// If a new admin is selected for the denom, this contract will no longer be a valid admin of the denom
     /// and all allowances and cw20 utility will no longer be functional
-    UpdateTokenFactoryAdmin { new_admin: String },
+    UpdateTokenFactoryAdmin {
+        new_admin: String,
+    },
     /// Allows the admin to modify the token denom metadata
-    ModifyMetadata { metadata: Metadata },
+    ModifyMetadata {
+        metadata: Binary,
+    },
 
     /// Implements CW20. Transfer is a base message to move tokens to another account without triggering actions
-    Transfer { recipient: String, amount: Uint128 },
+    Transfer {
+        recipient: String,
+        amount: Uint128,
+    },
     /// Implements CW20. Burn is a base message to destroy tokens forever
-    Burn { amount: Uint128 },
+    Burn {
+        amount: Uint128,
+    },
     /// Implements CW20.  Send is a base message to transfer tokens to a contract and trigger an action
     /// on the receiving contract.
     Send {
@@ -83,7 +102,10 @@ pub enum ExecuteMsg {
         msg: Binary,
     },
     /// Implements CW20 "approval" extension. Destroys tokens forever
-    BurnFrom { owner: String, amount: Uint128 },
+    BurnFrom {
+        owner: String,
+        amount: Uint128,
+    },
 }
 
 #[cw_serde]
