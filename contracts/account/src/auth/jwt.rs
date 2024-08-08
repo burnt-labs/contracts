@@ -1,10 +1,10 @@
 use crate::error::ContractError::{InvalidSignatureDetail, InvalidToken};
 use crate::error::ContractResult;
-use crate::proto::{self, XionCustomQuery};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use cosmos_sdk_proto::xion::v1::jwk::QueryValidateJwtRequest;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Binary, Deps};
+use cosmwasm_std::{Binary, Deps, to_json_binary};
 use serde::{Deserialize, Serialize};
 use std::str;
 
@@ -31,23 +31,25 @@ struct QueryValidateJWTResponse {
 }
 
 pub fn verify(
-    deps: Deps<XionCustomQuery>,
+    deps: Deps,
     tx_hash: &Vec<u8>,
     sig_bytes: &[u8],
     aud: &str,
     sub: &str,
 ) -> ContractResult<bool> {
-    // let challenge = general_purpose::STANDARD.encode(tx_hash);
-
-    let query = proto::QueryValidateJWTRequest {
+    let query = QueryValidateJwtRequest {
         aud: aud.to_string(),
         sub: sub.to_string(),
         sig_bytes: String::from_utf8(sig_bytes.into())?,
         // tx_hash: challenge,
     };
+    let grpc_query = cosmwasm_std::GrpcQuery{
+        path: String::from("/xion.jwk.v1.Query/ValidateJWT"),
+        data: to_json_binary(&query)?,
+    };
 
     deps.querier
-        .query::<QueryValidateJWTResponse>(&query.into())?;
+        .query::<QueryValidateJWTResponse>(&grpc_query.into())?;
 
     // at this point we have validated the JWT. Any custom claims on it's body
     // can follow

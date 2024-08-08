@@ -6,8 +6,11 @@ pub enum ContractError {
     #[error(transparent)]
     Encode(#[from] cosmos_sdk_proto::prost::EncodeError),
 
-    #[error("authz grant not found")]
-    AuthzGrantNotFound,
+    #[error(transparent)]
+    Decode(#[from] cosmos_sdk_proto::prost::DecodeError),
+
+    #[error("authz grant not found, msg_type: {msg_type_url}")]
+    AuthzGrantNotFound { msg_type_url: String },
 
     #[error("authz grant has no authorization")]
     AuthzGrantNoAuthorization,

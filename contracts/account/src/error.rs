@@ -4,6 +4,12 @@ pub enum ContractError {
     Std(#[from] cosmwasm_std::StdError),
 
     #[error(transparent)]
+    EncodeError(#[from] cosmos_sdk_proto::prost::EncodeError),
+
+    #[error(transparent)]
+    DecodeError(#[from] cosmos_sdk_proto::prost::DecodeError),
+
+    #[error(transparent)]
     Verification(#[from] cosmwasm_std::VerificationError),
 
     #[error(transparent)]
@@ -14,7 +20,6 @@ pub enum ContractError {
 
     #[error(transparent)]
     Bech32(#[from] bech32::Error),
-
     #[error(transparent)]
     UTF8Error(#[from] std::str::Utf8Error),
 
