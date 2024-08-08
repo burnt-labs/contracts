@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-
-use cosmwasm_std::{Binary, Uint128};
+use cosmwasm_std::{Addr, Binary, Uint128};
 use cw20::Expiration;
+use cw20::{AllowanceResponse, BalanceResponse, TokenInfoResponse};
 pub use cw_controllers::ClaimsResponse;
 
 #[cw_serde]
@@ -121,4 +121,11 @@ pub enum QueryMsg {
     /// Returns how much spender can use from owner account, 0 if unset.
     #[returns(AllowanceResponse)]
     Allowance { owner: String, spender: String },
+    #[returns(AdminResponse)]
+    Admin {},
+}
+
+#[cw_serde]
+pub struct AdminResponse {
+    pub admin: Option<Addr>,
 }
