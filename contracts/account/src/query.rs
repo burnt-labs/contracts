@@ -1,4 +1,4 @@
-use cosmwasm_std::{Order, StdError, StdResult, Storage};
+use cosmwasm_std::{Order, StdResult, Storage};
 
 use crate::state::AUTHENTICATORS;
 
@@ -14,8 +14,6 @@ pub fn authenticator_by_id(store: &dyn Storage, id: u8) -> StdResult<String> {
 
     match cosmwasm_std::to_json_binary(&auth) {
         Ok(auth_bz) => Ok(auth_bz.to_string()),
-        Err(error) => Err(StdError::GenericErr {
-            msg: error.to_string(),
-        }),
+        Err(error) => Err(error),
     }
 }

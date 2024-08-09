@@ -18,6 +18,8 @@ serde_json         = { workspace = true }
 schemars           = { workspace = true }
 cosmos-sdk-proto   = { workspace = true }
 prost              = { workspace = true }
-osmosis-std-derive = { workspace = true }
 prost-types        = { workspace = true }
 pbjson-types       = { workspace = true }
+
+[features]
+library = []
