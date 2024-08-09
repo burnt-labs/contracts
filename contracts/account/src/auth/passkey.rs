@@ -35,9 +35,10 @@ pub fn register(deps: Deps, addr: Addr, rp: String, data: Binary) -> ContractRes
     };
 
     let query_bz = query.to_bytes()?;
-    let query_response = deps
-        .querier
-        .query_grpc(String::from("path"), Binary::new(query_bz))?;
+    let query_response = deps.querier.query_grpc(
+        String::from("/xion.v1.Query/WebAuthNVerifyRegister"),
+        Binary::new(query_bz),
+    )?;
     let query_response = QueryWebAuthNVerifyRegisterResponse::decode(query_response.as_slice())?;
     Ok(Binary::new(query_response.credential))
 }
@@ -71,8 +72,10 @@ pub fn verify(
     };
 
     let query_bz = query.to_bytes()?;
-    deps.querier
-        .query_grpc(String::from("path"), Binary::new(query_bz))?;
+    deps.querier.query_grpc(
+        String::from("/xion.v1.Query/WebAuthNVerifyAuthenticate"),
+        Binary::new(query_bz),
+    )?;
 
     Ok(true)
 }
