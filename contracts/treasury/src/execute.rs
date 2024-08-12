@@ -160,24 +160,6 @@ pub fn deploy_fee_grant(
         if grant_config.authorization.ne(auth) {
             return Err(AuthzGrantMismatch);
         }
-        // if grants.clone().is_empty() && !grant_config.optional {
-        //     return Err(AuthzGrantNotFound { msg_type_url });
-        // } else {
-        //     match grants.first() {
-        //         None => return Err(AuthzGrantNotFound { msg_type_url }),
-        //         Some(grant) => {
-        //             match grant.clone().authorization {
-        //                 None => return Err(AuthzGrantNotFound { msg_type_url }),
-        //                 Some(auth) => {
-        //                     // the authorization must match the one in the config
-        //                     if grant_config.authorization.ne(&auth.into()) {
-        //                         return Err(AuthzGrantMismatch);
-        //                     }
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
     }
     // at this point, all the authz grants in the grant_config are verified
 
