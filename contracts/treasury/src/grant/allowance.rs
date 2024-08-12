@@ -17,7 +17,7 @@ pub fn format_allowance(
     expiration: Option<Timestamp>,
 ) -> ContractResult<Any> {
     let formatted_allowance: Any = match allowance_any.type_url.as_str() {
-        "/cosmos.feegrant.v1beta1.BasicAllowance" => match expiration.clone() {
+        "/cosmos.feegrant.v1beta1.BasicAllowance" => match expiration {
             None => allowance_any,
             Some(_) => {
                 let mut allowance = BasicAllowance::decode(allowance_any.value.as_slice())?;
@@ -30,7 +30,7 @@ pub fn format_allowance(
             }
         },
 
-        "/cosmos.feegrant.v1beta1.PeriodicAllowance" => match expiration.clone() {
+        "/cosmos.feegrant.v1beta1.PeriodicAllowance" => match expiration {
             None => allowance_any,
             Some(_) => {
                 let mut allowance = PeriodicAllowance::decode(allowance_any.value.as_slice())?;
@@ -109,7 +109,7 @@ pub fn format_allowance(
                     inner_allowance.clone().into(),
                     _granter.clone(),
                     grantee.clone(),
-                    expiration.clone(),
+                    expiration,
                 )?
                 .into();
             }
