@@ -5,6 +5,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+# enable feature if you want to disable entry points
+library = []
+
 [dependencies]
 cosmwasm-schema    = { workspace = true }
 cosmwasm-std       = { workspace = true }
