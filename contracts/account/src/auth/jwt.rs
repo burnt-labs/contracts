@@ -47,7 +47,7 @@ pub fn verify(
 
     let query_bz = query.to_bytes()?;
     deps.querier.query_grpc(
-        String::from("/xion.jwk.v1.Query/ValidateJWT".to_string()),
+        String::from("/xion.jwk.v1.Query/ValidateJWT"),
         Binary::new(query_bz),
     )?;
 
