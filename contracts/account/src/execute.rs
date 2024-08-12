@@ -298,7 +298,7 @@ pub mod tests {
         let auth_id = 0;
         let mut deps = OwnedDeps {
             storage: MockStorage::default(),
-            api: MockApi::default(),
+            api: MockApi::default().with_prefix("xion"),
             querier: MockQuerier::<XionCustomQuery>::new(&[]),
             custom_query_type: std::marker::PhantomData,
         };
