@@ -2,10 +2,10 @@ use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsRe
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
 use cosmos_sdk_proto::prost::Message;
 use cosmos_sdk_proto::traits::MessageExt;
+use cosmos_sdk_proto::Timestamp;
 use cosmwasm_std::{
     Addr, AnyMsg, Binary, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
 };
-use pbjson_types::Timestamp;
 
 use crate::error::ContractError::{
     AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized,

@@ -2,7 +2,6 @@ pub mod allowance;
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Binary;
-use prost::bytes::Bytes;
 
 #[cw_serde]
 pub struct GrantConfig {
@@ -24,20 +23,20 @@ pub struct Any {
     pub value: Binary,
 }
 
-impl From<pbjson_types::Any> for Any {
-    fn from(value: pbjson_types::Any) -> Self {
+impl From<cosmos_sdk_proto::Any> for Any {
+    fn from(value: cosmos_sdk_proto::Any) -> Self {
         Any {
             type_url: value.type_url,
-            value: Binary::from(value.value.to_vec()),
+            value: Binary::from(value.value),
         }
     }
 }
 
-impl From<Any> for pbjson_types::Any {
+impl From<Any> for cosmos_sdk_proto::Any {
     fn from(value: Any) -> Self {
-        pbjson_types::Any {
+        cosmos_sdk_proto::Any {
             type_url: value.type_url,
-            value: Bytes::copy_from_slice(value.value.as_slice()),
+            value: value.value.to_vec(),
         }
     }
 }
