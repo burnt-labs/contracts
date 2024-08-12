@@ -37,7 +37,7 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // This initializes a new contract which acts as a wrapper and admin of a 
+    // This initializes a new contract which acts as a wrapper and admin of a
     // token that has previously been created in x/tokenfactory
     // The recommended flow is:
     // 1. creator creates a new token in x/tokenfactory, setting themselves as the token admin
@@ -45,12 +45,12 @@ pub fn instantiate(
     // 3. creator transfers token admin control in x/tokenfactory from themselves, to this contract
 
     // because this contract needs to be the admin of the TF denom, it acts as a
-    // passthrough admin for the admin of the contract. The contract admin can 
-    // do all the same things the TF admin can. 
-    // Similar to TF denom admin, you can choose to remove the admin value and 
-    // have the token be admin-free, which means that tokens can no longer be 
+    // passthrough admin for the admin of the contract. The contract admin can
+    // do all the same things the TF admin can.
+    // Similar to TF denom admin, you can choose to remove the admin value and
+    // have the token be admin-free, which means that tokens can no longer be
     // minted or "forced" via the admin commands.
-    
+
     // store token info using cw20-base format
     let data = TokenInfo {
         denom: msg.denom,
@@ -502,9 +502,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Allowance { owner, spender } => {
             to_json_binary(&query_allowance(deps, owner, spender)?)
         }
-        QueryMsg::Admin {} => {
-            to_json_binary(&query_admin(deps)?)
-        }
+        QueryMsg::Admin {} => to_json_binary(&query_admin(deps)?),
     }
 }
 
@@ -543,7 +541,7 @@ pub fn query_balance(deps: Deps, address: String) -> StdResult<BalanceResponse> 
 
 pub fn query_admin(deps: Deps) -> StdResult<AdminResponse> {
     let token_info = TOKEN_INFO.load(deps.storage)?;
-    
+
     Ok(AdminResponse {
         admin: token_info.admin,
     })

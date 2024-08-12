@@ -7,8 +7,8 @@ use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{
 use cosmos_sdk_proto::prost::Message;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmos_sdk_proto::xion::v1::{AuthzAllowance, ContractsAllowance, MultiAnyAllowance};
+use cosmos_sdk_proto::Timestamp;
 use cosmwasm_std::Addr;
-use pbjson_types::Timestamp;
 
 pub fn format_allowance(
     allowance_any: Any,
@@ -17,7 +17,7 @@ pub fn format_allowance(
     expiration: Option<Timestamp>,
 ) -> ContractResult<Any> {
     let formatted_allowance: Any = match allowance_any.type_url.as_str() {
-        "/cosmos.feegrant.v1beta1.BasicAllowance" => match expiration.clone() {
+        "/cosmos.feegrant.v1beta1.BasicAllowance" => match expiration {
             None => allowance_any,
             Some(_) => {
                 let mut allowance = BasicAllowance::decode(allowance_any.value.as_slice())?;
@@ -30,7 +30,7 @@ pub fn format_allowance(
             }
         },
 
-        "/cosmos.feegrant.v1beta1.PeriodicAllowance" => match expiration.clone() {
+        "/cosmos.feegrant.v1beta1.PeriodicAllowance" => match expiration {
             None => allowance_any,
             Some(_) => {
                 let mut allowance = PeriodicAllowance::decode(allowance_any.value.as_slice())?;
@@ -104,7 +104,7 @@ pub fn format_allowance(
                     inner_allowance.clone().into(),
                     _granter.clone(),
                     grantee.clone(),
-                    expiration.clone(),
+                    expiration,
                 )?
                 .into();
             }
