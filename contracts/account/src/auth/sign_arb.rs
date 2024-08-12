@@ -35,7 +35,9 @@ mod tests {
     use crate::execute::tests::XionCustomQuery;
     use crate::msg::InstantiateMsg;
     use base64::{engine::general_purpose, Engine as _};
-    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage};
+    use cosmwasm_std::testing::{
+        message_info, mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+    };
     use cosmwasm_std::{Addr, Api, Binary, OwnedDeps};
 
     #[test]
