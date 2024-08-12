@@ -35,9 +35,7 @@ mod tests {
     use crate::execute::tests::XionCustomQuery;
     use crate::msg::InstantiateMsg;
     use base64::{engine::general_purpose, Engine as _};
-    use cosmwasm_std::testing::{
-        mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
-    };
+    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage};
     use cosmwasm_std::{Addr, Api, Binary, OwnedDeps};
 
     #[test]
@@ -96,12 +94,11 @@ mod tests {
     fn test_init_sign_arb() {
         let mut deps = OwnedDeps {
             storage: MockStorage::default(),
-            api: MockApi::default(),
+            api: MockApi::default().with_prefix("xion"),
             querier: MockQuerier::<XionCustomQuery>::new(&[]),
             custom_query_type: core::marker::PhantomData::<XionCustomQuery>,
         };
         let mut env = mock_env();
-        let info = mock_info("sender", &[]);
         // This is the local faucet address to simplify reuse
         env.contract.address = Addr::unchecked(
             "xion1cyyld62ly828e2xnp0c0ckpyz68wwfs26tjpscmqlaum2jcj8zdstlxvya".to_string(),
@@ -112,6 +109,8 @@ mod tests {
 
         let signer_s = util::derive_addr("xion", pubkey_bytes.as_slice()).unwrap();
         let signer = deps.api.addr_validate(signer_s.as_str()).unwrap();
+
+        let info = message_info(&signer, &[]);
 
         assert_eq!(
             "xion1e2fuwe3uhq8zd9nkkk876nawrwdulgv460vzg7",
