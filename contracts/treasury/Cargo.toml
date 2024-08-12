@@ -7,6 +7,10 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# enable feature if you want to disable entry points
+library = []
+
 [dependencies]
 cosmwasm-schema    = { workspace = true }
 cosmwasm-std       = { workspace = true }
