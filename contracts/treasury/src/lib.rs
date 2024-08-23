@@ -4,7 +4,7 @@ extern crate core;
 pub mod contract;
 mod error;
 mod execute;
-mod msg;
+pub mod msg;
 mod state;
 
 mod grant;

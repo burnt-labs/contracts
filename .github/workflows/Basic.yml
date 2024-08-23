@@ -5,14 +5,13 @@ on:
     branches:
       - main
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
   pull_request:
 
 name: Basic
 
 jobs:
-
   test:
     name: Test Suite
     runs-on: ubuntu-latest
@@ -35,7 +34,6 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
-
   lints:
     name: Lints
     runs-on: ubuntu-latest
@@ -54,11 +52,23 @@ jobs:
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
+          toolchain: stable
           command: fmt
           args: --all -- --check
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
+          toolchain: stable
           command: clippy
-          args: -- -D warnings
+          args: --all-targets -- -D warnings
+
+      - name: Generate Schema
+        run: ./scripts/schema.sh
+
+      - name: Show Schema changes
+        run: git status --porcelain
+
+      - name: Schema Changes
+        # fails if any changes not committed
+        run: test -z "$(git status --porcelain)"
