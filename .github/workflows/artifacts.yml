@@ -6,6 +6,8 @@ permissions:
 
 on:
   push:
+    tags:
+      - "v*"
     branches:
       - main
       - workflow
