@@ -1,3 +1,5 @@
 [alias]
 wasm = "build --release --lib --target wasm32-unknown-unknown"
 
+[env]
+RUSTFLAGS = "-C link-arg=-s"
