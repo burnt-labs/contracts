@@ -71,4 +71,4 @@ jobs:
 
       - name: Schema Changes
         # fails if any changes not committed
-        run: test -z "$(git status --porcelain)"
+        run: chmod +x ./scripts/check-schema.sh && test -z "$(git status --porcelain)"
