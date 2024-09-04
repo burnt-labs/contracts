@@ -1,5 +1,5 @@
 use crate::grant::{FeeConfig, GrantConfig};
-use crate::state::{ADMIN, FEE_CONFIG, GRANT_CONFIGS};
+use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS};
 use cosmwasm_std::{Addr, Order, StdResult, Storage};
 
 pub fn grant_config_type_urls(store: &dyn Storage) -> StdResult<Vec<String>> {
@@ -22,4 +22,8 @@ pub fn fee_config(store: &dyn Storage) -> StdResult<FeeConfig> {
 
 pub fn admin(store: &dyn Storage) -> StdResult<Addr> {
     ADMIN.load(store)
+}
+
+pub fn params(store: &dyn Storage) -> StdResult<Params> {
+    PARAMS.load(store)
 }
