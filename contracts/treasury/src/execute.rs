@@ -124,6 +124,7 @@ pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> Contra
 
     Url::parse(params.display_url.as_str())?;
     Url::parse(params.redirect_url.as_str())?;
+    Url::parse(params.icon_url.as_str())?;
 
     PARAMS.save(deps.storage, &params)?;
 
