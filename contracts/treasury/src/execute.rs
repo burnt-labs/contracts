@@ -1,18 +1,18 @@
+use crate::error::ContractError::{
+    AuthzGrantMismatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
+    Unauthorized,
+};
+use crate::error::{ContractError, ContractResult};
+use crate::grant::allowance::format_allowance;
+use crate::grant::{FeeConfig, GrantConfig};
+use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::QueryGrantsRequest;
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmos_sdk_proto::Timestamp;
 use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response};
 use serde_json::Value;
-
-use crate::error::ContractError::{
-    AuthzGrantMismatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
-    Unauthorized,
-};
-use crate::error::ContractResult;
-use crate::grant::allowance::format_allowance;
-use crate::grant::{FeeConfig, GrantConfig};
-use crate::state::{ADMIN, FEE_CONFIG, GRANT_CONFIGS};
+use url::Url;
 
 pub fn init(
     deps: DepsMut,
@@ -114,6 +114,20 @@ pub fn update_fee_config(
     FEE_CONFIG.save(deps.storage, &fee_config)?;
 
     Ok(Response::new().add_event(Event::new("updated_treasury_fee_config")))
+}
+
+pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    Url::parse(params.display_url.as_str())?;
+    Url::parse(params.redirect_url.as_str())?;
+
+    PARAMS.save(deps.storage, &params)?;
+
+    Ok(Response::new().add_event(Event::new("updated_params")))
 }
 
 pub fn deploy_fee_grant(

@@ -1,4 +1,5 @@
 use crate::grant::{FeeConfig, GrantConfig};
+use crate::state::Params;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Binary};
 
@@ -32,6 +33,9 @@ pub enum ExecuteMsg {
     RevokeAllowance {
         grantee: Addr,
     },
+    UpdateParams {
+        params: Params,
+    },
 }
 
 #[cw_serde]
@@ -49,4 +53,7 @@ pub enum QueryMsg {
 
     #[returns(Binary)]
     Admin {},
+
+    #[returns(Binary)]
+    Params {},
 }
