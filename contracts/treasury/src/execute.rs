@@ -2,7 +2,7 @@ use crate::error::ContractError::{
     AuthzGrantMismatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
     Unauthorized,
 };
-use crate::error::{ContractError, ContractResult};
+use crate::error::{ContractResult};
 use crate::grant::allowance::format_allowance;
 use crate::grant::{FeeConfig, GrantConfig};
 use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS};
