@@ -1,7 +1,12 @@
 use crate::error::ContractResult;
-use crate::proto::{self, XionCustomQuery};
 use base64::engine::general_purpose::{self};
 use base64::Engine;
+use cosmos_sdk_proto::prost::Message;
+use cosmos_sdk_proto::traits::MessageExt;
+use cosmos_sdk_proto::xion::v1::{
+    QueryWebAuthNVerifyAuthenticateRequest, QueryWebAuthNVerifyRegisterRequest,
+    QueryWebAuthNVerifyRegisterResponse,
+};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Binary, Deps};
 
@@ -21,22 +26,21 @@ struct QueryRegisterResponse {
 #[cw_serde]
 struct QueryAuthenticateResponse {}
 
-pub fn register(
-    deps: Deps<XionCustomQuery>,
-    addr: Addr,
-    rp: String,
-    data: Binary,
-) -> ContractResult<Binary> {
-    let query = proto::QueryWebAuthNVerifyRegisterRequest {
+pub fn register(deps: Deps, addr: Addr, rp: String, data: Binary) -> ContractResult<Binary> {
+    let query = QueryWebAuthNVerifyRegisterRequest {
         addr: addr.clone().into(),
         challenge: Binary::from(addr.as_bytes()).to_base64(),
         rp,
         data: data.to_vec(),
     };
 
-    let query_response = deps.querier.query::<QueryRegisterResponse>(&query.into())?;
-
-    Ok(query_response.credential)
+    let query_bz = query.to_bytes()?;
+    let query_response = deps.querier.query_grpc(
+        String::from("/xion.v1.Query/WebAuthNVerifyRegister"),
+        Binary::new(query_bz),
+    )?;
+    let query_response = QueryWebAuthNVerifyRegisterResponse::decode(query_response.as_slice())?;
+    Ok(Binary::new(query_response.credential))
 }
 
 #[cw_serde]
@@ -49,7 +53,7 @@ struct QueryVerifyRequest {
 }
 
 pub fn verify(
-    deps: Deps<XionCustomQuery>,
+    deps: Deps,
     addr: Addr,
     rp: String,
     signature: &Binary,
@@ -59,7 +63,7 @@ pub fn verify(
     let challenge =
         general_purpose::URL_SAFE_NO_PAD.encode(general_purpose::STANDARD.encode(tx_hash));
 
-    let query = proto::QueryWebAuthNVerifyAuthenticateRequest {
+    let query = QueryWebAuthNVerifyAuthenticateRequest {
         addr: addr.into(),
         challenge,
         rp,
@@ -67,8 +71,11 @@ pub fn verify(
         data: signature.clone().into(),
     };
 
-    deps.querier
-        .query::<QueryAuthenticateResponse>(&query.into())?;
+    let query_bz = query.to_bytes()?;
+    deps.querier.query_grpc(
+        String::from("/xion.v1.Query/WebAuthNVerifyAuthenticate"),
+        Binary::new(query_bz),
+    )?;
 
     Ok(true)
 }

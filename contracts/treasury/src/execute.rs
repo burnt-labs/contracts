@@ -1,17 +1,19 @@
+use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
+use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
+use cosmos_sdk_proto::prost::Message;
+use cosmos_sdk_proto::traits::MessageExt;
+use cosmos_sdk_proto::Timestamp;
+use cosmwasm_std::{
+    Addr, AnyMsg, Binary, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
+};
+
 use crate::error::ContractError::{
-    AuthzGrantMismatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
-    Unauthorized,
+    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized,
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
 use crate::grant::{FeeConfig, GrantConfig};
 use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS};
-use cosmos_sdk_proto::cosmos::authz::v1beta1::QueryGrantsRequest;
-use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
-use cosmos_sdk_proto::traits::MessageExt;
-use cosmos_sdk_proto::Timestamp;
-use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response};
-use serde_json::Value;
 use url::Url;
 
 pub fn init(
@@ -151,29 +153,31 @@ pub fn deploy_fee_grant(
             pagination: None,
         }
         .to_bytes()?;
-        let authz_query_res =
-            deps.querier
-                .query::<Value>(&cosmwasm_std::QueryRequest::Stargate {
-                    path: "/cosmos.authz.v1beta1.Query/Grants".to_string(),
-                    data: authz_query_msg_bytes.into(),
-                })?;
+        let authz_query_res = deps.querier.query_grpc(
+            String::from("/cosmos.authz.v1beta1.Query/Grants"),
+            Binary::new(authz_query_msg_bytes),
+        )?;
 
-        let grants = &authz_query_res["grants"];
-        // grant queries with a granter, grantee and type_url should always result
-        // in only one result, unless the grant is optional
-        if !grants.is_array() {
+        let response = QueryGrantsResponse::decode(authz_query_res.as_slice())?;
+        let grants = response.grants;
+
+        if grants.clone().is_empty() && !grant_config.optional {
             return Err(AuthzGrantNotFound { msg_type_url });
-        }
-        let grant = grants[0].clone();
-        if grant.is_null() {
-            return Err(AuthzGrantNotFound { msg_type_url });
-        }
-        let auth = &grant["authorization"];
-        if auth.is_null() {
-            return Err(AuthzGrantNoAuthorization);
-        }
-        if grant_config.authorization.ne(auth) {
-            return Err(AuthzGrantMismatch);
+        } else {
+            match grants.first() {
+                None => return Err(AuthzGrantNotFound { msg_type_url }),
+                Some(grant) => {
+                    match grant.clone().authorization {
+                        None => return Err(AuthzGrantNotFound { msg_type_url }),
+                        Some(auth) => {
+                            // the authorization must match the one in the config
+                            if grant_config.authorization.ne(&auth.into()) {
+                                return Err(AuthzGrantMismatch);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     // at this point, all the authz grants in the grant_config are verified
@@ -210,10 +214,10 @@ pub fn deploy_fee_grant(
                     allowance: Some(formatted_allowance.into()),
                 }
                 .to_bytes()?;
-            let cosmos_feegrant_msg = CosmosMsg::Stargate {
+            let cosmos_feegrant_msg = CosmosMsg::Any(AnyMsg {
                 type_url: "/cosmos.feegrant.v1beta1.MsgGrantAllowance".to_string(),
                 value: feegrant_msg_bytes.into(),
-            };
+            });
 
             // check to see if the user already has an existing feegrant
             let feegrant_query_msg_bytes = QueryAllowanceRequest {
@@ -223,24 +227,24 @@ pub fn deploy_fee_grant(
             .to_bytes()?;
             let feegrant_query_res = deps
                 .querier
-                .query::<Value>(&cosmwasm_std::QueryRequest::Stargate {
-                    path: "/cosmos.feegrant.v1beta1.Query/Allowance".to_string(),
-                    data: feegrant_query_msg_bytes.into(),
-                })
-                .unwrap_or_else(|_| serde_json::json!({"allowance": null}));
+                .query_grpc(
+                    "/cosmos.feegrant.v1beta1.Query/Allowance".to_string(),
+                    feegrant_query_msg_bytes.into(),
+                )
+                .unwrap_or_else(|_| Binary::default());
 
             let mut msgs: Vec<CosmosMsg> = Vec::new();
-            if !feegrant_query_res["allowance"].is_null() {
+            if !feegrant_query_res.is_empty() {
                 let feegrant_revoke_msg_bytes =
                     cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgRevokeAllowance {
                         granter: env.contract.address.clone().into_string(),
                         grantee: authz_grantee.clone().into_string(),
                     }
                     .to_bytes()?;
-                let cosmos_revoke_msg = CosmosMsg::Stargate {
+                let cosmos_revoke_msg = CosmosMsg::Any(AnyMsg {
                     type_url: "/cosmos.feegrant.v1beta1.MsgRevokeAllowance".to_string(),
                     value: feegrant_revoke_msg_bytes.into(),
-                };
+                });
                 msgs.push(cosmos_revoke_msg);
             }
             msgs.push(cosmos_feegrant_msg);
@@ -266,10 +270,10 @@ pub fn revoke_allowance(
             grantee: grantee.clone().into_string(),
         }
         .to_bytes()?;
-    let cosmos_feegrant_revoke_msg = CosmosMsg::Stargate {
+    let cosmos_feegrant_revoke_msg = CosmosMsg::Any(AnyMsg {
         type_url: "/cosmos.feegrant.v1beta1.MsgRevokeAllowance".to_string(),
         value: feegrant_revoke_msg_bytes.into(),
-    };
+    });
 
     Ok(Response::new()
         .add_message(cosmos_feegrant_revoke_msg)
