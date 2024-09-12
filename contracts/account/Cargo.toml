@@ -27,5 +27,4 @@ phf                = { workspace = true }
 rsa                = { workspace = true }
 getrandom          = { workspace = true }
 p256               = { workspace = true }
-prost              = { workspace = true }
 cosmos-sdk-proto   = { workspace = true }

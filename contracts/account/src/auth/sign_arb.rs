@@ -24,7 +24,7 @@ fn wrap_message(msg_bytes: &[u8], signer: Addr) -> Vec<u8> {
     // format the msg in the style of ADR-036 SignArbitrary
     let  envelope = format!("{{\"account_number\":\"0\",\"chain_id\":\"\",\"fee\":{{\"amount\":[],\"gas\":\"0\"}},\"memo\":\"\",\"msgs\":[{{\"type\":\"sign/MsgSignData\",\"value\":{{\"data\":\"{}\",\"signer\":\"{}\"}}}}],\"sequence\":\"0\"}}", msg_b64.as_str(), signer.as_str());
 
-    return sha256(envelope.to_string().as_bytes());
+    sha256(envelope.to_string().as_bytes())
 }
 
 #[cfg(test)]
@@ -36,7 +36,7 @@ mod tests {
     use crate::msg::InstantiateMsg;
     use base64::{engine::general_purpose, Engine as _};
     use cosmwasm_std::testing::{
-        mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+        message_info, mock_dependencies, mock_env, MockApi, MockQuerier, MockStorage,
     };
     use cosmwasm_std::{Addr, Api, Binary, OwnedDeps};
 
@@ -45,7 +45,8 @@ mod tests {
         let pub_key = "AxVQixKMvKkMWMgEBn5E+QjXxFLLiOUNs3EG3vvsgaGs";
         let pub_key_bytes = general_purpose::STANDARD.decode(pub_key).unwrap();
 
-        let deps = mock_dependencies();
+        let mut deps = mock_dependencies();
+        deps.api = deps.api.with_prefix("osmo");
         let addr = util::derive_addr("osmo", pub_key_bytes.as_slice()).unwrap();
 
         let valid_addr = deps.api.addr_validate(addr.as_str()).unwrap();
@@ -61,7 +62,8 @@ mod tests {
         let pubkey = "AxVQixKMvKkMWMgEBn5E+QjXxFLLiOUNs3EG3vvsgaGs";
         let pubkey_bytes = general_purpose::STANDARD.decode(pubkey).unwrap();
 
-        let deps = mock_dependencies();
+        let mut deps = mock_dependencies();
+        deps.api = deps.api.with_prefix("xion");
         let signer_s = util::derive_addr("xion", pubkey_bytes.as_slice()).unwrap();
         let signer = deps.api.addr_validate(signer_s.as_str()).unwrap();
 
@@ -96,12 +98,11 @@ mod tests {
     fn test_init_sign_arb() {
         let mut deps = OwnedDeps {
             storage: MockStorage::default(),
-            api: MockApi::default(),
+            api: MockApi::default().with_prefix("xion"),
             querier: MockQuerier::<XionCustomQuery>::new(&[]),
             custom_query_type: core::marker::PhantomData::<XionCustomQuery>,
         };
         let mut env = mock_env();
-        let info = mock_info("sender", &[]);
         // This is the local faucet address to simplify reuse
         env.contract.address = Addr::unchecked(
             "xion1cyyld62ly828e2xnp0c0ckpyz68wwfs26tjpscmqlaum2jcj8zdstlxvya".to_string(),
@@ -112,6 +113,8 @@ mod tests {
 
         let signer_s = util::derive_addr("xion", pubkey_bytes.as_slice()).unwrap();
         let signer = deps.api.addr_validate(signer_s.as_str()).unwrap();
+
+        let info = message_info(&signer, &[]);
 
         assert_eq!(
             "xion1e2fuwe3uhq8zd9nkkk876nawrwdulgv460vzg7",

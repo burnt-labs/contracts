@@ -1,5 +1,5 @@
 use crate::error::ContractResult;
-use crate::execute::{revoke_allowance, update_fee_config};
+use crate::execute::{revoke_allowance, update_fee_config, update_params};
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::{execute, query, CONTRACT_NAME, CONTRACT_VERSION};
 use cosmwasm_std::{
@@ -46,6 +46,7 @@ pub fn execute(
         }
         ExecuteMsg::UpdateFeeConfig { fee_config } => update_fee_config(deps, info, fee_config),
         ExecuteMsg::RevokeAllowance { grantee } => revoke_allowance(deps, env, info, grantee),
+        ExecuteMsg::UpdateParams { params } => update_params(deps, info, params),
     }
 }
 
@@ -60,5 +61,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::FeeConfig {} => to_json_binary(&query::fee_config(deps.storage)?),
         QueryMsg::Admin {} => to_json_binary(&query::admin(deps.storage)?),
+        QueryMsg::Params {} => to_json_binary(&query::params(deps.storage)?),
     }
 }
