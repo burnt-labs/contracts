@@ -1,0 +1,22 @@
+[package]
+name = "cw721-proxy"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# enable feature if you want to disable entry points
+library = []
+
+[dependencies]
+cosmwasm-schema = "^1.5"
+cosmwasm-std    = "^1.5"
+cw2             = "^1.1"
+serde           = { workspace = true }
+cw721 = {git = "https://github.com/public-awesome/cw-nfts.git", version = "0.19.0"}
+cw-ownable = "2.1.0"
+cw-storage-plus = "^1.1"
+thiserror = "1.0.64"

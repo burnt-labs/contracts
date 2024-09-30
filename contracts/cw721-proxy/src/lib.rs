@@ -2,8 +2,11 @@
 pub mod contract;
 mod error;
 mod execute;
+mod extension;
 mod msg;
 mod state;
 
-pub const CONTRACT_NAME: &str = "proxy";
+pub use crate::error::ContractError;
+
+pub const CONTRACT_NAME: &str = "cw721-proxy";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
