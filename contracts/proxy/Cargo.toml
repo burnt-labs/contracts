@@ -21,3 +21,7 @@ serde              = { workspace = true }
 serde_json         = { workspace = true }
 schemars           = { workspace = true }
 cosmos-sdk-proto   = { workspace = true }
+
+[dev-dependencies]
+cw721-proxy = {path = "../cw721-proxy"}
+cw721 = {git = "https://github.com/public-awesome/cw-nfts.git", version = "0.19.0"}

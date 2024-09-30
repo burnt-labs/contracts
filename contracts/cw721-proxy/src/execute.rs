@@ -3,33 +3,31 @@ use crate::state::DefaultCw721ProxyContract;
 use crate::ContractError;
 use crate::ContractError::Unauthorized;
 use cosmwasm_std::{Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response};
+use cw721::msg::Cw721InstantiateMsg;
 use cw721::traits::{Cw721Execute, Cw721Query};
 
 impl DefaultCw721ProxyContract<'static> {
-    pub fn instantiate(
+    pub fn instantiate_with_version(
         &self,
         deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
+        env: &Env,
+        info: &MessageInfo,
         msg: InstantiateMsg,
+        contract_name: &str,
+        contract_version: &str,
     ) -> Result<Response<Empty>, ContractError> {
         // set  the proxy addr
         self.proxy_addr.save(deps.storage, &msg.proxy_addr)?;
 
         // passthrough the rest
-        Ok(self
-            .base_contract
-            .instantiate(deps, &env, &info, msg.inner_msg)?)
-    }
-
-    pub fn execute_proxy(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        msg: InnerExecuteMsg,
-    ) -> Result<Response<Empty>, ContractError> {
-        Ok(self.base_contract.execute(deps, &env, &info, msg)?)
+        Ok(self.base_contract.instantiate_with_version(
+            deps,
+            &env,
+            &info,
+            msg.inner_msg,
+            contract_name,
+            contract_version,
+        )?)
     }
 
     pub fn execute(
@@ -48,13 +46,15 @@ impl DefaultCw721ProxyContract<'static> {
 
                 let new_info = MessageInfo {
                     sender: proxy_msg.sender,
-                    funds: info.funds,
+                    funds: info.clone().funds,
                 };
-                self.execute_proxy(deps, env, new_info, proxy_msg.msg)
+                Ok(self
+                    .base_contract
+                    .execute(deps, &env, &new_info, proxy_msg.msg)?)
             }
             _ => {
                 let inner_msg: InnerExecuteMsg = get_inner(msg)?;
-                self.execute_proxy(deps, env, info, inner_msg)
+                Ok(self.base_contract.execute(deps, &env, &info, inner_msg)?)
             }
         }
     }

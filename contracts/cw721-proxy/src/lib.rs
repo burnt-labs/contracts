@@ -2,8 +2,7 @@
 pub mod contract;
 mod error;
 mod execute;
-mod extension;
-mod msg;
+pub mod msg;
 mod state;
 
 pub use crate::error::ContractError;
