@@ -74,7 +74,7 @@ pub fn proxy_msgs(
     let mut proxy_msgs: Vec<WasmMsg> = Vec::with_capacity(msgs.len());
 
     for msg in msgs {
-        let (proxy_msg, contract_addr) = match msg {
+        let (proxy_msg, contract_addr, funds) = match msg {
             WasmMsg::Execute {
                 contract_addr,
                 msg,
@@ -83,9 +83,9 @@ pub fn proxy_msgs(
                 ProxyMsg {
                     sender: info.sender.clone(),
                     msg,
-                    funds,
                 },
                 contract_addr,
+                funds,
             ),
             _ => return Err(InvalidMsgType),
         };
@@ -102,7 +102,7 @@ pub fn proxy_msgs(
         let exec_msg = WasmMsg::Execute {
             contract_addr,
             msg: to_json_binary(&proxy_msg)?,
-            funds: proxy_msg.funds,
+            funds,
         };
         proxy_msgs.push(exec_msg);
     }

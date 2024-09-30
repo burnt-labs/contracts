@@ -19,5 +19,4 @@ pub enum ExecuteMsg {
 pub struct ProxyMsg {
     pub sender: Addr,
     pub msg: Binary,
-    pub funds: Vec<Coin>,
 }
