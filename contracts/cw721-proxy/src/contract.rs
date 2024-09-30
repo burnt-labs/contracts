@@ -3,11 +3,8 @@ use crate::state::DefaultCw721ProxyContract;
 use crate::{ContractError, CONTRACT_NAME, CONTRACT_VERSION};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response};
-use cw721::extension::Cw721Extensions;
-use cw721::traits::{Cw721Execute, Cw721Query};
 pub use cw721::*;
 pub use cw_ownable::{Action, Ownership, OwnershipError};
-use extension::Cw721BaseExtensions;
 
 #[entry_point]
 pub fn instantiate(
@@ -28,13 +25,13 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     let contract = DefaultCw721ProxyContract::default();
-    contract.execute(deps, &env, &info, msg)
+    contract.execute(deps, env, info, msg)
 }
 
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     let contract = DefaultCw721ProxyContract::default();
-    contract.query(deps, &env, msg)
+    contract.query(deps, env, msg)
 }
 
 #[entry_point]

@@ -3,7 +3,6 @@ use crate::state::DefaultCw721ProxyContract;
 use crate::ContractError;
 use crate::ContractError::Unauthorized;
 use cosmwasm_std::{Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response};
-use cw721::msg::Cw721InstantiateMsg;
 use cw721::traits::{Cw721Execute, Cw721Query};
 
 impl DefaultCw721ProxyContract<'static> {
@@ -22,8 +21,8 @@ impl DefaultCw721ProxyContract<'static> {
         // passthrough the rest
         Ok(self.base_contract.instantiate_with_version(
             deps,
-            &env,
-            &info,
+            env,
+            info,
             msg.inner_msg,
             contract_name,
             contract_version,

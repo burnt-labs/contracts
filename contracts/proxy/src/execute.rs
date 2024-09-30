@@ -2,10 +2,8 @@ use crate::error::ContractError::{InvalidCodeID, InvalidMsgType, Unauthorized};
 use crate::error::ContractResult;
 use crate::msg::ProxyMsg;
 use crate::state::{ADMIN, CODE_IDS};
-use cosmos_sdk_proto::cosmwasm::wasm::v1::QueryContractInfoRequest;
-use cosmos_sdk_proto::traits::MessageExt;
 use cosmwasm_std::{
-    to_json_binary, Addr, CosmosMsg, Deps, DepsMut, Env, Event, MessageInfo, Response, WasmMsg,
+    to_json_binary, Addr, Deps, DepsMut, Event, MessageInfo, Response, WasmMsg,
 };
 
 pub fn init(

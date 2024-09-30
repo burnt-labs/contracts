@@ -84,7 +84,7 @@ pub fn get_inner(msg: ExecuteMsg) -> Result<InnerExecuteMsg, ContractError> {
             extension,
         }),
         ExecuteMsg::Burn { token_id } => Ok(InnerExecuteMsg::Burn { token_id }),
-        ExecuteMsg::UpdateExtension { msg } => Err(InvalidMsgType), // cannot convert a proxy msg into an inner msg
+        ExecuteMsg::UpdateExtension { .. } => Err(InvalidMsgType), // cannot convert a proxy msg into an inner msg
         ExecuteMsg::UpdateNftInfo {
             token_id,
             token_uri,
