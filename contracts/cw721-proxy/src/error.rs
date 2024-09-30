@@ -1,12 +1,10 @@
-use cw721::error::Cw721ContractError;
-
 #[derive(Debug, thiserror::Error)]
 pub enum ContractError {
     #[error(transparent)]
     Std(#[from] cosmwasm_std::StdError),
 
     #[error(transparent)]
-    Cw721(#[from] Cw721ContractError),
+    Cw721(#[from] cw721::error::Cw721ContractError),
 
     // #[error(transparent)]
     // Encode(#[from] cosmos_sdk_proto::prost::EncodeError),
