@@ -2,9 +2,7 @@ use crate::error::ContractError::{InvalidCodeID, InvalidMsgType, Unauthorized};
 use crate::error::ContractResult;
 use crate::msg::ProxyMsg;
 use crate::state::{ADMIN, CODE_IDS};
-use cosmwasm_std::{
-    to_json_binary, Addr, Deps, DepsMut, Event, MessageInfo, Response, WasmMsg,
-};
+use cosmwasm_std::{to_json_binary, Addr, Deps, DepsMut, Event, MessageInfo, Response, WasmMsg};
 
 pub fn init(
     deps: DepsMut,

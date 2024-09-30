@@ -1,9 +1,7 @@
 use crate::error::ContractResult;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::{execute, CONTRACT_NAME, CONTRACT_VERSION};
-use cosmwasm_std::{
-    entry_point, DepsMut, Env, MessageInfo, Response,
-};
+use cosmwasm_std::{entry_point, DepsMut, Env, MessageInfo, Response};
 
 #[entry_point]
 pub fn instantiate(
