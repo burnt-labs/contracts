@@ -30,41 +30,13 @@ pub fn init(
     ))
 }
 
-pub fn is_admin(deps: Deps, address: Addr) -> ContractResult<()> {
-    let admin = ADMIN.load(deps.storage)?;
-    match admin {
-        None => Err(Unauthorized),
-        Some(a) => {
-            if a != address {
-                Err(Unauthorized)
-            } else {
-                Ok(())
-            }
-        }
-    }
-}
-
-pub fn update_admin(
-    deps: DepsMut,
-    info: MessageInfo,
-    new_admin: Option<Addr>,
-) -> ContractResult<Response> {
-    is_admin(deps.as_ref(), info.sender.clone())?;
-
-    ADMIN.save(deps.storage, &new_admin)?;
-
-    let admin_str: String = match new_admin {
-        None => String::new(),
-        Some(a) => a.into_string(),
-    };
-
-    Ok(
-        Response::new().add_event(Event::new("updated_treasury_admin").add_attributes(vec![
-            ("old admin", info.sender.into_string()),
-            ("new admin", admin_str),
-        ])),
-    )
-}
+// main logic: this contract is meant to allow a single address to represent 
+// multiple or dynamic other contracts. In this case, it is any contract that 
+// is backed by a particular code ID. The sender sends wrapped msgs of the 
+// WasmMsg::Execute type, which includes the target contract, and the msg binary.
+// This proxy contract will make any necessary in-flight checks (code ID here)
+// and then submit new ProxyMsg msgs to the target contract. The receiving 
+// contract must understand and authenticate such msgs
 
 pub fn proxy_msgs(
     deps: DepsMut,
@@ -112,6 +84,43 @@ pub fn proxy_msgs(
         .add_messages(proxy_msgs))
 }
 
+// administration msgs
+
+pub fn is_admin(deps: Deps, address: Addr) -> ContractResult<()> {
+    let admin = ADMIN.load(deps.storage)?;
+    match admin {
+        None => Err(Unauthorized),
+        Some(a) => {
+            if a != address {
+                Err(Unauthorized)
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+pub fn update_admin(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_admin: Option<Addr>,
+) -> ContractResult<Response> {
+    is_admin(deps.as_ref(), info.sender.clone())?;
+
+    ADMIN.save(deps.storage, &new_admin)?;
+
+    let admin_str: String = match new_admin {
+        None => String::new(),
+        Some(a) => a.into_string(),
+    };
+
+    Ok(
+        Response::new().add_event(Event::new("updated_treasury_admin").add_attributes(vec![
+            ("old admin", info.sender.into_string()),
+            ("new admin", admin_str),
+        ])),
+    )
+}
 pub fn add_code_ids(
     deps: DepsMut,
     info: MessageInfo,
