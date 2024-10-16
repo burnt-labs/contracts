@@ -47,6 +47,7 @@ pub fn execute(
         ExecuteMsg::UpdateFeeConfig { fee_config } => update_fee_config(deps, info, fee_config),
         ExecuteMsg::RevokeAllowance { grantee } => revoke_allowance(deps, env, info, grantee),
         ExecuteMsg::UpdateParams { params } => update_params(deps, info, params),
+        ExecuteMsg::Withdraw { coins } => withdraw_coins(deps, info, coins),
     }
 }
 
