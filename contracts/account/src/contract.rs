@@ -1,5 +1,7 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    to_json_binary, AnyMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+};
 
 use crate::error::ContractError;
 use crate::execute::{add_auth_method, assert_self, remove_auth_method};
@@ -22,12 +24,6 @@ pub fn instantiate(
     execute::init(deps, env, &mut msg.authenticator.clone())
 }
 
-#[cw_serde]
-pub struct Any {
-    pub type_url: String,
-    pub value: Binary,
-}
-
 /// Any contract must implement this sudo message (both variants) in order to
 /// qualify as an abstract account.
 #[cw_serde]
@@ -35,7 +31,7 @@ pub enum AccountSudoMsg {
     /// Called by the AnteHandler's BeforeTxDecorator before a tx is executed.
     BeforeTx {
         /// Messages the tx contains
-        msgs: Vec<Any>,
+        msgs: Vec<AnyMsg>,
 
         /// The tx serialized into binary format.
         ///
