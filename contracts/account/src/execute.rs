@@ -13,7 +13,7 @@ pub fn init(
     env: Env,
     add_authenticator: &mut AddAuthenticator,
 ) -> ContractResult<Response> {
-    add_auth_method(deps, env.clone(), add_authenticator)?;
+    add_auth_method(deps, &env, add_authenticator)?;
 
     Ok(
         Response::new().add_event(Event::new("create_abstract_account").add_attributes(vec![
@@ -87,7 +87,7 @@ pub fn after_tx() -> ContractResult<Response> {
 
 pub fn add_auth_method(
     deps: DepsMut,
-    env: Env,
+    env: &Env,
     add_authenticator: &mut AddAuthenticator,
 ) -> ContractResult<Response> {
     match add_authenticator.borrow_mut() {
@@ -102,7 +102,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
@@ -123,7 +123,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
@@ -144,7 +144,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
@@ -187,7 +187,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {

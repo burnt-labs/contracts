@@ -21,3 +21,11 @@ pub fn always_fail(_buf: &mut [u8]) -> Result<(), Error> {
 }
 use getrandom::register_custom_getrandom;
 register_custom_getrandom!(always_fail);
+
+/// Extra exports to be able to test the xion library externally
+pub mod testing {
+    pub use super::auth::testing::wrap_message;
+    pub use super::auth::util;
+}
+
+pub use auth::AddAuthenticator;
