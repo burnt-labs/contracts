@@ -1,7 +1,5 @@
-use absacc::AccountSudoMsg;
-use cosmwasm_std::{
-    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
-};
+pub use absacc::AccountSudoMsg;
+use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 
 use crate::error::ContractError;
 use crate::execute::{add_auth_method, assert_self, remove_auth_method};
@@ -13,7 +11,7 @@ use crate::{
     query, CONTRACT_NAME, CONTRACT_VERSION,
 };
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -24,7 +22,7 @@ pub fn instantiate(
     execute::init(deps, env, &mut msg.authenticator.clone())
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Response> {
     match msg {
         AccountSudoMsg::BeforeTx {
@@ -46,7 +44,7 @@ pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Resp
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -57,13 +55,13 @@ pub fn execute(
     let mut owned_msg = msg.clone();
     match &mut owned_msg {
         ExecuteMsg::AddAuthMethod { add_authenticator } => {
-            add_auth_method(deps, env, add_authenticator)
+            add_auth_method(deps, &env, add_authenticator)
         }
         ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, *id),
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::AuthenticatorIDs {} => to_json_binary(&query::authenticator_ids(deps.storage)?),
@@ -73,7 +71,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     // No state migrations performed, just returned a Response
     Ok(Response::default())
