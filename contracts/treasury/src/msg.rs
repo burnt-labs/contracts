@@ -1,7 +1,7 @@
 use crate::grant::{FeeConfig, GrantConfig};
 use crate::state::Params;
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Binary};
+use cosmwasm_std::{Addr, Binary, Coin};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -35,6 +35,9 @@ pub enum ExecuteMsg {
     },
     UpdateParams {
         params: Params,
+    },
+    Withdraw {
+        coins: Vec<Coin>,
     },
 }
 

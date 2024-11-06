@@ -1,12 +1,3 @@
-use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
-use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
-use cosmos_sdk_proto::prost::Message;
-use cosmos_sdk_proto::traits::MessageExt;
-use cosmos_sdk_proto::Timestamp;
-use cosmwasm_std::{
-    Addr, AnyMsg, Binary, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
-};
-
 use crate::error::ContractError::{
     AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized,
 };
@@ -14,6 +5,15 @@ use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
 use crate::grant::{FeeConfig, GrantConfig};
 use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS};
+use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
+use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
+use cosmos_sdk_proto::prost::Message;
+use cosmos_sdk_proto::traits::MessageExt;
+use cosmos_sdk_proto::Timestamp;
+use cosmwasm_std::BankMsg::Send;
+use cosmwasm_std::{
+    Addr, AnyMsg, Binary, Coin, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
+};
 use url::Url;
 
 pub fn init(
@@ -131,6 +131,22 @@ pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> Contra
     PARAMS.save(deps.storage, &params)?;
 
     Ok(Response::new().add_event(Event::new("updated_params")))
+}
+
+pub fn withdraw_coins(
+    deps: DepsMut,
+    info: MessageInfo,
+    coins: Vec<Coin>,
+) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    Ok(Response::new().add_message(Send {
+        to_address: info.sender.into_string(),
+        amount: coins,
+    }))
 }
 
 pub fn deploy_fee_grant(
