@@ -1,4 +1,4 @@
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum ContractError {
     #[error(transparent)]
     Std(#[from] cosmwasm_std::StdError),
@@ -32,8 +32,9 @@ pub enum ContractError {
     #[error(transparent)]
     P256EllipticCurve(#[from] p256::elliptic_curve::Error),
 
-    #[error(transparent)]
-    P256EcdsaCurve(#[from] p256::ecdsa::Error),
+    /// Doesn't support PartialEq, moved below
+    #[error("{0}")]
+    P256EcdsaCurve(String),
 
     #[error("error rebuilding key")]
     RebuildingKey,
@@ -77,11 +78,24 @@ pub enum ContractError {
     #[error("cannot override existing authenticator at index {index}")]
     OverridingIndex { index: u8 },
 
-    #[error(transparent)]
-    SerdeJSON(#[from] serde_json::Error),
+    /// Doesn't support PartialEq, moved below
+    #[error("{0}")]
+    SerdeJSON(String),
 
     #[error(transparent)]
     FromUTF8(#[from] std::string::FromUtf8Error),
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
+
+impl From<p256::ecdsa::Error> for ContractError {
+    fn from(value: p256::ecdsa::Error) -> Self {
+        Self::P256EcdsaCurve(format!("{:?}", value))
+    }
+}
+
+impl From<serde_json::Error> for ContractError {
+    fn from(value: serde_json::Error) -> Self {
+        Self::SerdeJSON(format!("{:?}", value))
+    }
+}
