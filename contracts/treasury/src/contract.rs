@@ -1,5 +1,5 @@
 use crate::error::ContractResult;
-use crate::execute::{revoke_allowance, update_fee_config, update_params};
+use crate::execute::{revoke_allowance, update_fee_config, update_params, withdraw_coins};
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::{execute, query, CONTRACT_NAME, CONTRACT_VERSION};
 use cosmwasm_std::{
