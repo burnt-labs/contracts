@@ -11,6 +11,10 @@ mod secp256r1;
 mod sign_arb;
 pub mod util;
 
+pub mod testing {
+    pub use super::sign_arb::wrap_message;
+}
+
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub enum AddAuthenticator {
     Secp256K1 {

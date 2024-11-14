@@ -7,8 +7,11 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# enable feature if you want to disable entry points
+library = []
+
 [dependencies]
-absacc             = { git = "https://github.com/burnt-labs/abstract-account.git", rev = "4e376f2f399f17e50016a932d4e5af7336d952d7" }
 cosmwasm-schema    = { workspace = true }
 cosmwasm-std       = { workspace = true }
 cw2                = { workspace = true }
