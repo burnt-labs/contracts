@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 
 use crate::error::ContractError;
-use crate::execute::{add_auth_method, assert_self, remove_auth_method};
+use crate::execute::{add_auth_method, assert_self, emit, remove_auth_method};
 use crate::msg::{ExecuteMsg, MigrateMsg};
 use crate::{
     error::ContractResult,
@@ -93,6 +93,7 @@ pub fn execute(
             add_auth_method(deps, &env, add_authenticator)
         }
         ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, *id),
+        ExecuteMsg::Emit { data } => emit(env, data.to_string()),
     }
 }
 
