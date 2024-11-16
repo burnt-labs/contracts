@@ -10,6 +10,8 @@ pub mod passkey;
 mod secp256r1;
 mod sign_arb;
 pub mod util;
+mod zkemail;
+mod groth16;
 
 pub mod testing {
     pub use super::sign_arb::wrap_message;
@@ -48,6 +50,13 @@ pub enum AddAuthenticator {
         url: String,
         credential: Binary,
     },
+    ZKEmail {
+        id: u8,
+        vkey: Binary,
+        email_hash: Binary,
+        email_domain: String,
+        proof: Binary,
+    },
 }
 
 impl AddAuthenticator {
@@ -59,6 +68,7 @@ impl AddAuthenticator {
             AddAuthenticator::Jwt { id, .. } => *id,
             AddAuthenticator::Secp256R1 { id, .. } => *id,
             AddAuthenticator::Passkey { id, .. } => *id,
+            AddAuthenticator::ZKEmail { id, .. } => *id,
         }
     }
 }
@@ -71,6 +81,11 @@ pub enum Authenticator {
     Jwt { aud: String, sub: String },
     Secp256R1 { pubkey: Binary },
     Passkey { url: String, passkey: Binary },
+    ZKEmail {
+        vkey: Binary,
+        email_hash: Binary,
+        email_domain: String,
+    },
 }
 
 impl Authenticator {
@@ -137,6 +152,15 @@ impl Authenticator {
                 )?;
 
                 Ok(true)
+            }
+            Authenticator::ZKEmail {
+                vkey,
+                email_hash,
+                email_domain,
+            } => {
+                let verification =
+                    zkemail::verify(deps, tx_bytes, sig_bytes, vkey, email_hash, email_domain)?;
+                Ok(verification)
             }
         }
     }
