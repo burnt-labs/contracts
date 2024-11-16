@@ -90,7 +90,6 @@ pub enum ContractError {
 
     #[error("{0}")]
     ArkSerialization(String),
-
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;

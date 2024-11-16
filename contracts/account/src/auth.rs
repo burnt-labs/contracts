@@ -5,13 +5,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 mod eth_crypto;
+mod groth16;
 pub mod jwt;
 pub mod passkey;
 mod secp256r1;
 mod sign_arb;
 pub mod util;
 mod zkemail;
-mod groth16;
 
 pub mod testing {
     pub use super::sign_arb::wrap_message;
@@ -75,12 +75,26 @@ impl AddAuthenticator {
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub enum Authenticator {
-    Secp256K1 { pubkey: Binary },
-    Ed25519 { pubkey: Binary },
-    EthWallet { address: String },
-    Jwt { aud: String, sub: String },
-    Secp256R1 { pubkey: Binary },
-    Passkey { url: String, passkey: Binary },
+    Secp256K1 {
+        pubkey: Binary,
+    },
+    Ed25519 {
+        pubkey: Binary,
+    },
+    EthWallet {
+        address: String,
+    },
+    Jwt {
+        aud: String,
+        sub: String,
+    },
+    Secp256R1 {
+        pubkey: Binary,
+    },
+    Passkey {
+        url: String,
+        passkey: Binary,
+    },
     ZKEmail {
         vkey: Binary,
         email_hash: Binary,

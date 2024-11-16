@@ -5,10 +5,10 @@ use ark_ff::{PrimeField, Zero};
 use ark_serialize::CanonicalDeserialize;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
-use cosmos_sdk_proto::traits::MessageExt;
-use cosmwasm_std::{Binary, Deps};
-use cosmos_sdk_proto::xion::v1::dkim::{QueryDkimPubKeyRequest, QueryDkimPubKeyResponse};
 use cosmos_sdk_proto::prost::Message;
+use cosmos_sdk_proto::traits::MessageExt;
+use cosmos_sdk_proto::xion::v1::dkim::{QueryDkimPubKeyRequest, QueryDkimPubKeyResponse};
+use cosmwasm_std::{Binary, Deps};
 
 const TX_BODY_MAX_BYTES: usize = 512;
 const EMAIL_MAX_BYTES: usize = 256;
