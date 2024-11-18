@@ -1,4 +1,5 @@
 use crate::auth::groth16::{GrothBn, GrothBnProof, GrothBnVkey, GrothFp};
+use crate::error::ContractError::InvalidDkim;
 use crate::error::ContractResult;
 use ark_crypto_primitives::snark::SNARK;
 use ark_ff::{PrimeField, Zero};
@@ -7,11 +8,10 @@ use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 use cosmos_sdk_proto::prost::Message;
 use cosmos_sdk_proto::traits::MessageExt;
-use cosmos_sdk_proto::xion::v1::dkim::{QueryDkimPubKeyRequest, QueryDkimPubKeyResponse};
+use cosmos_sdk_proto::xion::v1::dkim::{QueryDkimPubKeysRequest, QueryDkimPubKeysResponse};
 use cosmwasm_std::{Binary, Deps};
 
 const TX_BODY_MAX_BYTES: usize = 512;
-const EMAIL_MAX_BYTES: usize = 256;
 
 pub fn calculate_tx_body_commitment(tx: &str) -> GrothFp {
     let padded_tx_bytes = pad_bytes(tx.as_bytes(), TX_BODY_MAX_BYTES);
@@ -55,12 +55,15 @@ pub fn verify(
     sig_bytes: &Binary,
     vkey_bytes: &Binary,
     email_hash: &Binary,
-    email_domain: &String,
+    dkim_domain: &String,
 ) -> ContractResult<bool> {
     // vkey serialization is checked on submission
     let vkey = GrothBnVkey::deserialize_compressed_unchecked(vkey_bytes.as_slice())?;
+
+    let (dkim_hash_bz, proof_bz) = sig_bytes.split_at(256);
+
     // proof submission is from the tx, we can't be sure if it was properly serialized
-    let proof = GrothBnProof::deserialize_compressed(sig_bytes.as_slice())?;
+    let proof = GrothBnProof::deserialize_compressed(proof_bz)?;
 
     // inputs are tx body, email hash, and dmarc key hash
     let mut inputs: [GrothFp; 3] = [GrothFp::zero(); 3];
@@ -73,18 +76,26 @@ pub fn verify(
     let email_hash_input = GrothFp::deserialize_compressed_unchecked(email_hash.as_slice())?;
     inputs[1] = email_hash_input;
 
-    // retrieve the DKIM key hash from chain state
-    let query = QueryDkimPubKeyRequest {
-        selector: "TODO".to_string(),
-        domain: email_domain.to_string(),
+    // verify that domain+hash are known in chain state
+    let query = QueryDkimPubKeysRequest {
+        selector: "".to_string(),
+        domain: dkim_domain.to_string(),
+        poseidon_hash: dkim_hash_bz.to_vec(),
+        pagination: None,
     };
     let query_bz = query.to_bytes()?;
     let query_response = deps.querier.query_grpc(
-        String::from("/xion.dkim.v1.Query/QueryDkimPubKey"),
+        String::from("/xion.dkim.v1.Query/QueryDkimPubKeys"),
         Binary::new(query_bz),
     )?;
-    let query_response = QueryDkimPubKeyResponse::decode(query_response.as_slice())?;
-    inputs[2] = GrothFp::deserialize_compressed_unchecked(query_response.poseidon_hash.as_slice())?;
+    let query_response = QueryDkimPubKeysResponse::decode(query_response.as_slice())?;
+    if query_response.dkim_pub_keys.is_empty() {
+        return Err(InvalidDkim);
+    }
+
+    // verify the dkim pubkey hash in the proof output. the poseidon hash is
+    // from the tx, we can't be sure if it was properly formatted
+    inputs[2] = GrothFp::deserialize_compressed(dkim_hash_bz)?;
 
     let verified = GrothBn::verify(&vkey, inputs.as_slice(), &proof)?;
 

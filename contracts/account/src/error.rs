@@ -90,6 +90,9 @@ pub enum ContractError {
 
     #[error("{0}")]
     ArkSerialization(String),
+
+    #[error("dkim invalid")]
+    InvalidDkim,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;

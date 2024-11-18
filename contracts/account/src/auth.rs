@@ -54,7 +54,7 @@ pub enum AddAuthenticator {
         id: u8,
         vkey: Binary,
         email_hash: Binary,
-        email_domain: String,
+        dkim_domain: String,
         proof: Binary,
     },
 }
@@ -98,7 +98,7 @@ pub enum Authenticator {
     ZKEmail {
         vkey: Binary,
         email_hash: Binary,
-        email_domain: String,
+        dkim_domain: String,
     },
 }
 
@@ -170,10 +170,10 @@ impl Authenticator {
             Authenticator::ZKEmail {
                 vkey,
                 email_hash,
-                email_domain,
+                dkim_domain,
             } => {
                 let verification =
-                    zkemail::verify(deps, tx_bytes, sig_bytes, vkey, email_hash, email_domain)?;
+                    zkemail::verify(deps, tx_bytes, sig_bytes, vkey, email_hash, dkim_domain)?;
                 Ok(verification)
             }
         }

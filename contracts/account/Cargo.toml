@@ -43,5 +43,4 @@ ark-groth16 = { version = "=0.4.0", default-features = false }
 ark-relations = { version = "=0.4.0", default-features = false }
 ark-serialize = { version = "=0.4.2", default-features = false }
 ark-poly = { version = "=0.4.2", default-features = false }
-ark-circom = { git = "https://github.com/mvid/circom-compat" }
 poseidon-ark = {git = "https://github.com/arnaucube/poseidon-ark"}
