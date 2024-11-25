@@ -66,12 +66,11 @@ pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Resp
             simulate,
             ..
         } => {
-            let cred_bytes = cred_bytes.ok_or(ContractError::EmptySignature)?;
             execute::before_tx(
                 deps.as_ref(),
                 &env,
                 &Binary::from(tx_bytes.as_slice()),
-                Some(Binary::from(cred_bytes.as_slice())).as_ref(),
+                cred_bytes.as_ref(),
                 simulate,
             )
         }
