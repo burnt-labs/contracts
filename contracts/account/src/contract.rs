@@ -65,15 +65,13 @@ pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Resp
             cred_bytes,
             simulate,
             ..
-        } => {
-            execute::before_tx(
-                deps.as_ref(),
-                &env,
-                &Binary::from(tx_bytes.as_slice()),
-                cred_bytes.as_ref(),
-                simulate,
-            )
-        }
+        } => execute::before_tx(
+            deps.as_ref(),
+            &env,
+            &Binary::from(tx_bytes.as_slice()),
+            cred_bytes.as_ref(),
+            simulate,
+        ),
         AccountSudoMsg::AfterTx { .. } => execute::after_tx(),
     }
 }
