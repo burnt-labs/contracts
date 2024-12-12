@@ -78,6 +78,9 @@ pub enum ContractError {
     #[error("cannot override existing authenticator at index {index}")]
     OverridingIndex { index: u8 },
 
+    #[error("emit data too large")]
+    EmissionSizeExceeded,
+
     /// Doesn't support PartialEq, moved below
     #[error("{0}")]
     SerdeJSON(String),
