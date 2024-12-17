@@ -84,6 +84,9 @@ pub enum ContractError {
 
     #[error(transparent)]
     FromUTF8(#[from] std::string::FromUtf8Error),
+
+    #[error("Not found: {msg}")]
+    NotFound { msg: String },
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
