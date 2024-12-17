@@ -1,4 +1,4 @@
-use crate::error::ContractResult;
+use crate::error::{ContractError, ContractResult};
 use crate::execute::{revoke_allowance, update_fee_config, update_params, withdraw_coins};
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::{execute, query, CONTRACT_NAME, CONTRACT_VERSION};
@@ -14,10 +14,16 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    // Validate the admin address
+    let admin_addr = if let Some(addr) = msg.admin {
+        deps.api.addr_validate(&addr.as_str())?
+    } else {
+        return Err(ContractError::Unauthorized);
+    };
     execute::init(
         deps,
         info,
-        msg.admin,
+        Some(admin_addr),
         msg.type_urls,
         msg.grant_configs,
         msg.fee_config,
@@ -36,7 +42,11 @@ pub fn execute(
             authz_granter,
             authz_grantee,
         } => execute::deploy_fee_grant(deps, env, authz_granter, authz_grantee),
-        ExecuteMsg::UpdateAdmin { new_admin } => execute::update_admin(deps, info, new_admin),
+        ExecuteMsg::ProposeAdmin { new_admin } => {
+            execute::propose_admin(deps, info, new_admin.into_string())
+        }
+        ExecuteMsg::AcceptAdmin {} => execute::accept_admin(deps, info),
+        ExecuteMsg::CancelProposedAdmin {} => execute::cancel_proposed_admin(deps, info),
         ExecuteMsg::UpdateGrantConfig {
             msg_type_url,
             grant_config,

@@ -10,6 +10,8 @@ pub const FEE_CONFIG: Item<FeeConfig> = Item::new("fee_config");
 
 pub const ADMIN: Item<Addr> = Item::new("admin");
 
+pub const PENDING_ADMIN: Item<Addr> = Item::new("pending_admin");
+
 #[cw_serde]
 pub struct Params {
     pub display_url: String,

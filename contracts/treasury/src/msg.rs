@@ -13,9 +13,11 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    UpdateAdmin {
+    ProposeAdmin {
         new_admin: Addr,
     },
+    AcceptAdmin {},
+    CancelProposedAdmin {},
     UpdateGrantConfig {
         msg_type_url: String,
         grant_config: GrantConfig,

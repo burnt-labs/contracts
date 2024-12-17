@@ -242,6 +242,7 @@ pub fn save_authenticator(
 }
 
 pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Response> {
+    // Ensure there are more than 1 authenticator before removing
     if AUTHENTICATORS
         .keys(deps.storage, None, None, Order::Ascending)
         .count()
@@ -250,7 +251,16 @@ pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Res
         return Err(ContractError::MinimumAuthenticatorCount);
     }
 
+    // Validate that the key exists
+    if !AUTHENTICATORS.has(deps.storage, id) {
+        return Err(ContractError::NotFound {
+            msg: format!("Authenticator ID {} does not exist", id),
+        });
+    }
+
+    // Remove the authenticator
     AUTHENTICATORS.remove(deps.storage, id);
+
     Ok(
         Response::new().add_event(Event::new("remove_auth_method").add_attributes(vec![
             ("contract_address", env.contract.address.to_string()),

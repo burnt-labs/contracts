@@ -32,6 +32,9 @@ pub enum ContractError {
 
     #[error("unauthorized")]
     Unauthorized,
+
+    #[error("Not found: {msg}")]
+    NotFound { msg: String },
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
