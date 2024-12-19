@@ -1,0 +1,319 @@
+[
+  {
+    "name": "Polytone Proxy",
+    "description": "Polytone Proxy",
+    "code_id": "2",
+    "hash": "54E909B7F9AB191A0A0DB2040E09C8CFAB45DB75CA22852098531EC301878FC2",
+    "release": {
+      "url": "https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0",
+      "version": "v1.1.0"
+    },
+    "author": {
+      "name": "DAO DAO",
+      "url": "https://daodao.zone/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "Polytone Voice",
+    "description": "Polytone Voice",
+    "code_id": "3",
+    "hash": "3AA8F962BADEB899DB4BC6E5931C852473B5719DBA5AFF5DC26C66CDE1ED250E",
+    "release": {
+      "url": "https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0",
+      "version": "v1.1.0"
+    },
+    "author": {
+      "name": "DAO DAO",
+      "url": "https://daodao.zone/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "Polytone Note",
+    "description": "Polytone Note",
+    "code_id": "4",
+    "hash": "3AA8F962BADEB899DB4BC6E5931C852473B5719DBA5AFF5DC26C66CDE1ED250E",
+    "release": {
+      "url": "https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0",
+      "version": "v1.1.0"
+    },
+    "author": {
+      "name": "DAO DAO",
+      "url": "https://daodao.zone/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "MetaAccount",
+    "description": "MetaAccount",
+    "code_id": "5",
+    "hash": "FEFA4D0C57F6CA47A5D89C6F077A176D26027DB4EEFA758A929DD4C4AAF17D1B",
+    "release": {
+      "url": "https://github.com/burnt-labs/contracts/pull/40",
+      "version": "pr40"
+    },
+    "author": {
+      "name": "Burnt Labs",
+      "url": "https://burnt.com"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "cw1 Subkeys",
+    "description": "cw1 Subkeys",
+    "code_id": "6",
+    "hash": "0DEE80010FB15A7A03FC1153389DC1EEC36482B8D872B0640B8762C14E5C3CF8",
+    "release": {
+      "url": "https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0",
+      "version": "v2.0.0"
+    },
+    "author": {
+      "name": "CosmWasm",
+      "url": "https://cosmwasm.com/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "cw1 Whitelist",
+    "description": "cw1 Whitelist",
+    "code_id": "7",
+    "hash": "86C0008909BEB14147FA99F66CA1AFB674FDCD737CCAD89C47EA2C95966F747E",
+    "release": {
+      "url": "https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0",
+      "version": "v2.0.0"
+    },
+    "author": {
+      "name": "CosmWasm",
+      "url": "https://cosmwasm.com/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "cw3 Fixed Multisig",
+    "description": "cw3 Fixed Multisig",
+    "code_id": "8",
+    "hash": "734A8B5B958D9F3A9D97CAAEA93AAE409BD7FF21648B35B3F9A40F6DF0C39C00",
+    "release": {
+      "url": "https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0",
+      "version": "v2.0.0"
+    },
+    "author": {
+      "name": "CosmWasm",
+      "url": "https://cosmwasm.com/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "cw3 Flex Multisig",
+    "description": "cw3 Flex Multisig",
+    "code_id": "9",
+    "hash": "8047BC30ED7129F24D4A89E7527C4926D3363A6BA038830A592A2041301553CF",
+    "release": {
+      "url": "https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0",
+      "version": "v2.0.0"
+    },
+    "author": {
+      "name": "CosmWasm",
+      "url": "https://cosmwasm.com/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "cw4 Group",
+    "description": "cw4 Group",
+    "code_id": "10",
+    "hash": "4604A284E209C2FE320F223B9FD29805A0E8F2CF8EA7B01FAC28C3EFC4EE63F0",
+    "release": {
+      "url": "https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0",
+      "version": "v2.0.0"
+    },
+    "author": {
+      "name": "CosmWasm",
+      "url": "https://cosmwasm.com/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "cw4 Stake",
+    "description": "cw4 Stake",
+    "code_id": "12",
+    "hash": "DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653",
+    "release": {
+      "url": "https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0",
+      "version": "v2.0.0"
+    },
+    "author": {
+      "name": "CosmWasm",
+      "url": "https://cosmwasm.com/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "cw20 Base",
+    "description": "cw20 Base",
+    "code_id": "13",
+    "hash": "4D8E90DD340993033F1B9E8E3A3EE7F8673C582CA9BCDD8C8CF3C7470D6537D5",
+    "release": {
+      "url": "https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0",
+      "version": "v2.0.0"
+    },
+    "author": {
+      "name": "CosmWasm",
+      "url": "https://cosmwasm.com/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "cw20 ics20",
+    "description": "cw20 ics20",
+    "code_id": "14",
+    "hash": "A63BA1554095B6AC04D2F08246ABCCFA7F1C2276BF19F52A943EE5B85FD7749B",
+    "release": {
+      "url": "https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0",
+      "version": "v2.0.0"
+    },
+    "author": {
+      "name": "CosmWasm",
+      "url": "https://cosmwasm.com/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "Treasury",
+    "description": "Treasury",
+    "code_id": "15",
+    "hash": "6A30325831651208E07F9A9F6FE5B29ADD99D6EDBDF5601C4AF9856D287E56E6",
+    "release": {
+      "url": "https://github.com/burnt-labs/contracts/commit/8224140b66da51fcdef25227a195d2dee16cc422",
+      "version": "v0.1.0"
+    },
+    "author": {
+      "name": "Burnt Labs",
+      "url": "https://burnt.com"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "Abstract Account",
+    "description": "Abstract Account",
+    "code_id": "16",
+    "hash": "D3D18E16A185FD5D82A510D2D51E8849E1135A1EF23090738ED90CE1F2E377DA",
+    "release": {
+      "url": "https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0",
+      "version": "v0.25.0"
+    },
+    "author": {
+      "name": "Abstract Money",
+      "url": "https://abstract.money/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "Abstract Acccount (XION)",
+    "description": "Abstract Acccount (XION)",
+    "code_id": "17",
+    "hash": "A46BECDFECDECF94837B3D424826E78A483AF4F1E248EA378BFD5D702C5761AD",
+    "release": {
+      "url": "https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0",
+      "version": "v0.25.0"
+    },
+    "author": {
+      "name": "Abstract Money",
+      "url": "https://abstract.money/"
+    },
+    "governance": "Genesis"
+  },
+  {
+    "name": "Abstract ANS Host",
+    "description": "Abstract ANS Host",
+    "code_id": "18",
+    "hash": "B34F0DF05BAC1D769A87389B7856554751B5608D485943E98BC526A4C3322ADB",
+    "governance": "Genesis",
+    "release": {
+      "url": "https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0",
+      "version": "v0.25.0"
+    },
+    "author": {
+      "name": "Abstract Money",
+      "url": "https://abstract.money/"
+    }
+  },
+  {
+    "name": "Abstract IBC Client",
+    "description": "Abstract IBC Client",
+    "code_id": "19",
+    "hash": "919A489D744E4384FDC9E3706AA7C37E80A25D39083FF028956BA300AD9AC2E8",
+    "governance": "Genesis",
+    "release": {
+      "url": "https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0",
+      "version": "v0.25.0"
+    },
+    "author": {
+      "name": "Abstract Money",
+      "url": "https://abstract.money/"
+    }
+  },
+  {
+    "name": "Abstract IBC Host",
+    "description": "Abstract IBC Host",
+    "code_id": "20",
+    "hash": "1FA61DFAE0CF886FEB9EA6A5AFFAA84F478781B243D57B2CBFBDB01F9395AF5B",
+    "governance": "Genesis",
+    "release": {
+      "url": "https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0",
+      "version": "v0.25.0"
+    },
+    "author": {
+      "name": "Abstract Money",
+      "url": "https://abstract.money/"
+    }
+  },
+  {
+    "name": "Abstract ICA Client",
+    "description": "Abstract ICA Client",
+    "code_id": "21",
+    "hash": "E23F28815FB7673BA3C78AA81E2C738F648A7A610111341E60A1B29E2306B8E3",
+    "governance": "Genesis",
+    "release": {
+      "url": "https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0",
+      "version": "v0.25.0"
+    },
+    "author": {
+      "name": "Abstract Money",
+      "url": "https://abstract.money/"
+    }
+  },
+  {
+    "name": "Abstract Module Factory",
+    "description": "Abstract Module Factory",
+    "code_id": "22",
+    "hash": "9B287AFE1380CB886B161C66582255BF03DAD5EACFD27DF24FE89ADB81D2436D",
+    "governance": "Genesis",
+    "release": {
+      "url": "https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0",
+      "version": "v0.25.0"
+    },
+    "author": {
+      "name": "Abstract Money",
+      "url": "https://abstract.money/"
+    }
+  },
+  {
+    "name": "Abstract Registry",
+    "description": "Abstract Registry",
+    "code_id": "23",
+    "hash": "647047E79FEAF28D36A49372877703555C80F5B45B18C9ADB8BBBCFBCA421CD5",
+    "governance": "Genesis",
+    "release": {
+      "url": "https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0",
+      "version": "v0.25.0"
+    },
+    "author": {
+      "name": "Abstract Money",
+      "url": "https://abstract.money/"
+    }
+  }
+]
+
+
