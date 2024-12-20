@@ -26,10 +26,26 @@ echo "## Deployed Contracts" >> README.md
 echo "| Name | Description | Release | Author | Code ID | Hash | Governance Proposal |" >> README.md
 echo "|:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|" >> README.md
 
-jq -r '.[] | select(.deprecated != true) | "| \(.name) | \(.description // "") | \(if .release then "[\(.release.version)](\(.release.url))" else "" end) | \(if .author then "[\(.author.name)](\(.author.url))" else "" end) | `\(.code_id // "")` | `\(.hash)` | \(.governance // "") |"' contracts.json >> README.md
+jq -r '.[] | select(.deprecated != true) | "<tr id=\"contract-\(.code_id)\">
+<td>\(.name)</td>
+<td>\(.description // "")</td>
+<td>\(if .release then "[\(.release.version)](\(.release.url))" else "" end)</td>
+<td>\(if .author then "[\(.author.name)](\(.author.url))" else "" end)</td>
+<td>`\(.code_id // "")`</td>
+<td>`\(.hash)`</td>
+<td>\(.governance // "")</td>
+</tr>"' contracts.json >> README.md
 
 
 echo "## Deprecated Contracts" >> README.md
 echo "| Name | Description | Release | Author | Code ID | Hash | Governance Proposal |" >> README.md
 echo "|:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|" >> README.md
-jq -r '.[] | select(.deprecated == true) | "| \(.name) | \(.description // "") | \(if .release then "[\(.release.version)](\(.release.url))" else "" end) | \(if .author then "[\(.author.name)](\(.author.url))" else "" end) | `\(.code_id // "")` | `\(.hash)` | \(.governance // "") |"' contracts.json >> README.md
+jq -r '.[] | select(.deprecated == true) | "<tr id=\"contract-\(.code_id)\">
+<td>\(.name)</td>
+<td>\(.description // "")</td>
+<td>\(if .release then "[\(.release.version)](\(.release.url))" else "" end)</td>
+<td>\(if .author then "[\(.author.name)](\(.author.url))" else "" end)</td>
+<td>`\(.code_id // "")`</td>
+<td>`\(.hash)`</td>
+<td>\(.governance // "")</td>
+</tr>"' contracts.json >> README.md

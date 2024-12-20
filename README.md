@@ -20,57 +20,465 @@ docker run --rm -v "$(pwd)":/code \
 ## Deployed Contracts
 | Name | Description | Release | Author | Code ID | Hash | Governance Proposal |
 |:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|
-| Polytone Proxy | Polytone Proxy | [v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0) | [DAO DAO](https://daodao.zone/) | `2` | `54E909B7F9AB191A0A0DB2040E09C8CFAB45DB75CA22852098531EC301878FC2` | Genesis |
-| Polytone Voice | Polytone Voice | [v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0) | [DAO DAO](https://daodao.zone/) | `3` | `3AA8F962BADEB899DB4BC6E5931C852473B5719DBA5AFF5DC26C66CDE1ED250E` | Genesis |
-| Polytone Note | Polytone Note | [v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0) | [DAO DAO](https://daodao.zone/) | `4` | `CD13C487B820CE79BC7932F41497274635477845C2DCAF5CD4B06332175F53EC` | Genesis |
-| MetaAccount | Xion's MetaAccount implementation | [pr40](https://github.com/burnt-labs/contracts/pull/40) | [Burnt Labs](https://burnt.com) | `5` | `FEFA4D0C57F6CA47A5D89C6F077A176D26027DB4EEFA758A929DD4C4AAF17D1B` | Genesis |
-| cw1 Subkeys | cw1 Subkeys | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `6` | `0DEE80010FB15A7A03FC1153389DC1EEC36482B8D872B0640B8762C14E5C3CF8` | Genesis |
-| cw1 Whitelist | cw1 Whitelist | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `7` | `86C0008909BEB14147FA99F66CA1AFB674FDCD737CCAD89C47EA2C95966F747E` | Genesis |
-| cw3 Fixed Multisig | cw3 Fixed Multisig | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `8` | `734A8B5B958D9F3A9D97CAAEA93AAE409BD7FF21648B35B3F9A40F6DF0C39C00` | Genesis |
-| cw3 Flex Multisig | cw3 Flex Multisig | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `9` | `8047BC30ED7129F24D4A89E7527C4926D3363A6BA038830A592A2041301553CF` | Genesis |
-| cw4 Group | cw4 Group | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `10` | `4604A284E209C2FE320F223B9FD29805A0E8F2CF8EA7B01FAC28C3EFC4EE63F0` | Genesis |
-| cw4 Stake | cw4 Stake | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `12` | `DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653` | Genesis |
-| cw20 Base | cw20 Base | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `13` | `4D8E90DD340993033F1B9E8E3A3EE7F8673C582CA9BCDD8C8CF3C7470D6537D5` | Genesis |
-| cw20 ics20 | cw20 ics20 | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `14` | `A63BA1554095B6AC04D2F08246ABCCFA7F1C2276BF19F52A943EE5B85FD7749B` | Genesis |
-| Treasury | Treasury | [v0.1.0](https://github.com/burnt-labs/contracts/commit/8224140b66da51fcdef25227a195d2dee16cc422) | [Burnt Labs](https://burnt.com) | `15` | `6A30325831651208E07F9A9F6FE5B29ADD99D6EDBDF5601C4AF9856D287E56E6` | Genesis |
-| Abstract Account | Abstract Account | [v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0) | [Abstract Money](https://abstract.money/) | `16` | `D3D18E16A185FD5D82A510D2D51E8849E1135A1EF23090738ED90CE1F2E377DA` | Genesis |
-| Abstract Acccount (XION) | Abstract Acccount (XION) | [v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0) | [Abstract Money](https://abstract.money/) | `17` | `A46BECDFECDECF94837B3D424826E78A483AF4F1E248EA378BFD5D702C5761AD` | Genesis |
-| Abstract ANS Host | Abstract ANS Host | [v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0) | [Abstract Money](https://abstract.money/) | `18` | `B34F0DF05BAC1D769A87389B7856554751B5608D485943E98BC526A4C3322ADB` | Genesis |
-| Abstract IBC Client | Abstract IBC Client | [v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0) | [Abstract Money](https://abstract.money/) | `19` | `919A489D744E4384FDC9E3706AA7C37E80A25D39083FF028956BA300AD9AC2E8` | Genesis |
-| Abstract IBC Host | Abstract IBC Host | [v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0) | [Abstract Money](https://abstract.money/) | `20` | `1FA61DFAE0CF886FEB9EA6A5AFFAA84F478781B243D57B2CBFBDB01F9395AF5B` | Genesis |
-| Abstract ICA Client | Abstract ICA Client | [v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0) | [Abstract Money](https://abstract.money/) | `21` | `E23F28815FB7673BA3C78AA81E2C738F648A7A610111341E60A1B29E2306B8E3` | Genesis |
-| Abstract Module Factory | Abstract Module Factory | [v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0) | [Abstract Money](https://abstract.money/) | `22` | `9B287AFE1380CB886B161C66582255BF03DAD5EACFD27DF24FE89ADB81D2436D` | Genesis |
-| Abstract Registry | Abstract Registry | [v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0) | [Abstract Money](https://abstract.money/) | `23` | `647047E79FEAF28D36A49372877703555C80F5B45B18C9ADB8BBBCFBCA421CD5` | Genesis |
-| Multiquery | Multiquery | [ae6b422](https://github.com/AbstractSDK/multiquery/commit/ae6b4225c9a3086a4f353522f5b03343138b16e1) | [Abstract Money](https://abstract.money/) | `24` | `C3282C016874B7FE7F4127F0695D42003C92EBA1C1BB10CC16BC584BAB186205` | Genesis |
-| cw721 Base | cw721 Base | [v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0) | [CosmWasm](https://cosmwasm.com/) | `25` | `E13AA30E0D70EA895B294AD1BC809950E60FE081B322B1657F75B67BE6021B1C` | Genesis |
-| cw721 Expiration | cw721 Expiration | [v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0) | [CosmWasm](https://cosmwasm.com/) | `26` | `EC8FE99C35618D786C6DC5F83293FC37CD98C4A297CF6AA9D150F64941E6442D` | Genesis |
-| cw721 Fixed Price | cw721 Fixed Price | [v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0) | [CosmWasm](https://cosmwasm.com/) | `27` | `A58EE79215200778768FE3862F7C995B1BE35FBF3AB34C2DE715E5B9D77DCCBB` | Genesis |
-| cw721 Metadata Onchain | cw721 Metadata Onchain | [v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0) | [CosmWasm](https://cosmwasm.com/) | `28` | `51A70227FF5DC29C38DC514B0F32BB474ECB82FFFA3C029C6789578A55925143` | Genesis |
-| cw721 Non-Transferable | cw721 Non-Transferable | [v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0) | [CosmWasm](https://cosmwasm.com/) | `29` | `68D5DB29833B0C25A1DD4C8D837038528E521EF3622D9945FFCB0B70676FCABE` | Genesis |
-| cw721 Receiver Tester | cw721 Receiver Tester | [v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0) | [CosmWasm](https://cosmwasm.com/) | `30` | `FEBB507E5FDA85C8C450CF28DCFBCBFB1BF17DECE43B7B7ECAD14D2FAD20C828` | Genesis |
-| cw2981 Royalties | cw2981 Royalties | [v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0) | [CosmWasm](https://cosmwasm.com/) | `31` | `5BC7CE4A04A747FAFD1A139F2DB73E7EAC094C6D3882AF8E055D15FFD3EE67E8` | Genesis |
-| Mercle Mint with Claim | Mercle Mint with Claim | [18ceaf7](https://github.com/mercledao/MercleCosmwasmContracts/commit/18ceaf7e1a57a1dbf189da6e3a173618d4ea64fa) | [Mercle](https://mercle.xyz/) | `32` | `E1472FCB9275B908A931A1EA789AA8232EDF275D2EFEA05736BB786180CA91A1` | Genesis |
-| Mercle NFT Membership | Mercle NFT Membership | [18ceaf7](https://github.com/mercledao/MercleCosmwasmContracts/commit/18ceaf7e1a57a1dbf189da6e3a173618d4ea64fa) | [Mercle](https://mercle.xyz/) | `33` | `B8998FEF98FBC7DE80437E41D4F2372CC471237F2D3F0A94F151B195C3418A33` | Genesis |
-| BonusBlock Badge Minter | BonusBlock Badge Minter | [202538d](https://github.com/BBlockLabs/BonusBlock-Minter-SC-Rust/commit/202538de73d52f0ff66a8e2abb9baaad4ee98053) | [BonusBlock](https://www.bonusblock.io/) | `34` | `933AF6AB10A1024CBC0627C4E31DD87FC37F4C70A76C6C4DE9DB06FBFE229DEF` | Genesis |
-| Talis Collection Offer | Talis Collection Offer | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `35` | `8524BEE102B7E1B6C85D0ED1DE7C47EA9B7AA2B51845D5DFDAB1EA645599B4DD` | Genesis |
-| Talis English Auction | Talis English Auction | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `36` | `36FABE3758D19F4285C0B503579FABB06D702B09BCE74CD0FF8AB8987152EE36` | Genesis |
-| Talis Marketplace | Talis Marketplace | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `37` | `0B9D0EF7D459A86062A77924EE440ECAC9A0BF21F6A201126032A353C1E19CCF` | Genesis |
-| Talis Multi-Flavor | Talis Multi-Flavor | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `38` | `5D6EB094E88C8BE613570C612D74951BA9D5BDBD0D772B8987E68AE62D30B9DD` | Genesis |
-| Talis PoC Candy Mint | Talis PoC Candy Mint | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `40` | `811E37F714B7229BB6731A98EDA48CF4A2438E3CEA4B8BFC31B7F7CAF277B0FD` | Genesis |
-| Talis Xion Proxy | Talis Xion Proxy | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `41` | `21C147C2EC45190437367407B22D18717E137722EA3C8C4F410C05E55C403A57` | Genesis |
-| Astroport Factory | Astroport Factory | [v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0) | [Astroport](https://astroport.fi/) | `42` | `56EA99FB759B2DF28D18A0B1CFCCD4A0CACBADA3E7254DC2842D188277727CFB` | Genesis |
-| Astroport Maker | Astroport Maker | [v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0) | [Astroport](https://astroport.fi/) | `43` | `ADEFC4EE995B783BC45B0C338A6299A03FDEADB1F69CED4C2B6F22AF07B9EC1A` | Genesis |
-| Astroport Native Coin Registry | Astroport Native Coin Registry | [v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0) | [Astroport](https://astroport.fi/) | `44` | `2958D95914D24E4856D10877C38740B955C760F86D2B082EDCF19691809D378E` | Genesis |
-| Astroport Pair | Astroport Pair | [v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0) | [Astroport](https://astroport.fi/) | `45` | `88C14F95C3BCBB0B8AABC433DC28F49373FD25EAB7141A881AC310BE4B04979D` | Genesis |
-| Astroport Router | Astroport Router | [v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0) | [Astroport](https://astroport.fi/) | `46` | `6FEF673B1318C84AC8AB2CA81B2CDCA96B8C8C9D0995B8038D919F539AE7C3CC` | Genesis |
-| Astroport TokenFactory Tracker | Astroport TokenFactory Tracker | [v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0) | [Astroport](https://astroport.fi/) | `47` | `B0C14C860F1473B007A734DCC4ADBA1D3B52CECC660465670033F6E875014318` | Genesis |
-| Talis Whitelist | Talis Whitelist | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `48` | `37360FDE0EE1384AA56781B0D05D4B0187843AE96335158DFEAD7806106DE779` | Genesis |
-| Talis Staking | Talis Staking | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `49` | `9C9047420A5B870D490585C753FFB46C97E310A55E9FCF50EA784BAFC2A701FD` | Genesis |
-| Talis Frens Proxy | Talis Frens Proxy | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `50` | `919FF797B7F35A40B5D32B506C2C05918DAA1C42B89C6864425F2047B5BC19F7` | Genesis |
-| Talis Trading Escrow | Talis Trading Escrow | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `51` | `01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2` | Genesis |
-| Talis Trading Escrow | Talis Trading Escrow | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `51` | `01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2` | Genesis |
+<tr id="contract-2">
+<td>Polytone Proxy</td>
+<td>Polytone Proxy</td>
+<td>[v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0)</td>
+<td>[DAO DAO](https://daodao.zone/)</td>
+<td>`2`</td>
+<td>`54E909B7F9AB191A0A0DB2040E09C8CFAB45DB75CA22852098531EC301878FC2`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-3">
+<td>Polytone Voice</td>
+<td>Polytone Voice</td>
+<td>[v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0)</td>
+<td>[DAO DAO](https://daodao.zone/)</td>
+<td>`3`</td>
+<td>`3AA8F962BADEB899DB4BC6E5931C852473B5719DBA5AFF5DC26C66CDE1ED250E`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-4">
+<td>Polytone Note</td>
+<td>Polytone Note</td>
+<td>[v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0)</td>
+<td>[DAO DAO](https://daodao.zone/)</td>
+<td>`4`</td>
+<td>`CD13C487B820CE79BC7932F41497274635477845C2DCAF5CD4B06332175F53EC`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-5">
+<td>MetaAccount</td>
+<td>Xion's MetaAccount implementation</td>
+<td>[pr40](https://github.com/burnt-labs/contracts/pull/40)</td>
+<td>[Burnt Labs](https://burnt.com)</td>
+<td>`5`</td>
+<td>`FEFA4D0C57F6CA47A5D89C6F077A176D26027DB4EEFA758A929DD4C4AAF17D1B`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-6">
+<td>cw1 Subkeys</td>
+<td>cw1 Subkeys</td>
+<td>[v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`6`</td>
+<td>`0DEE80010FB15A7A03FC1153389DC1EEC36482B8D872B0640B8762C14E5C3CF8`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-7">
+<td>cw1 Whitelist</td>
+<td>cw1 Whitelist</td>
+<td>[v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`7`</td>
+<td>`86C0008909BEB14147FA99F66CA1AFB674FDCD737CCAD89C47EA2C95966F747E`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-8">
+<td>cw3 Fixed Multisig</td>
+<td>cw3 Fixed Multisig</td>
+<td>[v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`8`</td>
+<td>`734A8B5B958D9F3A9D97CAAEA93AAE409BD7FF21648B35B3F9A40F6DF0C39C00`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-9">
+<td>cw3 Flex Multisig</td>
+<td>cw3 Flex Multisig</td>
+<td>[v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`9`</td>
+<td>`8047BC30ED7129F24D4A89E7527C4926D3363A6BA038830A592A2041301553CF`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-10">
+<td>cw4 Group</td>
+<td>cw4 Group</td>
+<td>[v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`10`</td>
+<td>`4604A284E209C2FE320F223B9FD29805A0E8F2CF8EA7B01FAC28C3EFC4EE63F0`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-12">
+<td>cw4 Stake</td>
+<td>cw4 Stake</td>
+<td>[v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`12`</td>
+<td>`DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-13">
+<td>cw20 Base</td>
+<td>cw20 Base</td>
+<td>[v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`13`</td>
+<td>`4D8E90DD340993033F1B9E8E3A3EE7F8673C582CA9BCDD8C8CF3C7470D6537D5`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-14">
+<td>cw20 ics20</td>
+<td>cw20 ics20</td>
+<td>[v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`14`</td>
+<td>`A63BA1554095B6AC04D2F08246ABCCFA7F1C2276BF19F52A943EE5B85FD7749B`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-15">
+<td>Treasury</td>
+<td>Treasury</td>
+<td>[v0.1.0](https://github.com/burnt-labs/contracts/commit/8224140b66da51fcdef25227a195d2dee16cc422)</td>
+<td>[Burnt Labs](https://burnt.com)</td>
+<td>`15`</td>
+<td>`6A30325831651208E07F9A9F6FE5B29ADD99D6EDBDF5601C4AF9856D287E56E6`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-16">
+<td>Abstract Account</td>
+<td>Abstract Account</td>
+<td>[v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0)</td>
+<td>[Abstract Money](https://abstract.money/)</td>
+<td>`16`</td>
+<td>`D3D18E16A185FD5D82A510D2D51E8849E1135A1EF23090738ED90CE1F2E377DA`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-17">
+<td>Abstract Acccount (XION)</td>
+<td>Abstract Acccount (XION)</td>
+<td>[v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0)</td>
+<td>[Abstract Money](https://abstract.money/)</td>
+<td>`17`</td>
+<td>`A46BECDFECDECF94837B3D424826E78A483AF4F1E248EA378BFD5D702C5761AD`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-18">
+<td>Abstract ANS Host</td>
+<td>Abstract ANS Host</td>
+<td>[v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0)</td>
+<td>[Abstract Money](https://abstract.money/)</td>
+<td>`18`</td>
+<td>`B34F0DF05BAC1D769A87389B7856554751B5608D485943E98BC526A4C3322ADB`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-19">
+<td>Abstract IBC Client</td>
+<td>Abstract IBC Client</td>
+<td>[v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0)</td>
+<td>[Abstract Money](https://abstract.money/)</td>
+<td>`19`</td>
+<td>`919A489D744E4384FDC9E3706AA7C37E80A25D39083FF028956BA300AD9AC2E8`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-20">
+<td>Abstract IBC Host</td>
+<td>Abstract IBC Host</td>
+<td>[v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0)</td>
+<td>[Abstract Money](https://abstract.money/)</td>
+<td>`20`</td>
+<td>`1FA61DFAE0CF886FEB9EA6A5AFFAA84F478781B243D57B2CBFBDB01F9395AF5B`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-21">
+<td>Abstract ICA Client</td>
+<td>Abstract ICA Client</td>
+<td>[v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0)</td>
+<td>[Abstract Money](https://abstract.money/)</td>
+<td>`21`</td>
+<td>`E23F28815FB7673BA3C78AA81E2C738F648A7A610111341E60A1B29E2306B8E3`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-22">
+<td>Abstract Module Factory</td>
+<td>Abstract Module Factory</td>
+<td>[v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0)</td>
+<td>[Abstract Money](https://abstract.money/)</td>
+<td>`22`</td>
+<td>`9B287AFE1380CB886B161C66582255BF03DAD5EACFD27DF24FE89ADB81D2436D`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-23">
+<td>Abstract Registry</td>
+<td>Abstract Registry</td>
+<td>[v0.25.0](https://github.com/AbstractSDK/abstract/releases/tag/v0.25.0)</td>
+<td>[Abstract Money](https://abstract.money/)</td>
+<td>`23`</td>
+<td>`647047E79FEAF28D36A49372877703555C80F5B45B18C9ADB8BBBCFBCA421CD5`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-24">
+<td>Multiquery</td>
+<td>Multiquery</td>
+<td>[ae6b422](https://github.com/AbstractSDK/multiquery/commit/ae6b4225c9a3086a4f353522f5b03343138b16e1)</td>
+<td>[Abstract Money](https://abstract.money/)</td>
+<td>`24`</td>
+<td>`C3282C016874B7FE7F4127F0695D42003C92EBA1C1BB10CC16BC584BAB186205`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-25">
+<td>cw721 Base</td>
+<td>cw721 Base</td>
+<td>[v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`25`</td>
+<td>`E13AA30E0D70EA895B294AD1BC809950E60FE081B322B1657F75B67BE6021B1C`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-26">
+<td>cw721 Expiration</td>
+<td>cw721 Expiration</td>
+<td>[v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`26`</td>
+<td>`EC8FE99C35618D786C6DC5F83293FC37CD98C4A297CF6AA9D150F64941E6442D`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-27">
+<td>cw721 Fixed Price</td>
+<td>cw721 Fixed Price</td>
+<td>[v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`27`</td>
+<td>`A58EE79215200778768FE3862F7C995B1BE35FBF3AB34C2DE715E5B9D77DCCBB`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-28">
+<td>cw721 Metadata Onchain</td>
+<td>cw721 Metadata Onchain</td>
+<td>[v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`28`</td>
+<td>`51A70227FF5DC29C38DC514B0F32BB474ECB82FFFA3C029C6789578A55925143`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-29">
+<td>cw721 Non-Transferable</td>
+<td>cw721 Non-Transferable</td>
+<td>[v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`29`</td>
+<td>`68D5DB29833B0C25A1DD4C8D837038528E521EF3622D9945FFCB0B70676FCABE`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-30">
+<td>cw721 Receiver Tester</td>
+<td>cw721 Receiver Tester</td>
+<td>[v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`30`</td>
+<td>`FEBB507E5FDA85C8C450CF28DCFBCBFB1BF17DECE43B7B7ECAD14D2FAD20C828`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-31">
+<td>cw2981 Royalties</td>
+<td>cw2981 Royalties</td>
+<td>[v0.19.0](https://github.com/public-awesome/cw-nfts/releases/tag/v0.19.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`31`</td>
+<td>`5BC7CE4A04A747FAFD1A139F2DB73E7EAC094C6D3882AF8E055D15FFD3EE67E8`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-32">
+<td>Mercle Mint with Claim</td>
+<td>Mercle Mint with Claim</td>
+<td>[18ceaf7](https://github.com/mercledao/MercleCosmwasmContracts/commit/18ceaf7e1a57a1dbf189da6e3a173618d4ea64fa)</td>
+<td>[Mercle](https://mercle.xyz/)</td>
+<td>`32`</td>
+<td>`E1472FCB9275B908A931A1EA789AA8232EDF275D2EFEA05736BB786180CA91A1`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-33">
+<td>Mercle NFT Membership</td>
+<td>Mercle NFT Membership</td>
+<td>[18ceaf7](https://github.com/mercledao/MercleCosmwasmContracts/commit/18ceaf7e1a57a1dbf189da6e3a173618d4ea64fa)</td>
+<td>[Mercle](https://mercle.xyz/)</td>
+<td>`33`</td>
+<td>`B8998FEF98FBC7DE80437E41D4F2372CC471237F2D3F0A94F151B195C3418A33`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-34">
+<td>BonusBlock Badge Minter</td>
+<td>BonusBlock Badge Minter</td>
+<td>[202538d](https://github.com/BBlockLabs/BonusBlock-Minter-SC-Rust/commit/202538de73d52f0ff66a8e2abb9baaad4ee98053)</td>
+<td>[BonusBlock](https://www.bonusblock.io/)</td>
+<td>`34`</td>
+<td>`933AF6AB10A1024CBC0627C4E31DD87FC37F4C70A76C6C4DE9DB06FBFE229DEF`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-35">
+<td>Talis Collection Offer</td>
+<td>Talis Collection Offer</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`35`</td>
+<td>`8524BEE102B7E1B6C85D0ED1DE7C47EA9B7AA2B51845D5DFDAB1EA645599B4DD`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-36">
+<td>Talis English Auction</td>
+<td>Talis English Auction</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`36`</td>
+<td>`36FABE3758D19F4285C0B503579FABB06D702B09BCE74CD0FF8AB8987152EE36`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-37">
+<td>Talis Marketplace</td>
+<td>Talis Marketplace</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`37`</td>
+<td>`0B9D0EF7D459A86062A77924EE440ECAC9A0BF21F6A201126032A353C1E19CCF`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-38">
+<td>Talis Multi-Flavor</td>
+<td>Talis Multi-Flavor</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`38`</td>
+<td>`5D6EB094E88C8BE613570C612D74951BA9D5BDBD0D772B8987E68AE62D30B9DD`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-40">
+<td>Talis PoC Candy Mint</td>
+<td>Talis PoC Candy Mint</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`40`</td>
+<td>`811E37F714B7229BB6731A98EDA48CF4A2438E3CEA4B8BFC31B7F7CAF277B0FD`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-41">
+<td>Talis Xion Proxy</td>
+<td>Talis Xion Proxy</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`41`</td>
+<td>`21C147C2EC45190437367407B22D18717E137722EA3C8C4F410C05E55C403A57`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-42">
+<td>Astroport Factory</td>
+<td>Astroport Factory</td>
+<td>[v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0)</td>
+<td>[Astroport](https://astroport.fi/)</td>
+<td>`42`</td>
+<td>`56EA99FB759B2DF28D18A0B1CFCCD4A0CACBADA3E7254DC2842D188277727CFB`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-43">
+<td>Astroport Maker</td>
+<td>Astroport Maker</td>
+<td>[v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0)</td>
+<td>[Astroport](https://astroport.fi/)</td>
+<td>`43`</td>
+<td>`ADEFC4EE995B783BC45B0C338A6299A03FDEADB1F69CED4C2B6F22AF07B9EC1A`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-44">
+<td>Astroport Native Coin Registry</td>
+<td>Astroport Native Coin Registry</td>
+<td>[v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0)</td>
+<td>[Astroport](https://astroport.fi/)</td>
+<td>`44`</td>
+<td>`2958D95914D24E4856D10877C38740B955C760F86D2B082EDCF19691809D378E`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-45">
+<td>Astroport Pair</td>
+<td>Astroport Pair</td>
+<td>[v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0)</td>
+<td>[Astroport](https://astroport.fi/)</td>
+<td>`45`</td>
+<td>`88C14F95C3BCBB0B8AABC433DC28F49373FD25EAB7141A881AC310BE4B04979D`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-46">
+<td>Astroport Router</td>
+<td>Astroport Router</td>
+<td>[v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0)</td>
+<td>[Astroport](https://astroport.fi/)</td>
+<td>`46`</td>
+<td>`6FEF673B1318C84AC8AB2CA81B2CDCA96B8C8C9D0995B8038D919F539AE7C3CC`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-47">
+<td>Astroport TokenFactory Tracker</td>
+<td>Astroport TokenFactory Tracker</td>
+<td>[v5.7.0](https://github.com/astroport-fi/astroport-core/releases/tag/v5.7.0)</td>
+<td>[Astroport](https://astroport.fi/)</td>
+<td>`47`</td>
+<td>`B0C14C860F1473B007A734DCC4ADBA1D3B52CECC660465670033F6E875014318`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-48">
+<td>Talis Whitelist</td>
+<td>Talis Whitelist</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`48`</td>
+<td>`37360FDE0EE1384AA56781B0D05D4B0187843AE96335158DFEAD7806106DE779`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-49">
+<td>Talis Staking</td>
+<td>Talis Staking</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`49`</td>
+<td>`9C9047420A5B870D490585C753FFB46C97E310A55E9FCF50EA784BAFC2A701FD`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-50">
+<td>Talis Frens Proxy</td>
+<td>Talis Frens Proxy</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`50`</td>
+<td>`919FF797B7F35A40B5D32B506C2C05918DAA1C42B89C6864425F2047B5BC19F7`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-51">
+<td>Talis Trading Escrow</td>
+<td>Talis Trading Escrow</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`51`</td>
+<td>`01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-51">
+<td>Talis Trading Escrow</td>
+<td>Talis Trading Escrow</td>
+<td>[f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8)</td>
+<td>[Talis](https://talis.art/)</td>
+<td>`51`</td>
+<td>`01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2`</td>
+<td>Genesis</td>
+</tr>
 ## Deprecated Contracts
 | Name | Description | Release | Author | Code ID | Hash | Governance Proposal |
 |:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|
-| MetaAccount | MetaAccount | [v1.0.0](https://github.com/burnt-labs/contracts/releases/tag/v1.0.0) | [Burnt Labs](https://burnt.com) | `1` | `5E0F49F9686FAD66C132031EC6A43EC63AD84A2B6C8A35C555542AC84FC03708` | Genesis |
-| cw4 Stake | cw4 Stake | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `11` | `DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653` | Genesis |
+<tr id="contract-1">
+<td>MetaAccount</td>
+<td>MetaAccount</td>
+<td>[v1.0.0](https://github.com/burnt-labs/contracts/releases/tag/v1.0.0)</td>
+<td>[Burnt Labs](https://burnt.com)</td>
+<td>`1`</td>
+<td>`5E0F49F9686FAD66C132031EC6A43EC63AD84A2B6C8A35C555542AC84FC03708`</td>
+<td>Genesis</td>
+</tr>
+<tr id="contract-11">
+<td>cw4 Stake</td>
+<td>cw4 Stake</td>
+<td>[v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0)</td>
+<td>[CosmWasm](https://cosmwasm.com/)</td>
+<td>`11`</td>
+<td>`DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653`</td>
+<td>Genesis</td>
+</tr>
