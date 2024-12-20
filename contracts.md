@@ -4,6 +4,19 @@
 
 Contract information for XION mainnet
 
+## Development
+
+### Compiling
+
+```bash
+
+docker run --rm -v "$(pwd)":/code \
+  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
+  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+  cosmwasm/optimizer:0.16.1
+
+```
+
 ## Deployed Contracts
 | Name | Description | Release | Author | Code ID | Hash | Governance Proposal |
 |:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|
