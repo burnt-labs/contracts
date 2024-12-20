@@ -1,7 +1,7 @@
 [
   {
     "name": "Polytone Proxy",
-    "description": "Polytone is a protocol that gives every smart contract an account on every IBC-connected blockchain",
+    "description": "Polytone Proxy",
     "code_id": "2",
     "hash": "54E909B7F9AB191A0A0DB2040E09C8CFAB45DB75CA22852098531EC301878FC2",
     "release": {
