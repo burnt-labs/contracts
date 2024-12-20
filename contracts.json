@@ -1,7 +1,7 @@
 [
   {
     "name": "Polytone Proxy",
-    "description": "Polytone Proxy",
+    "description": "ICA Proxy, allows controlled execution of messages.",
     "code_id": "2",
     "hash": "54E909B7F9AB191A0A0DB2040E09C8CFAB45DB75CA22852098531EC301878FC2",
     "release": {
@@ -17,7 +17,7 @@
   },
   {
     "name": "Polytone Voice",
-    "description": "Polytone Voice",
+    "description": "Receiver of messages over IBC, executes on the destination chain. Maintains access control through the proxy (see above).",
     "code_id": "3",
     "hash": "3AA8F962BADEB899DB4BC6E5931C852473B5719DBA5AFF5DC26C66CDE1ED250E",
     "release": {
@@ -33,7 +33,7 @@
   },
   {
     "name": "Polytone Note",
-    "description": "Polytone Note",
+    "description": "Sends messages to be executed on other chains over IBC. Handles channel management and packet routing.",
     "code_id": "4",
     "hash": "CD13C487B820CE79BC7932F41497274635477845C2DCAF5CD4B06332175F53EC",
     "release": {
