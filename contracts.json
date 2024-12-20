@@ -1,7 +1,7 @@
 [
   {
     "name": "Polytone Proxy",
-    "description": "Polytone Proxy",
+    "description": "Polytone is a protocol that gives every smart contract an account on every IBC-connected blockchain",
     "code_id": "2",
     "hash": "54E909B7F9AB191A0A0DB2040E09C8CFAB45DB75CA22852098531EC301878FC2",
     "release": {
@@ -49,7 +49,7 @@
   },
   {
     "name": "MetaAccount",
-    "description": "MetaAccount",
+    "description": "Xion's MetaAccount implementation",
     "code_id": "5",
     "hash": "FEFA4D0C57F6CA47A5D89C6F077A176D26027DB4EEFA758A929DD4C4AAF17D1B",
     "release": {

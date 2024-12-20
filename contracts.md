@@ -20,10 +20,10 @@ docker run --rm -v "$(pwd)":/code \
 ## Deployed Contracts
 | Name | Description | Release | Author | Code ID | Hash | Governance Proposal |
 |:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|
-| Polytone Proxy | Polytone Proxy | [v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0) | [DAO DAO](https://daodao.zone/) | `2` | `54E909B7F9AB191A0A0DB2040E09C8CFAB45DB75CA22852098531EC301878FC2` | Genesis |
+| Polytone Proxy | Polytone is a protocol that gives every smart contract an account on every IBC-connected blockchain | [v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0) | [DAO DAO](https://daodao.zone/) | `2` | `54E909B7F9AB191A0A0DB2040E09C8CFAB45DB75CA22852098531EC301878FC2` | Genesis |
 | Polytone Voice | Polytone Voice | [v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0) | [DAO DAO](https://daodao.zone/) | `3` | `3AA8F962BADEB899DB4BC6E5931C852473B5719DBA5AFF5DC26C66CDE1ED250E` | Genesis |
 | Polytone Note | Polytone Note | [v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0) | [DAO DAO](https://daodao.zone/) | `4` | `3AA8F962BADEB899DB4BC6E5931C852473B5719DBA5AFF5DC26C66CDE1ED250E` | Genesis |
-| MetaAccount | MetaAccount | [pr40](https://github.com/burnt-labs/contracts/pull/40) | [Burnt Labs](https://burnt.com) | `5` | `FEFA4D0C57F6CA47A5D89C6F077A176D26027DB4EEFA758A929DD4C4AAF17D1B` | Genesis |
+| MetaAccount | Xion's MetaAccount implementation | [pr40](https://github.com/burnt-labs/contracts/pull/40) | [Burnt Labs](https://burnt.com) | `5` | `FEFA4D0C57F6CA47A5D89C6F077A176D26027DB4EEFA758A929DD4C4AAF17D1B` | Genesis |
 | cw1 Subkeys | cw1 Subkeys | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `6` | `0DEE80010FB15A7A03FC1153389DC1EEC36482B8D872B0640B8762C14E5C3CF8` | Genesis |
 | cw1 Whitelist | cw1 Whitelist | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `7` | `86C0008909BEB14147FA99F66CA1AFB674FDCD737CCAD89C47EA2C95966F747E` | Genesis |
 | cw3 Fixed Multisig | cw3 Fixed Multisig | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `8` | `734A8B5B958D9F3A9D97CAAEA93AAE409BD7FF21648B35B3F9A40F6DF0C39C00` | Genesis |

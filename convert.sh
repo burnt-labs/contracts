@@ -5,6 +5,8 @@ echo "# XION Mainnet Contracts" >> contracts.md
 echo "" >> contracts.md
 echo "Contract information for XION mainnet" >> contracts.md
 echo "" >> contracts.md
+
+
 echo "## Development" >> contracts.md
 echo "" >> contracts.md
 echo "### Compiling" >> contracts.md
@@ -18,6 +20,8 @@ echo "  cosmwasm/optimizer:0.16.1" >> contracts.md
 echo "" >> contracts.md
 echo "\`\`\`" >> contracts.md
 echo "" >> contracts.md
+
+
 echo "## Deployed Contracts" >> contracts.md
 echo "| Name | Description | Release | Author | Code ID | Hash | Governance Proposal |" >> contracts.md
 echo "|:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|" >> contracts.md
