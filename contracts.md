@@ -56,3 +56,8 @@ Contract information for XION mainnet
 | Talis Frens Proxy | Talis Frens Proxy | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `50` | `919FF797B7F35A40B5D32B506C2C05918DAA1C42B89C6864425F2047B5BC19F7` | Genesis |
 | Talis Trading Escrow | Talis Trading Escrow | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `51` | `01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2` | Genesis |
 | Talis Trading Escrow | Talis Trading Escrow | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `51` | `01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2` | Genesis |
+## Deprecated Contracts
+| Name | Description | Release | Author | Code ID | Hash | Governance Proposal |
+|:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|
+| MetaAccount | MetaAccount | [v1.0.0](https://github.com/burnt-labs/contracts/releases/tag/v1.0.0) | [Burnt Labs](https://burnt.com) | `1` | `5E0F49F9686FAD66C132031EC6A43EC63AD84A2B6C8A35C555542AC84FC03708` | Genesis |
+| cw4 Stake | cw4 Stake | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `11` | `DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653` | Genesis |
