@@ -27,6 +27,8 @@ struct QueryRegisterResponse {
 struct QueryAuthenticateResponse {}
 
 pub fn register(deps: Deps, addr: Addr, rp: String, data: Binary) -> ContractResult<Binary> {
+    panic!("passkeys disabled, pending audit");
+
     let query = QueryWebAuthNVerifyRegisterRequest {
         addr: addr.clone().into(),
         challenge: Binary::from(addr.as_bytes()).to_base64(),
@@ -60,6 +62,8 @@ pub fn verify(
     tx_hash: Vec<u8>,
     credential: &Binary,
 ) -> ContractResult<bool> {
+    panic!("passkeys disabled, pending audit");
+    
     let challenge =
         general_purpose::URL_SAFE_NO_PAD.encode(general_purpose::STANDARD.encode(tx_hash));
 
