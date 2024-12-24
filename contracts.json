@@ -65,7 +65,7 @@
   },
   {
     "name": "cw1 Subkeys",
-    "description": "cw1 Subkeys",
+    "description": "A Proxy contract that extends the functionality of cw1-whitelist. Allows admins to grant allowances and set permissions to 'subkeys'",
     "code_id": "6",
     "hash": "0DEE80010FB15A7A03FC1153389DC1EEC36482B8D872B0640B8762C14E5C3CF8",
     "release": {
@@ -81,7 +81,7 @@
   },
   {
     "name": "cw1 Whitelist",
-    "description": "cw1 Whitelist",
+    "description": "Proxy contract maintaining a list of admin addresses that can execute messages through it. Admin list defined at contract creation.",
     "code_id": "7",
     "hash": "86C0008909BEB14147FA99F66CA1AFB674FDCD737CCAD89C47EA2C95966F747E",
     "release": {
@@ -97,7 +97,7 @@
   },
   {
     "name": "cw3 Fixed Multisig",
-    "description": "cw3 Fixed Multisig",
+    "description": "Implements a multisig wallet with a fixed set of voters defined at instantiation, each voter can have different voting weights. Allows voters to create, vote on, and execute proposals containing arbitrary messages. Supports different voting thresholds & configurable voting periods.",
     "code_id": "8",
     "hash": "734A8B5B958D9F3A9D97CAAEA93AAE409BD7FF21648B35B3F9A40F6DF0C39C00",
     "release": {
@@ -113,7 +113,7 @@
   },
   {
     "name": "cw3 Flex Multisig",
-    "description": "cw3 Flex Multisig",
+    "description": "An advanced multisig using a separate cw4 (group) contract to manage its voter set, allowing multiple multisigs to share the same group of voters with different voting thresholds.",
     "code_id": "9",
     "hash": "8047BC30ED7129F24D4A89E7527C4926D3363A6BA038830A592A2041301553CF",
     "release": {
@@ -129,7 +129,7 @@
   },
   {
     "name": "cw4 Group",
-    "description": "cw4 Group",
+    "description": "Manages group membership with weighted voting power. Maintains a list of members, controlled by an admin with rights to add or remove members.",
     "code_id": "10",
     "hash": "4604A284E209C2FE320F223B9FD29805A0E8F2CF8EA7B01FAC28C3EFC4EE63F0",
     "release": {
@@ -145,7 +145,7 @@
   },
   {
     "name": "cw4 Stake",
-    "description": "cw4 Stake",
+    "description": "Determines group membership and voting weights based on the amount of tokens (native or cw20) that users have staked, with configurable parameters like minimum bond amount and tokens-per-weight ratio.",
     "code_id": "12",
     "hash": "DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653",
     "release": {
@@ -161,7 +161,7 @@
   },
   {
     "name": "cw20 Base",
-    "description": "cw20 Base",
+    "description": "Implementation of the CW20 token standard in CosmWasm.",
     "code_id": "13",
     "hash": "4D8E90DD340993033F1B9E8E3A3EE7F8673C582CA9BCDD8C8CF3C7470D6537D5",
     "release": {
@@ -177,7 +177,7 @@
   },
   {
     "name": "cw20 ics20",
-    "description": "cw20 ics20",
+    "description": "Enables CW20 tokens to be sent over IBC using the ICS20 protocol, allowing custom CW20 tokens from one chain to be used like native tokens on other chains.",
     "code_id": "14",
     "hash": "A63BA1554095B6AC04D2F08246ABCCFA7F1C2276BF19F52A943EE5B85FD7749B",
     "release": {
