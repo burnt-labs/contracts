@@ -5,14 +5,14 @@ use cosmwasm_std::Binary;
 
 #[cw_serde]
 pub struct GrantConfig {
-    description: String,
+    pub description: String,
     pub authorization: Any,
     pub optional: bool,
 }
 
 #[cw_serde]
 pub struct FeeConfig {
-    description: String,
+    pub description: String,
     pub allowance: Option<Any>,
     pub expiration: Option<u32>,
 }

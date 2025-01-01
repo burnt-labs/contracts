@@ -41,6 +41,10 @@ pub fn execute(
             msg_type_url,
             grant_config,
         } => execute::update_grant_config(deps, info, msg_type_url, grant_config),
+        ExecuteMsg::UpdateConfigs {
+            grants,
+            fee_configs,
+        } => execute::update_configs(deps, env, info, grants, fee_configs),
         ExecuteMsg::RemoveGrantConfig { msg_type_url } => {
             execute::remove_grant_config(deps, info, msg_type_url)
         }

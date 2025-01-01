@@ -12,6 +12,12 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
+pub struct UpdateGrant {
+    pub msg_type_url: String,
+    pub grant_config: GrantConfig,
+}
+
+#[cw_serde]
 pub enum ExecuteMsg {
     UpdateAdmin {
         new_admin: Addr,
@@ -19,6 +25,10 @@ pub enum ExecuteMsg {
     UpdateGrantConfig {
         msg_type_url: String,
         grant_config: GrantConfig,
+    },
+    UpdateConfigs {
+        grants: Option<Vec<UpdateGrant>>,
+        fee_configs: Option<Vec<FeeConfig>>,
     },
     RemoveGrantConfig {
         msg_type_url: String,

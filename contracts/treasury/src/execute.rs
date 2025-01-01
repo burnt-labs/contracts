@@ -4,6 +4,7 @@ use crate::error::ContractError::{
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
 use crate::grant::{FeeConfig, GrantConfig};
+use crate::msg::UpdateGrant;
 use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
@@ -12,7 +13,7 @@ use cosmos_sdk_proto::traits::MessageExt;
 use cosmos_sdk_proto::Timestamp;
 use cosmwasm_std::BankMsg::Send;
 use cosmwasm_std::{
-    Addr, AnyMsg, Binary, Coin, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
+    Addr, AnyMsg, Binary, Coin, CosmosMsg, DepsMut, Empty, Env, Event, MessageInfo, Order, Response,
 };
 use url::Url;
 
@@ -83,6 +84,46 @@ pub fn update_grant_config(
             ("overwritten", existed.to_string()),
         ]),
     ))
+}
+
+pub fn update_configs(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    authz_grants: Option<Vec<UpdateGrant>>,
+    fee_grants: Option<Vec<FeeConfig>>,
+) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if info.sender != admin {
+        return Err(Unauthorized);
+    }
+
+    let mut res = Response::<Empty>::new();
+    res = res.add_event(Event::new("update_configs"));
+
+    if let Some(grants) = authz_grants {
+        for grant in grants {
+            let existed = GRANT_CONFIGS.has(deps.storage, grant.msg_type_url.clone());
+
+            GRANT_CONFIGS.save(
+                deps.storage,
+                grant.msg_type_url.clone(),
+                &grant.grant_config,
+            )?;
+            res = res.add_attributes(vec![
+                ("msg type url", grant.msg_type_url),
+                ("overwritten", existed.to_string()),
+            ]);
+        }
+    }
+
+    if let Some(fee_grants) = fee_grants {
+        for config in fee_grants {
+            FEE_CONFIG.save(deps.storage, &config)?;
+        }
+    }
+
+    Ok(res)
 }
 
 pub fn remove_grant_config(
@@ -297,4 +338,211 @@ pub fn revoke_allowance(
             Event::new("revoked_treasury_allowance")
                 .add_attributes(vec![("grantee", grantee.into_string())]),
         ))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::contract::execute;
+    use crate::grant::Any;
+    use crate::msg::ExecuteMsg;
+    use crate::state::{ADMIN, FEE_CONFIG, GRANT_CONFIGS};
+    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
+    use cosmwasm_std::Addr;
+
+    #[test]
+    fn test_update_configs_with_json_input() {
+        // Arrange: Set up environment and dependencies
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = message_info(&Addr::unchecked("admin"), &[]);
+
+        // Mock admin address in storage
+        ADMIN
+            .save(deps.as_mut().storage, &Addr::unchecked("admin"))
+            .unwrap();
+
+        // Example JSON string for ExecuteMsg::UpdateConfigs
+        let json_msg = r#"
+        {
+            "update_configs": {
+                "grants": [
+                    {
+                        "msg_type_url": "/cosmos.bank.v1.MsgSend",
+                        "grant_config": {
+                            "description": "Bank grant",
+                            "authorization": {
+                                "type_url": "/cosmos.authz.v1.GenericAuthorization",
+                                "value": "CgRQYXk="
+                            },
+                            "optional": true
+                        }
+                    },
+                    {
+                        "msg_type_url": "/cosmos.staking.v1.MsgDelegate",
+                        "grant_config": {
+                            "description": "Staking grant",
+                            "authorization": {
+                                "type_url": "/cosmos.authz.v1.GenericAuthorization",
+                                "value": "CgREZWxlZ2F0ZQ=="
+                            },
+                            "optional": false
+                        }
+                    }
+                ],
+                "fee_configs": [
+                    {
+                        "description": "Fee allowance for user1",
+                        "allowance": {
+                            "type_url": "/cosmos.feegrant.v1.BasicAllowance",
+                            "value": "CgQICAI="
+                        },
+                        "expiration": 1715151235
+                    }
+                ]
+            }
+        }
+        "#;
+
+        // Deserialize JSON into ExecuteMsg
+        let execute_msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
+
+        // Act: Call the execute function with the deserialized message
+        let result = execute(deps.as_mut(), env.clone(), info.clone(), execute_msg);
+
+        // Assert: Ensure the response is successful
+        match result {
+            Ok(response) => {
+                // Ensure the event is emitted
+                assert!(response.events.iter().any(|e| e.ty == "update_configs"));
+
+                // Validate grant configs were saved
+                let grants = ["/cosmos.bank.v1.MsgSend", "/cosmos.staking.v1.MsgDelegate"];
+                for &grant_key in grants.iter() {
+                    let exists = GRANT_CONFIGS.has(deps.as_ref().storage, grant_key.to_string());
+                    assert!(exists);
+
+                    let stored_grant = GRANT_CONFIGS
+                        .load(deps.as_ref().storage, grant_key.to_string())
+                        .unwrap();
+                    if grant_key == "/cosmos.bank.v1.MsgSend" {
+                        assert_eq!(stored_grant.description, "Bank grant");
+                        assert_eq!(
+                            stored_grant.authorization,
+                            Any {
+                                type_url: "/cosmos.authz.v1.GenericAuthorization".to_string(),
+                                value: vec![0x0A, 0x04, 0x50, 0x61, 0x79].into(),
+                            }
+                        );
+                        assert!(stored_grant.optional);
+                    } else if grant_key == "/cosmos.staking.v1.MsgDelegate" {
+                        assert_eq!(stored_grant.description, "Staking grant");
+                        assert_eq!(
+                            stored_grant.authorization,
+                            Any {
+                                type_url: "/cosmos.authz.v1.GenericAuthorization".to_string(),
+                                value: vec![
+                                    0x0A, 0x04, 0x44, 0x65, 0x6C, 0x65, 0x67, 0x61, 0x74, 0x65
+                                ]
+                                .into(),
+                            }
+                        );
+                        assert!(!stored_grant.optional);
+                    }
+                }
+
+                // Validate fee configs were saved
+                let fee_config = FEE_CONFIG.load(deps.as_ref().storage).unwrap();
+                assert_eq!(fee_config.description, "Fee allowance for user1");
+                assert_eq!(
+                    fee_config.allowance.unwrap(),
+                    Any {
+                        type_url: "/cosmos.feegrant.v1.BasicAllowance".to_string(),
+                        value: b"\x0a\x04\x08\x08\x02".into(),
+                    }
+                );
+                assert_eq!(fee_config.expiration.unwrap(), 1715151235);
+            }
+            Err(err) => panic!("Test failed with error: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_update_configs_with_none_values() {
+        // Arrange: Set up environment and dependencies
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = message_info(&Addr::unchecked("admin"), &[]);
+
+        // Mock admin address in storage
+        ADMIN
+            .save(deps.as_mut().storage, &Addr::unchecked("admin"))
+            .unwrap();
+
+        // Example JSON with `null` for grants and fee_configs
+        let json_msg = r#"
+        {
+            "update_configs": {
+                "grants": null,
+                "fee_configs": null
+            }
+        }
+        "#;
+
+        // Deserialize JSON into ExecuteMsg
+        let execute_msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
+
+        // Act: Call the execute function with no grants or fee_configs
+        let result = execute(deps.as_mut(), env.clone(), info.clone(), execute_msg);
+
+        // Assert: Ensure the response is successful
+        match result {
+            Ok(response) => {
+                // Ensure the event is emitted
+                assert!(response.events.iter().any(|e| e.ty == "update_configs"));
+
+                // Ensure no grants or fees were added
+                assert!(GRANT_CONFIGS
+                    .keys(
+                        deps.as_ref().storage,
+                        None,
+                        None,
+                        cosmwasm_std::Order::Ascending
+                    )
+                    .next()
+                    .is_none());
+                assert!(FEE_CONFIG
+                    .may_load(deps.as_ref().storage)
+                    .unwrap()
+                    .is_none());
+            }
+            Err(err) => panic!("Test failed with error: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_update_configs_with_invalid_json() {
+        // Arrange: Set up environment and dependencies
+        let mut deps = mock_dependencies();
+        // Mock admin address in storage
+        ADMIN
+            .save(deps.as_mut().storage, &Addr::unchecked("admin"))
+            .unwrap();
+
+        // Invalid JSON input
+        let invalid_json_msg = r#"
+        {
+            "update_configs": {
+                "grants": [
+                    { "msg_type_url": "/invalid/url" }
+                ]
+            }
+        }
+        "#;
+
+        // Deserialize JSON into ExecuteMsg
+        let execute_msg: Result<ExecuteMsg, _> = serde_json::from_str(invalid_json_msg);
+
+        // Assert: Ensure deserialization fails
+        assert!(execute_msg.is_err());
+    }
 }
