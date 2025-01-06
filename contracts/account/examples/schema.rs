@@ -1,4 +1,4 @@
-use account::msg::*;
+use xion_account::msg::*;
 use cosmwasm_schema::write_api;
 
 fn main() {
