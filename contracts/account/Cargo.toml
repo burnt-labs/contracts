@@ -1,7 +1,9 @@
 [package]
-name = "account"
+name = "xion-account"
 version = "0.1.0"
 edition = "2021"
+description = "Primary MetaAccount implementation for XION network"
+license = "Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -26,7 +28,6 @@ hex                = { workspace = true }
 ripemd             = { workspace = true }
 bech32             = { workspace = true }
 base64             = { workspace = true }
-phf                = { workspace = true }
 rsa                = { workspace = true }
 getrandom          = { workspace = true }
 p256               = { workspace = true }
