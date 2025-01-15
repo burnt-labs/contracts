@@ -5,11 +5,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 mod eth_crypto;
+mod groth16;
 pub mod jwt;
 pub mod passkey;
 mod secp256r1;
 mod sign_arb;
 pub mod util;
+mod zkemail;
 
 pub mod testing {
     pub use super::sign_arb::wrap_message;
@@ -48,6 +50,13 @@ pub enum AddAuthenticator {
         url: String,
         credential: Binary,
     },
+    ZKEmail {
+        id: u8,
+        vkey: Binary,
+        email_hash: Binary,
+        dkim_domain: String,
+        proof: Binary,
+    },
 }
 
 impl AddAuthenticator {
@@ -59,18 +68,38 @@ impl AddAuthenticator {
             AddAuthenticator::Jwt { id, .. } => *id,
             AddAuthenticator::Secp256R1 { id, .. } => *id,
             AddAuthenticator::Passkey { id, .. } => *id,
+            AddAuthenticator::ZKEmail { id, .. } => *id,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub enum Authenticator {
-    Secp256K1 { pubkey: Binary },
-    Ed25519 { pubkey: Binary },
-    EthWallet { address: String },
-    Jwt { aud: String, sub: String },
-    Secp256R1 { pubkey: Binary },
-    Passkey { url: String, passkey: Binary },
+    Secp256K1 {
+        pubkey: Binary,
+    },
+    Ed25519 {
+        pubkey: Binary,
+    },
+    EthWallet {
+        address: String,
+    },
+    Jwt {
+        aud: String,
+        sub: String,
+    },
+    Secp256R1 {
+        pubkey: Binary,
+    },
+    Passkey {
+        url: String,
+        passkey: Binary,
+    },
+    ZKEmail {
+        vkey: Binary,
+        email_hash: Binary,
+        dkim_domain: String,
+    },
 }
 
 impl Authenticator {
@@ -137,6 +166,15 @@ impl Authenticator {
                 )?;
 
                 Ok(true)
+            }
+            Authenticator::ZKEmail {
+                vkey,
+                email_hash,
+                dkim_domain,
+            } => {
+                let verification =
+                    zkemail::verify(deps, tx_bytes, sig_bytes, vkey, email_hash, dkim_domain)?;
+                Ok(verification)
             }
         }
     }
