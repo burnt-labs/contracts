@@ -260,6 +260,18 @@ pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Res
     )
 }
 
+const MAX_SIZE: usize = 1024;
+pub fn emit(env: Env, data: String) -> ContractResult<Response> {
+    if data.len() > MAX_SIZE {
+        Err(ContractError::EmissionSizeExceeded)
+    } else {
+        let emit_event = Event::new("account_emit")
+            .add_attribute("address", env.contract.address)
+            .add_attribute("data", data);
+        Ok(Response::new().add_event(emit_event))
+    }
+}
+
 pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {
     if sender != contract {
         return Err(ContractError::Unauthorized);
