@@ -84,6 +84,9 @@ pub enum ContractError {
 
     #[error(transparent)]
     FromUTF8(#[from] std::string::FromUtf8Error),
+
+    #[error("invalid ethereum address")]
+    InvalidEthAddress,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
