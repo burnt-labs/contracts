@@ -193,7 +193,8 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
+
                 Ok(())
             }
         }
