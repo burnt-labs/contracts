@@ -1,5 +1,5 @@
-use treasury::msg::*;
 use cosmwasm_schema::write_api;
+use treasury::msg::*;
 
 fn main() {
     write_api! {
