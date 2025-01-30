@@ -16,7 +16,7 @@ pub fn instantiate(
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // Validate the admin address
     let admin_addr = if let Some(addr) = msg.admin {
-        deps.api.addr_validate(&addr.as_str())?
+        deps.api.addr_validate(addr.as_str())?
     } else {
         return Err(ContractError::Unauthorized);
     };
