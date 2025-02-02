@@ -70,6 +70,12 @@ pub fn before_tx(
             Authenticator::Passkey { .. } => {
                 // todo: figure out if there are minimum checks for passkeys
             }
+            Authenticator::ZKEmail { .. } => {
+                // todo: verify that this minimum is as high as possible
+                if sig_bytes.len() < 700 {
+                    return Err(ContractError::ShortSignature);
+                }
+            }
         }
 
         return match authenticator.verify(deps, env, tx_bytes, sig_bytes)? {
@@ -218,6 +224,22 @@ pub fn add_auth_method(
             // we replace the sent credential with the passkey for indexers and other
             // observers to see
             *(credential) = passkey;
+            Ok(())
+        }
+        AddAuthenticator::ZKEmail {
+            id,
+            verification_contract,
+            email_hash,
+            dkim_domain,
+        } => {
+            // todo: how does verification work in a situation like this?
+
+            let auth = Authenticator::ZKEmail {
+                verification_contract: verification_contract.clone(),
+                email_hash: email_hash.clone(),
+                dkim_domain: dkim_domain.clone(),
+            };
+            save_authenticator(deps, *id, &auth)?;
             Ok(())
         }
     }?;
