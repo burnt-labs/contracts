@@ -18,6 +18,7 @@ cw2                = { workspace = true }
 thiserror          = { workspace = true }
 base64             = { workspace = true }
 cosmos-sdk-proto   = { workspace = true }
+getrandom          = { workspace = true }
 
 ark-crypto-primitives = { version = "=0.4.0" }
 ark-ec = { version = "=0.4.2", default-features = false  }
