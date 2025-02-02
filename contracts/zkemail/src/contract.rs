@@ -113,3 +113,28 @@ fn query_verify(
 
     Ok(to_json_binary(&verified)?)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use cosmwasm_std::{testing::MockApi, Uint256};
+
+    use super::*;
+
+    #[test]
+    fn verifying_zkemail_signature() {
+        let api = MockApi::default();
+        
+        // build tx bytes to sign
+        
+        // load proof from previously sent and proved email
+
+        // assign email salt from email used to prove
+        
+        // mock api for querying dkim module
+        
+        // submit data for verification
+
+    }
+}
