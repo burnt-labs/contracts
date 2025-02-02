@@ -199,7 +199,8 @@ pub fn add_auth_method(
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
+
                 Ok(())
             }
         }
@@ -226,12 +227,15 @@ pub fn add_auth_method(
             Ok(())
         }
         AddAuthenticator::ZKEmail {
-            id, vkey, email_hash, dkim_domain, proof: _
+            id,
+            verification_contract,
+            email_hash,
+            dkim_domain,
         } => {
             // todo: how does verification work in a situation like this?
-            
+
             let auth = Authenticator::ZKEmail {
-                vkey: vkey.clone(),
+                verification_contract: verification_contract.clone(),
                 email_hash: email_hash.clone(),
                 dkim_domain: dkim_domain.clone(),
             };
@@ -276,6 +280,18 @@ pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Res
             ("authenticator_id", id.to_string()),
         ])),
     )
+}
+
+const MAX_SIZE: usize = 1024;
+pub fn emit(env: Env, data: String) -> ContractResult<Response> {
+    if data.len() > MAX_SIZE {
+        Err(ContractError::EmissionSizeExceeded)
+    } else {
+        let emit_event = Event::new("account_emit")
+            .add_attribute("address", env.contract.address)
+            .add_attribute("data", data);
+        Ok(Response::new().add_event(emit_event))
+    }
 }
 
 pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {

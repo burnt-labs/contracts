@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 
 use crate::error::ContractError;
-use crate::execute::{add_auth_method, assert_self, remove_auth_method};
+use crate::execute::{add_auth_method, assert_self, emit, remove_auth_method};
 use crate::msg::{ExecuteMsg, MigrateMsg};
 use crate::{
     error::ContractResult,
@@ -65,16 +65,13 @@ pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Resp
             cred_bytes,
             simulate,
             ..
-        } => {
-            let cred_bytes = cred_bytes.ok_or(ContractError::EmptySignature)?;
-            execute::before_tx(
-                deps.as_ref(),
-                &env,
-                &Binary::from(tx_bytes.as_slice()),
-                Some(Binary::from(cred_bytes.as_slice())).as_ref(),
-                simulate,
-            )
-        }
+        } => execute::before_tx(
+            deps.as_ref(),
+            &env,
+            &Binary::from(tx_bytes.as_slice()),
+            cred_bytes.as_ref(),
+            simulate,
+        ),
         AccountSudoMsg::AfterTx { .. } => execute::after_tx(),
     }
 }
@@ -93,6 +90,7 @@ pub fn execute(
             add_auth_method(deps, &env, add_authenticator)
         }
         ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, *id),
+        ExecuteMsg::Emit { data } => emit(env, data.to_string()),
     }
 }
 

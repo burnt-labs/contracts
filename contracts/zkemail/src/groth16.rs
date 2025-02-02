@@ -2,15 +2,15 @@ use ark_bn254::{Bn254, Config, FrConfig};
 use ark_ec::bn::Bn;
 use ark_ff::Fp;
 use ark_ff::MontBackend;
-use ark_groth16::{Groth16, Proof, VerifyingKey};
 use ark_ff::PrimeField;
-use ark_groth16::r1cs_to_qap::{evaluate_constraint, LibsnarkReduction, R1CSToQAP};
+use ark_groth16::r1cs_to_qap::{LibsnarkReduction, R1CSToQAP, evaluate_constraint};
+use ark_groth16::{Groth16, Proof, VerifyingKey};
 use ark_poly::EvaluationDomain;
 use ark_relations::r1cs::{ConstraintMatrices, ConstraintSystemRef, SynthesisError};
 use ark_std::{cfg_into_iter, cfg_iter, cfg_iter_mut, vec};
 
 // Developer's Note:
-// This has been copied over from the ark-circom package, which focuses on 
+// This has been copied over from the ark-circom package, which focuses on
 // proving and verifying in arkworks using circom. It has many dependencies on
 // wasmer/ethers/js that we do not need, if we only want to verify existing proofs
 
@@ -18,7 +18,6 @@ pub type GrothBnVkey = VerifyingKey<Bn254>;
 pub type GrothBnProof = Proof<Bn<Config>>;
 pub type GrothBn = Groth16<Bn254, CircomReduction>;
 pub type GrothFp = Fp<MontBackend<FrConfig, 4>, 4>;
-
 
 /// Implements the witness map used by snarkjs. The arkworks witness map calculates the
 /// coefficients of H through computing (AB-C)/Z in the evaluation domain and going back to the

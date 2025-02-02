@@ -1,5 +1,6 @@
 [alias]
 wasm = "build --release --lib --target wasm32-unknown-unknown"
+schema = "run --example schema"
 
 [env]
 RUSTFLAGS = "-C link-arg=-s"

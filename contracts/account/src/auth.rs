@@ -1,11 +1,10 @@
 use crate::auth::secp256r1::verify;
 use crate::error::ContractError;
-use cosmwasm_std::{Binary, Deps, Env};
+use cosmwasm_std::{Addr, Binary, Deps, Env};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 mod eth_crypto;
-mod groth16;
 pub mod jwt;
 pub mod passkey;
 mod secp256r1;
@@ -52,10 +51,9 @@ pub enum AddAuthenticator {
     },
     ZKEmail {
         id: u8,
-        vkey: Binary,
+        verification_contract: Addr,
         email_hash: Binary,
         dkim_domain: String,
-        proof: Binary,
     },
 }
 
@@ -96,7 +94,7 @@ pub enum Authenticator {
         passkey: Binary,
     },
     ZKEmail {
-        vkey: Binary,
+        verification_contract: Addr,
         email_hash: Binary,
         dkim_domain: String,
     },
@@ -138,7 +136,13 @@ impl Authenticator {
                 }
             }
             Authenticator::EthWallet { address } => {
-                let addr_bytes = hex::decode(&address[2..])?;
+                if !address.starts_with("0x") || address.len() != 42 {
+                    return Err(ContractError::InvalidEthAddress);
+                }
+                let normalized_address = address.to_lowercase();
+                let addr_bytes = hex::decode(&normalized_address[2..])
+                    .map_err(|_| ContractError::InvalidEthAddress)?;
+
                 match eth_crypto::verify(deps.api, tx_bytes, sig_bytes, &addr_bytes) {
                     Ok(_) => Ok(true),
                     Err(error) => Err(error),
@@ -168,12 +172,18 @@ impl Authenticator {
                 Ok(true)
             }
             Authenticator::ZKEmail {
-                vkey,
+                verification_contract,
                 email_hash,
                 dkim_domain,
             } => {
-                let verification =
-                    zkemail::verify(deps, tx_bytes, sig_bytes, vkey, email_hash, dkim_domain)?;
+                let verification = zkemail::verify(
+                    deps,
+                    verification_contract,
+                    tx_bytes,
+                    sig_bytes,
+                    email_hash,
+                    dkim_domain,
+                )?;
                 Ok(verification)
             }
         }

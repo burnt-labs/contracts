@@ -78,6 +78,9 @@ pub enum ContractError {
     #[error("cannot override existing authenticator at index {index}")]
     OverridingIndex { index: u8 },
 
+    #[error("emit data too large")]
+    EmissionSizeExceeded,
+
     /// Doesn't support PartialEq, moved below
     #[error("{0}")]
     SerdeJSON(String),
@@ -85,14 +88,8 @@ pub enum ContractError {
     #[error(transparent)]
     FromUTF8(#[from] std::string::FromUtf8Error),
 
-    #[error("r1cs synthesis error")]
-    R1CS(#[from] ark_relations::r1cs::SynthesisError),
-
-    #[error("{0}")]
-    ArkSerialization(String),
-
-    #[error("dkim invalid")]
-    InvalidDkim,
+    #[error("invalid ethereum address")]
+    InvalidEthAddress,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
@@ -106,11 +103,5 @@ impl From<p256::ecdsa::Error> for ContractError {
 impl From<serde_json::Error> for ContractError {
     fn from(value: serde_json::Error) -> Self {
         Self::SerdeJSON(format!("{:?}", value))
-    }
-}
-
-impl From<ark_serialize::SerializationError> for ContractError {
-    fn from(value: ark_serialize::SerializationError) -> Self {
-        Self::ArkSerialization(format!("{:?}", value))
     }
 }
