@@ -18,4 +18,5 @@ pub fn always_fail(_buf: &mut [u8]) -> Result<(), Error> {
     Err(Error::from(code))
 }
 use getrandom::register_custom_getrandom;
+#[cfg(not(feature = "library"))]
 register_custom_getrandom!(always_fail);

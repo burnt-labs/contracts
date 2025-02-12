@@ -10,16 +10,16 @@ use crate::{CONTRACT_NAME, CONTRACT_VERSION};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ff::Zero;
 use ark_serialize::CanonicalDeserialize;
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
+use base64::Engine;
 use cosmos_sdk_proto::prost::Message;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmos_sdk_proto::xion::v1::dkim::{QueryDkimPubKeysRequest, QueryDkimPubKeysResponse};
 use cosmwasm_std::{
-    Binary, Deps, DepsMut, Env, Event, MessageInfo, Response, Storage, entry_point, to_json_binary,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response, Storage,
 };
 
-#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -41,7 +41,7 @@ pub fn init(deps: DepsMut, env: Env, vkey: SnarkJsVkey) -> ContractResult<Respon
     )
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> ContractResult<Binary> {
     match msg {
         VKey {} => query_vkey(deps.storage),
@@ -125,16 +125,15 @@ mod tests {
     #[test]
     fn verifying_zkemail_signature() {
         let api = MockApi::default();
-        
+
         // build tx bytes to sign
-        
+
         // load proof from previously sent and proved email
 
         // assign email salt from email used to prove
-        
-        // mock api for querying dkim module
-        
-        // submit data for verification
 
+        // mock api for querying dkim module
+
+        // submit data for verification
     }
 }
