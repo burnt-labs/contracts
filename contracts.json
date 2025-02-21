@@ -768,22 +768,6 @@
     "deprecated": false
   },
   {
-    "name": "Talis Trading Escrow",
-    "description": "Talis Trading Escrow",
-    "code_id": "51",
-    "hash": "01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2",
-    "governance": "Genesis",
-    "release": {
-      "url": "https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8",
-      "version": "f084f5b"
-    },
-    "author": {
-      "name": "Talis",
-      "url": "https://talis.art/"
-    },
-    "deprecated": false
-  },
-  {
     "name": "MetaAccount",
     "description": "MetaAccount",
     "code_id": "1",

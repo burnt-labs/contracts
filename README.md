@@ -6,6 +6,14 @@ Contract information for XION mainnet
 
 ## Development
 
+### Validation
+
+Before submitting changes to contracts.json, validate the format and content:
+
+```bash
+node validate.js
+```
+
 ### Compiling
 
 ```bash
