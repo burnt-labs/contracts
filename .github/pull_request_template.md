@@ -22,19 +22,6 @@ Please fill in all the required information below for the contract(s) being adde
 }
 ```
 
-### Finding Code ID and Hash
-If you have a governance proposal ID, you can find the code ID by:
-1. View the proposal on [XION Explorer](https://explorer.burnt.com/xion/gov)
-2. Find the `store-code` or `instantiate-contract` message in the proposal details
-3. Once the proposal is passed and executed:
-   - The code ID will be visible in the transaction details
-   - The hash can be found in the transaction logs
-4. You can also query via the chain's RPC endpoint:
-   ```bash
-   xiond query gov proposal <proposal-id>
-   xiond query wasm code-info <code-id>
-   ```
-
 ### Documentation Updates
 The README.md is automatically generated from `contracts.json`. After making changes:
 
