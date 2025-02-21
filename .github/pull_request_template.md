@@ -45,7 +45,7 @@ If you have a governance proposal ID, you can find the code ID by:
 Before submitting your PR, run the validation script to check your changes:
 
 ```bash
-node validate.js
+node scripts/validate.js
 ```
 
 The script checks:
@@ -53,7 +53,7 @@ The script checks:
 - Hash is 64 characters and uppercase hex
 - URLs are valid HTTPS links
 - Code IDs are unique
-- Contracts are in alphabetical order (active and deprecated sections separately)
+- Contracts are ordered by code_id within active and deprecated sections
 - Active contracts come before deprecated ones
 
 ### Checklist

@@ -11,7 +11,7 @@ Contract information for XION mainnet
 Before submitting changes to contracts.json, validate the format and content:
 
 ```bash
-node validate.js
+node scripts/validate.js
 ```
 
 ### Compiling
