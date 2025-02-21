@@ -1,11 +1,8 @@
 ## Description
-
 <!-- Provide a brief description of the changes in this PR -->
 
 ## Contract Details
-
 Please fill in all the required information below for the contract(s) being added to `contracts.json`:
-
 ```json
 {
   "name": "",           // Contract name (required)
@@ -26,9 +23,7 @@ Please fill in all the required information below for the contract(s) being adde
 ```
 
 ### Finding Code ID and Hash
-
 If you have a governance proposal ID, you can find the code ID by:
-
 1. View the proposal on [XION Explorer](https://explorer.burnt.com/xion/gov)
 2. Find the `store-code` or `instantiate-contract` message in the proposal details
 3. Once the proposal is passed and executed:
@@ -40,24 +35,37 @@ If you have a governance proposal ID, you can find the code ID by:
    xiond query wasm code-info <code-id>
    ```
 
+### Documentation Updates
+The README.md is automatically generated from `contracts.json`. After making changes:
+
+1. Ensure you have the required dependencies:
+   - Node.js: https://nodejs.org/
+   - jq: `brew install jq` (macOS) or `apt-get install jq` (Ubuntu/Debian)
+
+2. Run the convert script to validate and update the README:
+   ```bash
+   ./convert.sh
+   ```
+
+3. Commit both the `contracts.json` and generated `README.md` changes
+
+⚠️ Important Notes:
+- Do not edit README.md manually. All changes must be made through `contracts.json`
+- Pull requests with manual README edits will be automatically rejected by CI
+- If you forget to run `./convert.sh` locally, the CI will fail with a "README out of sync" error
+
 ### Validation
-
-Before submitting your PR, run the validation script to check your changes:
-
-```bash
-node scripts/validate.js
-```
-
-The script checks:
-- All required fields are present
+The `convert.sh` script automatically performs these validations:
+- All required fields are present and properly formatted
 - Hash is 64 characters and uppercase hex
 - URLs are valid HTTPS links
-- Code IDs are unique
-- Contracts are ordered by code_id within active and deprecated sections
+- Code IDs are unique and properly ordered
 - Active contracts come before deprecated ones
+- README.md stays in sync with contracts.json
+
+If any validation fails, the script will show specific error messages to help you fix the issues.
 
 ### Checklist
-
 - [ ] Added entry to `contracts.json` with all required fields
 - [ ] Contract name is clear and descriptive
 - [ ] Description explains the contract's purpose
@@ -68,11 +76,9 @@ The script checks:
 - [ ] Author information is correct with valid URL
 - [ ] Governance field correctly references proposal or "Genesis"
 - [ ] Deprecated flag is set appropriately
-- [ ] Entry maintains alphabetical order in the JSON array
-- [ ] Ran `node validate.js` and fixed any validation errors
+- [ ] Entry maintains code_id order in its section (active or deprecated)
+- [ ] Ran `./convert.sh` and fixed any validation errors
+- [ ] Both `contracts.json` and generated `README.md` are included in the commit
 
 ### Additional Notes
-
 <!-- Add any additional context or notes about the contract deployment here -->
-
-Note: After the PR is merged, the README.md will be automatically updated from contracts.json.
