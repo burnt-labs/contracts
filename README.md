@@ -6,13 +6,26 @@ Contract information for XION mainnet
 
 ## Development
 
-### Validation
+### Updating Documentation
 
-Before submitting changes to contracts.json, validate the format and content:
+The README is automatically generated from `contracts.json`. To update it:
 
+1. Ensure you have the required dependencies:
+   - Node.js: https://nodejs.org/
+   - jq: `brew install jq` (macOS) or `apt-get install jq` (Ubuntu/Debian)
+
+2. Modify `contracts.json` with your changes
+   - The script will validate the JSON format and required fields
+   - Each contract must include: name, description, code_id, hash, release info, and author details
+
+3. Run the convert script:
 ```bash
-node scripts/validate.js
+./convert.sh
 ```
+
+4. Commit both the `contracts.json` and generated `README.md` changes
+   - The CI will validate both files are in sync during pull requests
+   - Pull requests with manual README edits will be rejected
 
 ### Compiling
 
@@ -75,7 +88,6 @@ docker run --rm -v "$(pwd)":/code \
 | Talis Whitelist | Talis Whitelist | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `48` | `37360FDE0EE1384AA56781B0D05D4B0187843AE96335158DFEAD7806106DE779` | Genesis |
 | Talis Staking | Talis Staking | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `49` | `9C9047420A5B870D490585C753FFB46C97E310A55E9FCF50EA784BAFC2A701FD` | Genesis |
 | Talis Frens Proxy | Talis Frens Proxy | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `50` | `919FF797B7F35A40B5D32B506C2C05918DAA1C42B89C6864425F2047B5BC19F7` | Genesis |
-| Talis Trading Escrow | Talis Trading Escrow | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `51` | `01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2` | Genesis |
 | Talis Trading Escrow | Talis Trading Escrow | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `51` | `01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2` | Genesis |
 ## Deprecated Contracts
 | Name | Description | Release | Author | Code ID | Hash | Governance Proposal |

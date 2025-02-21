@@ -4,10 +4,13 @@ on:
   pull_request:
     paths:
       - 'contracts.json'
+      - 'README.md'
 
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      CI: true
     steps:
       - uses: actions/checkout@v3
       
@@ -15,6 +18,9 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18'
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
           
-      - name: Validate JSON
-        run: node scripts/validate.js
+      - name: Validate contracts.json and verify README.md
+        run: bash convert.sh
