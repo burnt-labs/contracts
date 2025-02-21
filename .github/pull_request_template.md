@@ -18,9 +18,22 @@ Please fill in all the required information below for the contract(s) being adde
     "url": ""         // Organization website URL
   },
   "governance": "",    // "Genesis" or proposal number
-  "deprecated": false  // true if contract is deprecated
+  "deprecated": false  // true if contract is deprecated - mixed inline with active contracts
 }
 ```
+
+### Finding Code ID and Hash
+If you have a governance proposal ID, you can find the code ID by:
+1. View the proposal on [XION Explorer](https://explorer.burnt.com/xion/gov)
+2. Find the `store-code` or `instantiate-contract` message in the proposal details
+3. Once the proposal is passed and executed:
+   - The code ID will be visible in the transaction details
+   - The hash can be found in the transaction logs
+4. You can also query via the chain's RPC endpoint:
+   ```bash
+   xiond query gov proposal <proposal-id>
+   xiond query wasm code-info <code-id>
+   ```
 
 ### Documentation Updates
 The README.md is automatically generated from `contracts.json`. After making changes:
@@ -46,8 +59,8 @@ The `convert.sh` script automatically performs these validations:
 - All required fields are present and properly formatted
 - Hash is 64 characters and uppercase hex
 - URLs are valid HTTPS links
-- Code IDs are unique and properly ordered
-- Active contracts come before deprecated ones
+- Code IDs are unique
+- Contracts are ordered by code_id (both active and deprecated contracts follow the same ordering)
 - README.md stays in sync with contracts.json
 
 If any validation fails, the script will show specific error messages to help you fix the issues.
@@ -63,7 +76,7 @@ If any validation fails, the script will show specific error messages to help yo
 - [ ] Author information is correct with valid URL
 - [ ] Governance field correctly references proposal or "Genesis"
 - [ ] Deprecated flag is set appropriately
-- [ ] Entry maintains code_id order in its section (active or deprecated)
+- [ ] Entry is placed in code_id order (regardless of deprecated status)
 - [ ] Ran `./convert.sh` and fixed any validation errors
 - [ ] Both `contracts.json` and generated `README.md` are included in the commit
 
