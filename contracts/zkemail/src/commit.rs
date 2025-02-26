@@ -1,5 +1,6 @@
 use crate::ark_verifier::GrothFp;
 use ark_ff::*;
+use crate::poseidon;
 
 const EMAIL_MAX_BYTES: usize = 256;
 const TX_BODY_MAX_BYTES: usize = 512;
@@ -10,14 +11,14 @@ pub fn calculate_email_commitment(salt: &str, email: &str) -> GrothFp {
     let mut salt = pack_bytes_into_fields(padded_salt_bytes);
     let email = pack_bytes_into_fields(padded_email_bytes);
     salt.extend(email);
-    let poseidon = poseidon_ark::Poseidon::new();
+    let poseidon = poseidon::Poseidon::new();
     poseidon.hash(salt).unwrap()
 }
 
 pub fn calculate_tx_body_commitment(tx: &str) -> GrothFp {
     let padded_tx_bytes = pad_bytes(tx.as_bytes(), TX_BODY_MAX_BYTES);
     let tx = pack_bytes_into_fields(padded_tx_bytes);
-    let poseidon = poseidon_ark::Poseidon::new();
+    let poseidon = poseidon::Poseidon::new();
     let mut commitment = GrothFp::zero(); // Initialize commitment with an initial value
 
     tx.chunks(16).enumerate().for_each(|(i, chunk)| {

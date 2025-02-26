@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 cosmwasm-schema    = { workspace = true }
 serde              = { workspace = true }
-serde_json = { workspace = true }
+serde_json         = { workspace = true }
 cw-storage-plus    = { workspace = true }
 cosmwasm-std       = { workspace = true }
 cw2                = { workspace = true }
@@ -22,13 +22,12 @@ base64             = { workspace = true }
 cosmos-sdk-proto   = { workspace = true }
 getrandom          = { workspace = true }
 
-ark-crypto-primitives = { version = "=0.4.0" }
-ark-ec = { version = "=0.4.2", default-features = false  }
-ark-ff = { version = "=0.4.2", default-features = false, features = [ "asm"] }
-ark-std = { version = "=0.4.0", default-features = false }
-ark-bn254 = { version = "=0.4.0" }
-ark-groth16 = { version = "=0.4.0", default-features = false }
-ark-relations = { version = "=0.4.0", default-features = false }
-ark-serialize = { version = "=0.4.2", default-features = false }
-ark-poly = { version = "=0.4.2", default-features = false }
-poseidon-ark = {git = "https://github.com/arnaucube/poseidon-ark"}
+ark-crypto-primitives = { version = "=0.5.0", default-features = false, features = [] }
+ark-ec = { version = "=0.5.0", default-features = false, features = []  }
+ark-ff = { version = "=0.5.0", default-features = false, features = [ "asm"] }
+ark-std = { git = "https://github.com/ash-burnt/arkworks-std", rev = "abc512310d30b324b58ad6c6c45f7249b3a36ca9", default-features = false, features = []}
+ark-bn254 = { version = "=0.5.0" , features = ["scalar_field"]}
+ark-groth16 = { version = "=0.5.0", default-features = false, features = [] }
+ark-relations = { version = "=0.5.1", default-features = false, features = [] }
+ark-serialize = { version = "=0.5.0", default-features = false, features = [] }
+ark-poly = { version = "=0.5.0", default-features = false, features = [] }
