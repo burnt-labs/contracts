@@ -38,13 +38,13 @@ docker run --rm -v "$(pwd)":/code \
 
 ```
 
-## Deployed Contracts
+## Active Contracts
 | Name | Description | Release | Author | Code ID | Hash | Governance Proposal |
 |:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|
 | Polytone Proxy | ICA Proxy, allows controlled execution of messages. | [v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0) | [DAO DAO](https://daodao.zone/) | `2` | `54E909B7F9AB191A0A0DB2040E09C8CFAB45DB75CA22852098531EC301878FC2` | Genesis |
 | Polytone Voice | Receiver of messages over IBC, executes on the destination chain. Maintains access control through the proxy (see above). | [v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0) | [DAO DAO](https://daodao.zone/) | `3` | `3AA8F962BADEB899DB4BC6E5931C852473B5719DBA5AFF5DC26C66CDE1ED250E` | Genesis |
 | Polytone Note | Sends messages to be executed on other chains over IBC. Handles channel management and packet routing. | [v1.1.0](https://github.com/DA0-DA0/polytone/releases/tag/v1.1.0) | [DAO DAO](https://daodao.zone/) | `4` | `CD13C487B820CE79BC7932F41497274635477845C2DCAF5CD4B06332175F53EC` | Genesis |
-| MetaAccount | Xion's MetaAccount implementation | [pr40](https://github.com/burnt-labs/contracts/pull/40) | [Burnt Labs](https://burnt.com) | `5` | `FEFA4D0C57F6CA47A5D89C6F077A176D26027DB4EEFA758A929DD4C4AAF17D1B` | Genesis |
+| MetaAccount (v2) | Second version of Xion's MetaAccount implementation | [pr40](https://github.com/burnt-labs/contracts/pull/40) | [Burnt Labs](https://burnt.com) | `5` | `FEFA4D0C57F6CA47A5D89C6F077A176D26027DB4EEFA758A929DD4C4AAF17D1B` | Genesis |
 | cw1 Subkeys | A Proxy contract that extends the functionality of cw1-whitelist. Allows admins to grant allowances and set permissions to 'subkeys' | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `6` | `0DEE80010FB15A7A03FC1153389DC1EEC36482B8D872B0640B8762C14E5C3CF8` | Genesis |
 | cw1 Whitelist | Proxy contract maintaining a list of admin addresses that can execute messages through it. Admin list defined at contract creation. | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `7` | `86C0008909BEB14147FA99F66CA1AFB674FDCD737CCAD89C47EA2C95966F747E` | Genesis |
 | cw3 Fixed Multisig | Implements a multisig wallet with a fixed set of voters defined at instantiation, each voter can have different voting weights. Allows voters to create, vote on, and execute proposals containing arbitrary messages. Supports different voting thresholds & configurable voting periods. | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `8` | `734A8B5B958D9F3A9D97CAAEA93AAE409BD7FF21648B35B3F9A40F6DF0C39C00` | Genesis |
@@ -89,8 +89,9 @@ docker run --rm -v "$(pwd)":/code \
 | Talis Staking | Talis Staking | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `49` | `9C9047420A5B870D490585C753FFB46C97E310A55E9FCF50EA784BAFC2A701FD` | Genesis |
 | Talis Frens Proxy | Talis Frens Proxy | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `50` | `919FF797B7F35A40B5D32B506C2C05918DAA1C42B89C6864425F2047B5BC19F7` | Genesis |
 | Talis Trading Escrow | Talis Trading Escrow | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `51` | `01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2` | Genesis |
+
 ## Deprecated Contracts
 | Name | Description | Release | Author | Code ID | Hash | Governance Proposal |
 |:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|
-| MetaAccount | MetaAccount | [v1.0.0](https://github.com/burnt-labs/contracts/releases/tag/v1.0.0) | [Burnt Labs](https://burnt.com) | `1` | `5E0F49F9686FAD66C132031EC6A43EC63AD84A2B6C8A35C555542AC84FC03708` | Genesis |
+| MetaAccount (v1.0.0) | Initial version of MetaAccount implementation, superseded by v2 | [v1.0.0](https://github.com/burnt-labs/contracts/releases/tag/v1.0.0) | [Burnt Labs](https://burnt.com) | `1` | `5E0F49F9686FAD66C132031EC6A43EC63AD84A2B6C8A35C555542AC84FC03708` | Genesis |
 | cw4 Stake | cw4 Stake | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `11` | `DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653` | Genesis |

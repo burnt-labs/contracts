@@ -61,38 +61,14 @@ function validateJson(data, schema, path = '') {
       validateJson(item, schema.items, `${path}[${index}]`);
     });
 
-    // Split into active and deprecated
-    const activeData = data.filter(item => !item.deprecated);
-    const deprecatedData = data.filter(item => item.deprecated);
-
-    // Check active contracts come before deprecated ones
-    data.forEach((item, index) => {
-      if (!item.deprecated && index >= activeData.length) {
-        throw new Error(`Active contracts should come before deprecated contracts`);
-      }
-      if (item.deprecated && index < activeData.length) {
-        throw new Error(`Deprecated contracts should come after active contracts`);
-      }
-    });
-
-    // Check code_id ordering within active contracts
-    for (let i = 1; i < activeData.length; i++) {
-      const prevCodeId = parseInt(activeData[i-1].code_id);
-      const currentCodeId = parseInt(activeData[i].code_id);
+    // Check code_id ordering for all contracts
+    for (let i = 1; i < data.length; i++) {
+      const prevCodeId = parseInt(data[i-1].code_id);
+      const currentCodeId = parseInt(data[i].code_id);
       if (currentCodeId < prevCodeId) {
-        throw new Error(`Active contracts not in code_id order: ${activeData[i-1].name} (${prevCodeId}) comes before ${activeData[i].name} (${currentCodeId})`);
+        throw new Error(`Contracts not in code_id order: ${data[i-1].name} (${prevCodeId}) comes before ${data[i].name} (${currentCodeId})`);
       }
     }
-
-    // Check code_id ordering within deprecated contracts
-    for (let i = 1; i < deprecatedData.length; i++) {
-      const prevCodeId = parseInt(deprecatedData[i-1].code_id);
-      const currentCodeId = parseInt(deprecatedData[i].code_id);
-      if (currentCodeId < prevCodeId) {
-        throw new Error(`Deprecated contracts not in code_id order: ${deprecatedData[i-1].name} (${prevCodeId}) comes before ${deprecatedData[i].name} (${currentCodeId})`);
-      }
-    }
-
     return;
   }
 
