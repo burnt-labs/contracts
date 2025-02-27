@@ -95,3 +95,26 @@ docker run --rm -v "$(pwd)":/code \
 |:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|
 | MetaAccount (v1.0.0) | Initial version of MetaAccount implementation, superseded by v2 | [v1.0.0](https://github.com/burnt-labs/contracts/releases/tag/v1.0.0) | [Burnt Labs](https://burnt.com) | `1` | `5E0F49F9686FAD66C132031EC6A43EC63AD84A2B6C8A35C555542AC84FC03708` | Genesis |
 | cw4 Stake | cw4 Stake | [v2.0.0](https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0) | [CosmWasm](https://cosmwasm.com/) | `11` | `DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653` | Genesis |
+
+## Utilities
+
+### Code ID Verification
+
+The repository includes a utility to verify that the code IDs and their corresponding hashes in the local `contracts.json` file match those deployed on the Xion mainnet.
+
+#### Prerequisites
+- Node.js 18 or higher: https://nodejs.org/
+
+#### Usage
+To verify code IDs:
+```bash
+node scripts/verify-code-ids.js
+```
+
+The utility will:
+1. Read the local contracts.json file
+2. Fetch current contract data from Xion mainnet
+3. Compare code IDs and hashes
+4. Report any mismatches or discrepancies
+
+This helps ensure that the contract information in this repository accurately reflects what's deployed on the Xion mainnet.

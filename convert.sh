@@ -76,6 +76,31 @@ echo "| Name | Description | Release | Author | Code ID | Hash | Governance Prop
 echo "|:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|" >> README.md
 jq -r '.[] | select(.deprecated == true) | "| \(.name) | \(.description // "") | \(if .release then "[\(.release.version)](\(.release.url))" else "" end) | \(if .author then "[\(.author.name)](\(.author.url))" else "" end) | `\(.code_id // "")` | `\(.hash)` | \(.governance // "") |"' contracts.json >> README.md
 
+echo "" >> README.md
+echo "## Utilities" >> README.md
+echo "" >> README.md
+echo "### Code ID Verification" >> README.md
+echo "" >> README.md
+echo "The repository includes a utility to verify that the code IDs and their corresponding hashes in the local \`contracts.json\` file match those deployed on the Xion mainnet." >> README.md
+echo "" >> README.md
+echo "#### Prerequisites" >> README.md
+echo "- Node.js 18 or higher: https://nodejs.org/" >> README.md
+echo "" >> README.md
+echo "#### Usage" >> README.md
+echo "To verify code IDs:" >> README.md
+echo "\`\`\`bash" >> README.md
+echo "node scripts/verify-code-ids.js" >> README.md
+echo "\`\`\`" >> README.md
+echo "" >> README.md
+echo "The utility will:" >> README.md
+echo "1. Read the local contracts.json file" >> README.md
+echo "2. Fetch current contract data from Xion mainnet" >> README.md
+echo "3. Compare code IDs and hashes" >> README.md
+echo "4. Report any mismatches or discrepancies" >> README.md
+echo "" >> README.md
+echo "This helps ensure that the contract information in this repository accurately reflects what's deployed on the Xion mainnet." >> README.md
+echo "" >> README.md
+
 # In CI, verify README hasn't changed
 if [ -n "$CI" ]; then
     NEW_HASH=$(if command -v md5sum >/dev/null 2>&1; then md5sum README.md | cut -d' ' -f1; else md5 -q README.md; fi)
