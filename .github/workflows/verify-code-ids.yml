@@ -38,14 +38,16 @@ jobs:
       - name: Verify Code IDs
         id: verify
         run: |
-          # Capture output and ensure it's properly formatted for Slack
-          output=$(node scripts/verify-code-ids.js 2>&1)
-          echo "$output"
-          # Use heredoc to preserve newlines in environment variable
-          echo "verification_output<<EOF" >> $GITHUB_ENV
-          echo "$output" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-          # Script's exit code will determine step success/failure
+          # Run verification and save output to file
+          node scripts/verify-code-ids.js 2>&1 | tee output.txt
+
+      - name: Read output file
+        if: failure()
+        id: output
+        run: |
+          echo 'content<<ENDOUTPUT' >> $GITHUB_OUTPUT
+          cat output.txt >> $GITHUB_OUTPUT
+          echo 'ENDOUTPUT' >> $GITHUB_OUTPUT
 
       - name: Notify Slack on failure
         if: failure()
@@ -66,7 +68,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "```\n${{ env.verification_output }}\n```"
+                    "text": "```${{ steps.output.outputs.content }}```"
                   }
                 },
                 {
