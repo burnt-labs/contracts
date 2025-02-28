@@ -99,7 +99,6 @@ echo "3. Compare code IDs and hashes" >> README.md
 echo "4. Report any mismatches or discrepancies" >> README.md
 echo "" >> README.md
 echo "This helps ensure that the contract information in this repository accurately reflects what's deployed on the Xion mainnet." >> README.md
-echo "" >> README.md
 
 # In CI, verify README hasn't changed
 if [ -n "$CI" ]; then
