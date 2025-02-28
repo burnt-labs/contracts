@@ -37,12 +37,14 @@ jobs:
 
       - name: Verify Code IDs
         id: verify
+        continue-on-error: true
         run: |
           # Run verification and save output to file
           node scripts/verify-code-ids.js 2>&1 | tee output.txt
+          exit ${PIPESTATUS[0]}
 
       - name: Read output file
-        if: failure()
+        if: steps.verify.outcome == 'failure'
         id: output
         run: |
           echo 'content<<ENDOUTPUT' >> $GITHUB_OUTPUT
@@ -50,7 +52,7 @@ jobs:
           echo 'ENDOUTPUT' >> $GITHUB_OUTPUT
 
       - name: Notify Slack on failure
-        if: failure()
+        if: steps.verify.outcome == 'failure'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
@@ -86,3 +88,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Fail workflow if verification failed
+        if: steps.verify.outcome == 'failure'
+        run: exit 1
