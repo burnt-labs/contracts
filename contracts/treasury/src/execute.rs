@@ -1,10 +1,10 @@
 use crate::error::ContractError::{
-    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized,
+    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, GrantConfigNotFound, Unauthorized,
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
 use crate::grant::{FeeConfig, GrantConfig};
-use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS};
+use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS, PENDING_ADMIN};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
 use cosmos_sdk_proto::prost::Message;
@@ -46,20 +46,69 @@ pub fn init(
     ))
 }
 
-pub fn update_admin(deps: DepsMut, info: MessageInfo, new_admin: Addr) -> ContractResult<Response> {
+pub fn propose_admin(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_admin: String,
+) -> ContractResult<Response> {
+    // Load the current admin
     let admin = ADMIN.load(deps.storage)?;
+
+    // Check if the caller is the current admin
     if admin != info.sender {
         return Err(Unauthorized);
     }
 
-    ADMIN.save(deps.storage, &new_admin)?;
+    // Validate the new admin address
+    let validated_admin = deps.api.addr_validate(&new_admin)?;
+
+    // Save the proposed new admin to PENDING_ADMIN
+    PENDING_ADMIN.save(deps.storage, &validated_admin)?;
 
     Ok(
-        Response::new().add_event(Event::new("updated_treasury_admin").add_attributes(vec![
-            ("old admin", admin.into_string()),
-            ("new admin", new_admin.into_string()),
+        Response::new().add_event(Event::new("proposed_new_admin").add_attributes(vec![
+            ("proposed_admin", validated_admin.to_string()),
+            ("proposer", admin.to_string()),
         ])),
     )
+}
+
+pub fn accept_admin(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
+    // Load the pending admin
+    let pending_admin = PENDING_ADMIN.load(deps.storage)?;
+
+    // Verify the sender is the pending admin
+    if pending_admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    // Update the ADMIN storage with the new admin
+    ADMIN.save(deps.storage, &pending_admin)?;
+
+    // Clear the PENDING_ADMIN
+    PENDING_ADMIN.remove(deps.storage);
+
+    Ok(Response::new().add_event(
+        Event::new("accepted_new_admin")
+            .add_attributes(vec![("new_admin", pending_admin.to_string())]),
+    ))
+}
+
+pub fn cancel_proposed_admin(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
+    // Load the current admin
+    let admin = ADMIN.load(deps.storage)?;
+
+    // Check if the caller is the current admin
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    // Remove the pending admin
+    PENDING_ADMIN.remove(deps.storage);
+
+    Ok(Response::new().add_event(
+        Event::new("cancelled_proposed_admin").add_attribute("action", "cancel_proposed_admin"),
+    ))
 }
 
 pub fn update_grant_config(
@@ -90,11 +139,20 @@ pub fn remove_grant_config(
     info: MessageInfo,
     msg_type_url: String,
 ) -> ContractResult<Response> {
+    // Check if the sender is the admin
     let admin = ADMIN.load(deps.storage)?;
     if admin != info.sender {
         return Err(Unauthorized);
     }
 
+    // Validate that the key exists
+    if !GRANT_CONFIGS.has(deps.storage, msg_type_url.clone()) {
+        return Err(GrantConfigNotFound {
+            type_url: msg_type_url,
+        });
+    }
+
+    // Remove the grant config
     GRANT_CONFIGS.remove(deps.storage, msg_type_url.clone());
 
     Ok(Response::new().add_event(
