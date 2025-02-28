@@ -110,6 +110,7 @@ async function verifyCodeIds() {
             }
 
             console.log(`\nTotal mismatches found: ${totalMismatches}`);
+            process.exit(1);
         }
 
     } catch (error) {
