@@ -47,9 +47,9 @@ jobs:
         if: steps.verify.outcome == 'failure'
         id: output
         run: |
-          echo 'content<<ENDOUTPUT' >> $GITHUB_OUTPUT
+          echo "content<<EOF" >> $GITHUB_OUTPUT
           cat output.txt >> $GITHUB_OUTPUT
-          echo 'ENDOUTPUT' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Notify Slack on failure
         if: steps.verify.outcome == 'failure'
@@ -57,7 +57,6 @@ jobs:
         with:
           payload: |
             {
-              "text": "❌ Code ID verification failed!",
               "blocks": [
                 {
                   "type": "header",
@@ -70,18 +69,17 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "```${{ steps.output.outputs.content }}```"
+                    "text": "```\n${{ steps.output.outputs.content }}\n```"
                   }
                 },
                 {
-                  "type": "divider"
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "Please update contracts.json to match the current state of the chain.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
-                  }
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
+                    }
+                  ]
                 }
               ]
             }
