@@ -38,8 +38,10 @@ jobs:
       - name: Verify Code IDs
         id: verify
         run: |
-          output=$(node scripts/verify-code-ids.js)
+          # Capture output and ensure it's properly formatted for Slack
+          output=$(node scripts/verify-code-ids.js 2>&1)
           echo "$output"
+          # Use heredoc to preserve newlines in environment variable
           echo "verification_output<<EOF" >> $GITHUB_ENV
           echo "$output" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
@@ -64,24 +66,18 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*Verification Output:*\n```${{ env.verification_output }}```"
+                    "text": "```\n${{ env.verification_output }}\n```"
                   }
+                },
+                {
+                  "type": "divider"
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Please update contracts.json to match the current state of the chain."
+                    "text": "Please update contracts.json to match the current state of the chain.\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
                   }
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
-                    }
-                  ]
                 }
               ]
             }
