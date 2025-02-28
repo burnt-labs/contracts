@@ -22,6 +22,7 @@ const fs = require('fs');
 const path = require('path');
 
 async function verifyCodeIds() {
+    let hasErrors = false;
     try {
         // Read local contracts.json
         const contractsPath = path.join(__dirname, '..', 'contracts.json');
@@ -110,11 +111,15 @@ async function verifyCodeIds() {
             }
 
             console.log(`\nTotal mismatches found: ${totalMismatches}`);
-            process.exit(1);
+            hasErrors = true;
         }
 
     } catch (error) {
         console.error('Error during verification:', error);
+        hasErrors = true;
+    }
+
+    if (hasErrors) {
         process.exit(1);
     }
 }
