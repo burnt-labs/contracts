@@ -88,6 +88,9 @@ pub enum ContractError {
     #[error(transparent)]
     FromUTF8(#[from] std::string::FromUtf8Error),
 
+    #[error("invalid ethereum address")]
+    InvalidEthAddress,
+
     #[error("authenticator {index} not found")]
     AuthenticatorNotFound { index: u8 },
 }
