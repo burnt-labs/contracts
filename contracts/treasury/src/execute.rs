@@ -1,5 +1,6 @@
 use crate::error::ContractError::{
-    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, GrantConfigNotFound, Unauthorized,
+    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, GrantConfigNotFound,
+    Unauthorized,
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
