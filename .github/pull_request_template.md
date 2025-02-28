@@ -2,37 +2,52 @@
 <!-- Provide a brief description of the changes in this PR -->
 
 ## Contract Details
-Please fill in all the required information below for the contract(s) being added to `contracts.json`:
+Please append all the required information below for the contract(s) being added to `contracts.json`.
+
+Required fields and their descriptions:
+- `name`: Contract name (required)
+- `description`: Brief description of the contract's purpose
+- `code_id`: Contract code ID on mainnet
+- `hash`: Contract hash in UPPERCASE
+- `release`:
+  - `url`: URL to the release/commit (e.g., https://github.com/org/repo/releases/tag/v1.0.0)
+  - `version`: Version tag or first 7 chars of commit hash
+- `author`:
+  - `name`: Organization name
+  - `url`: Organization website URL
+- `governance`: "Genesis" or proposal number
+- `deprecated`: true if contract is deprecated (mixed inline with active contracts)
+
+Example JSON structure:
 ```json
 {
-  "name": "",           // Contract name (required)
-  "description": "",    // Brief description of the contract's purpose
-  "code_id": "",       // Contract code ID on mainnet
-  "hash": "",          // Contract hash in UPPERCASE
+  "name": "",
+  "description": "",
+  "code_id": "",
+  "hash": "",
   "release": {
-    "url": "",         // URL to the release/commit (e.g., https://github.com/org/repo/releases/tag/v1.0.0)
-    "version": ""      // Version tag or first 7 chars of commit hash
+    "url": "",
+    "version": ""
   },
   "author": {
-    "name": "",        // Organization name
-    "url": ""         // Organization website URL
+    "name": "",
+    "url": ""
   },
-  "governance": "",    // "Genesis" or proposal number
-  "deprecated": false  // true if contract is deprecated - mixed inline with active contracts
+  "governance": "",
+  "deprecated": false
 }
 ```
 
 ### Finding Code ID and Hash
-If you have a governance proposal ID, you can find the code ID by:
-1. View the proposal on [XION Explorer](https://explorer.burnt.com/xion/gov)
-2. Find the `store-code` or `instantiate-contract` message in the proposal details
-3. Once the proposal is passed and executed:
-   - The code ID will be visible in the transaction details
-   - The hash can be found in the transaction logs
-4. You can also query via the chain's RPC endpoint:
+To find the latest code ID and hash:
+1. Run the verification tool which will show all code IDs on chain:
    ```bash
-   xiond query gov proposal <proposal-id>
-   xiond query wasm code-info <code-id>
+   node scripts/verify-code-ids.js
+   ```
+2. The new code ID will be shown in the mismatches as "exists on chain but not in contracts.json"
+3. You can also query the code hash via the chain's RPC endpoint:
+   ```bash
+   xiond query wasm code-info <code-id> --node https://rpc.xion-mainnet-1.burnt.com
    ```
 
 ### Documentation Updates
