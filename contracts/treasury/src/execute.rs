@@ -1,5 +1,5 @@
 use crate::error::ContractError::{
-    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, NotFound, Unauthorized,
+    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, GrantConfigNotFound, Unauthorized,
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
@@ -147,8 +147,8 @@ pub fn remove_grant_config(
 
     // Validate that the key exists
     if !GRANT_CONFIGS.has(deps.storage, msg_type_url.clone()) {
-        return Err(NotFound {
-            msg: format!("Grant config for '{}' does not exist", msg_type_url),
+        return Err(GrantConfigNotFound {
+            type_url: msg_type_url,
         });
     }
 

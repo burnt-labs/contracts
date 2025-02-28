@@ -33,8 +33,8 @@ pub enum ContractError {
     #[error("unauthorized")]
     Unauthorized,
 
-    #[error("Not found: {msg}")]
-    NotFound { msg: String },
+    #[error("grant config for {type_url} not found")]
+    GrantConfigNotFound { type_url: String },
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
