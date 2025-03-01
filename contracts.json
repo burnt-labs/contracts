@@ -1,5 +1,21 @@
 [
   {
+    "name": "MetaAccount (v1.0.0)",
+    "description": "Initial version of MetaAccount implementation, superseded by v2",
+    "code_id": "1",
+    "hash": "5E0F49F9686FAD66C132031EC6A43EC63AD84A2B6C8A35C555542AC84FC03708",
+    "governance": "Genesis",
+    "release": {
+      "url": "https://github.com/burnt-labs/contracts/releases/tag/v1.0.0",
+      "version": "v1.0.0"
+    },
+    "author": {
+      "name": "Burnt Labs",
+      "url": "https://burnt.com"
+    },
+    "deprecated": true
+  },
+  {
     "name": "Polytone Proxy",
     "description": "ICA Proxy, allows controlled execution of messages.",
     "code_id": "2",
@@ -48,8 +64,8 @@
     "deprecated": false
   },
   {
-    "name": "MetaAccount",
-    "description": "Xion's MetaAccount implementation",
+    "name": "MetaAccount (v2)",
+    "description": "Second version of Xion's MetaAccount implementation",
     "code_id": "5",
     "hash": "FEFA4D0C57F6CA47A5D89C6F077A176D26027DB4EEFA758A929DD4C4AAF17D1B",
     "release": {
@@ -142,6 +158,22 @@
     },
     "governance": "Genesis",
     "deprecated": false
+  },
+  {
+    "name": "cw4 Stake",
+    "description": "cw4 Stake",
+    "code_id": "11",
+    "hash": "DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653",
+    "governance": "Genesis",
+    "deprecated": true,
+    "release": {
+      "url": "https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0",
+      "version": "v2.0.0"
+    },
+    "author": {
+      "name": "CosmWasm",
+      "url": "https://cosmwasm.com/"
+    }
   },
   {
     "name": "cw4 Stake",
@@ -766,55 +798,5 @@
       "url": "https://talis.art/"
     },
     "deprecated": false
-  },
-  {
-    "name": "Talis Trading Escrow",
-    "description": "Talis Trading Escrow",
-    "code_id": "51",
-    "hash": "01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2",
-    "governance": "Genesis",
-    "release": {
-      "url": "https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8",
-      "version": "f084f5b"
-    },
-    "author": {
-      "name": "Talis",
-      "url": "https://talis.art/"
-    },
-    "deprecated": false
-  },
-  {
-    "name": "MetaAccount",
-    "description": "MetaAccount",
-    "code_id": "1",
-    "hash": "5E0F49F9686FAD66C132031EC6A43EC63AD84A2B6C8A35C555542AC84FC03708",
-    "governance": "Genesis",
-    "release": {
-      "url": "https://github.com/burnt-labs/contracts/releases/tag/v1.0.0",
-      "version": "v1.0.0"
-    },
-    "author": {
-      "name": "Burnt Labs",
-      "url": "https://burnt.com"
-    },
-    "deprecated": true
-  },
-  {
-    "name": "cw4 Stake",
-    "description": "cw4 Stake",
-    "code_id": "11",
-    "hash": "DCA8257AD67CCB15B4A61A882131B9D3FDD0DD178B121BB51BBDA35B682C6653",
-    "governance": "Genesis",
-    "deprecated": true,
-    "release": {
-      "url": "https://github.com/CosmWasm/cw-plus/releases/tag/v2.0.0",
-      "version": "v2.0.0"
-    },
-    "author": {
-      "name": "CosmWasm",
-      "url": "https://cosmwasm.com/"
-    }
   }
 ]
-
-
