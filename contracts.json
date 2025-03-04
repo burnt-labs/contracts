@@ -800,7 +800,7 @@
     "deprecated": false
   },
   {
-    "name": "Fractible",
+    "name": "Fractit",
     "description": "A protocol for the fractional ownership of NFTs",
     "code_id": "52",
     "hash": "F6D5ADDC062B5B45BCA207EAF49B8D2736A2D7F86956FCE4D5176E3D07C91980",
@@ -809,8 +809,8 @@
       "version": "b62e2bc8aa7646e73bceb07af67137c48c5a7488"
     },
     "author": {
-      "name": "Fractible",
-      "url": "https://fractible.io"
+      "name": "Fractit",
+      "url": "https://fractit.com"
     },
     "governance": "21",
     "deprecated": false
@@ -826,7 +826,7 @@
     },
     "author": {
       "name": "Fractit",
-      "url": "https://fractit.io"
+      "url": "https://fractit.com"
     },
     "governance": "22",
     "deprecated": false
