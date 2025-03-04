@@ -830,5 +830,21 @@
     },
     "governance": "22",
     "deprecated": false
+  },
+  {
+    "name": "Thrive Protocol",
+    "description": "First Thrive Protocol contract implementation on XION, enabling to distribute rewards achieved in Thrive XION",
+    "code_id": "54",
+    "hash": "BB2FAC1091B93026A0CD57AE40E814A916D9CFC4A7B4F23F1E49A28D7ABEF286",
+    "release": {
+      "url": "https://github.com/ThriveCoin/tp-xion-reward-contract-rs",
+      "version": "cd3f0e36d50f06b4f6a04511ff67bfb7b515829b"
+    },
+    "author": {
+      "name": "Thrive Protocol",
+      "url": "https://thriveprotocol.com"
+    },
+    "governance": "24",
+    "deprecated": false
   }
 ]
