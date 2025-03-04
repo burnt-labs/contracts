@@ -798,5 +798,37 @@
       "url": "https://talis.art/"
     },
     "deprecated": false
+  },
+  {
+    "name": "Fractible",
+    "description": "A protocol for the fractional ownership of NFTs",
+    "code_id": "52",
+    "hash": "F6D5ADDC062B5B45BCA207EAF49B8D2736A2D7F86956FCE4D5176E3D07C91980",
+    "release": {
+      "url": "https://github.com/Fractit/fractible_xion",
+      "version": "b62e2bc8aa7646e73bceb07af67137c48c5a7488"
+    },
+    "author": {
+      "name": "Fractible",
+      "url": "https://fractible.io"
+    },
+    "governance": "21",
+    "deprecated": false
+  },
+  {
+    "name": "Fractit Inception Pass",
+    "description": "Protocol for managing Fractit Inception Pass NFTs",
+    "code_id": "53",
+    "hash": "D45A22411A5C430A2C74248A20391618F5E0ECDD1BDC579C87493823E242663F",
+    "release": {
+      "url": "https://github.com/Fractit/fractible_xion",
+      "version": "2eb952db4592ea3965070c1199117927319f433b"
+    },
+    "author": {
+      "name": "Fractit",
+      "url": "https://fractit.io"
+    },
+    "governance": "22",
+    "deprecated": false
   }
 ]

@@ -89,6 +89,8 @@ docker run --rm -v "$(pwd)":/code \
 | Talis Staking | Talis Staking | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `49` | `9C9047420A5B870D490585C753FFB46C97E310A55E9FCF50EA784BAFC2A701FD` | Genesis |
 | Talis Frens Proxy | Talis Frens Proxy | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `50` | `919FF797B7F35A40B5D32B506C2C05918DAA1C42B89C6864425F2047B5BC19F7` | Genesis |
 | Talis Trading Escrow | Talis Trading Escrow | [f084f5b](https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8) | [Talis](https://talis.art/) | `51` | `01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2` | Genesis |
+| Fractible | A protocol for the fractional ownership of NFTs | [b62e2bc8aa7646e73bceb07af67137c48c5a7488](https://github.com/Fractit/fractible_xion) | [Fractible](https://fractible.io) | `52` | `F6D5ADDC062B5B45BCA207EAF49B8D2736A2D7F86956FCE4D5176E3D07C91980` | 21 |
+| Fractit Inception Pass | Protocol for managing Fractit Inception Pass NFTs | [2eb952db4592ea3965070c1199117927319f433b](https://github.com/Fractit/fractible_xion) | [Fractit](https://fractit.io) | `53` | `D45A22411A5C430A2C74248A20391618F5E0ECDD1BDC579C87493823E242663F` | 22 |
 
 ## Deprecated Contracts
 | Name | Description | Release | Author | Code ID | Hash | Governance Proposal |
