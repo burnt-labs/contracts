@@ -68,13 +68,13 @@ echo "" >> README.md
 echo "## Active Contracts" >> README.md
 echo "| Name | Description | Release | Author | Code ID | Hash | Governance Proposal |" >> README.md
 echo "|:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|" >> README.md
-jq -r '.[] | select(.deprecated != true) | "| \(.name) | \(.description // "") | \(if .release then "[\(.release.version)](\(.release.url))" else "" end) | \(if .author then "[\(.author.name)](\(.author.url))" else "" end) | `\(.code_id // "")` | `\(.hash)` | \(.governance // "") |"' contracts.json >> README.md
+jq -r '.[] | select(.deprecated != true) | "| \(.name) | \(.description // "") | \(if .release then "[\(.release.version)](\(.release.url))" else "" end) | \(if .author then "[\(.author.name)](\(.author.url))" else "" end) | `\(.code_id // "")` | `\(.hash)` | \(if .governance and (.governance | test("^[0-9]+$")) then "[\(.governance)](https://www.mintscan.io/xion/proposals/\(.governance))" else .governance // "" end) |"' contracts.json >> README.md
 
 echo "" >> README.md
 echo "## Deprecated Contracts" >> README.md
 echo "| Name | Description | Release | Author | Code ID | Hash | Governance Proposal |" >> README.md
 echo "|:-----|:------------|:--------|:-------|:--------|:-----|:-------------------|" >> README.md
-jq -r '.[] | select(.deprecated == true) | "| \(.name) | \(.description // "") | \(if .release then "[\(.release.version)](\(.release.url))" else "" end) | \(if .author then "[\(.author.name)](\(.author.url))" else "" end) | `\(.code_id // "")` | `\(.hash)` | \(.governance // "") |"' contracts.json >> README.md
+jq -r '.[] | select(.deprecated == true) | "| \(.name) | \(.description // "") | \(if .release then "[\(.release.version)](\(.release.url))" else "" end) | \(if .author then "[\(.author.name)](\(.author.url))" else "" end) | `\(.code_id // "")` | `\(.hash)` | \(if .governance and (.governance | test("^[0-9]+$")) then "[\(.governance)](https://www.mintscan.io/xion/proposals/\(.governance))" else .governance // "" end) |"' contracts.json >> README.md
 
 echo "" >> README.md
 echo "## Utilities" >> README.md
