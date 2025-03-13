@@ -91,7 +91,7 @@ docker run --rm -v "$(pwd)":/code \
 | Fractit | A protocol for the fractional ownership of NFTs | [b62e2bc8aa7646e73bceb07af67137c48c5a7488](https://github.com/Fractit/fractible_xion) | [Fractit](https://fractit.com) | `52` | `F6D5ADDC062B5B45BCA207EAF49B8D2736A2D7F86956FCE4D5176E3D07C91980` | [21](https://www.mintscan.io/xion/proposals/21) |
 | Fractit Inception Pass | Protocol for managing Fractit Inception Pass NFTs | [2eb952db4592ea3965070c1199117927319f433b](https://github.com/Fractit/fractible_xion) | [Fractit](https://fractit.com) | `53` | `D45A22411A5C430A2C74248A20391618F5E0ECDD1BDC579C87493823E242663F` | [22](https://www.mintscan.io/xion/proposals/22) |
 | Thrive Protocol | First Thrive Protocol contract implementation on XION, enabling to distribute rewards achieved in Thrive XION | [cd3f0e36d50f06b4f6a04511ff67bfb7b515829b](https://github.com/ThriveCoin/tp-xion-reward-contract-rs) | [Thrive Protocol](https://thriveprotocol.com) | `54` | `BB2FAC1091B93026A0CD57AE40E814A916D9CFC4A7B4F23F1E49A28D7ABEF286` | [24](https://www.mintscan.io/xion/proposals/24) |
-| MetaAccount (v3) | Third version of Xion's MetaAccount implementation | [v1.0.0](https://github.com/burnt-labs/contracts/releases/tag/v1.0.0) | [Burnt Labs](https://burnt.com) | `55` | `6FD7AA76AA9ED8E6F55D16093EE64611CCFB9743AC5A07B71AD4ACB342AF0EBF` | Genesis |
+| MetaAccount (v3) | Third version of Xion's MetaAccount implementation | [98fb64c9c4d917ba9e4b223b64558a2fd4c09ac7](https://github.com/burnt-labs/contracts) | [Burnt Labs](https://burnt.com) | `55` | `6FD7AA76AA9ED8E6F55D16093EE64611CCFB9743AC5A07B71AD4ACB342AF0EBF` | Genesis |
 
 ## Deprecated Contracts
 | Name | Description | Release | Author | Code ID | Hash | Governance Proposal |
