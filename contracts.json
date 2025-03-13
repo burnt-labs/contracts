@@ -77,7 +77,7 @@
       "url": "https://burnt.com"
     },
     "governance": "Genesis",
-    "deprecated": true
+    "deprecated": false
   },
   {
     "name": "cw1 Subkeys",
