@@ -846,5 +846,21 @@
     },
     "governance": "24",
     "deprecated": false
+  },
+  {
+    "name": "MetaAccount (v3)",
+    "description": "Third version of Xion's MetaAccount implementation",
+    "code_id": "55",
+    "hash": "6FD7AA76AA9ED8E6F55D16093EE64611CCFB9743AC5A07B71AD4ACB342AF0EBF",
+    "governance": "Genesis",
+    "release": {
+      "url": "https://github.com/burnt-labs/contracts",
+      "version": "98fb64c9c4d917ba9e4b223b64558a2fd4c09ac7"
+    },
+    "author": {
+      "name": "Burnt Labs",
+      "url": "https://burnt.com"
+    },
+    "deprecated": false
   }
 ]
