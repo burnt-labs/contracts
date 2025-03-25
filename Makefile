@@ -21,7 +21,7 @@ $(CONTRACTS):
 optimize: $(CONTRACTS)
 	@echo "🔧 Optimizing contracts..."
 	for contract in $(COMPILED_CONTRACTS); do \
-		wasm-opt -Oz -o target/wasm32-unknown-unknown/release/$$contract.wasm target/wasm32-unknown-unknown/release/$$contract.wasm; \
+		wasm-opt -Oz -o artifacts/$$contract.wasm target/wasm32-unknown-unknown/release/$$contract.wasm; \
 	done
 	@echo "✅ Optimization complete"
 
