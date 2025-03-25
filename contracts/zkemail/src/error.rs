@@ -6,11 +6,11 @@ pub enum ContractError {
     #[error(transparent)]
     SerdeJSON(#[from] serde_json::Error),
 
-    #[error("r1cs synthesis error")]
-    R1CS(#[from] ark_relations::r1cs::SynthesisError),
+    #[error("{0}")]
+    R1CS(String),
 
-    #[error(transparent)]
-    ArkSerialization(#[from] ark_serialize::SerializationError),
+    #[error("{0}")]
+    ArkSerialization(String),
 
     #[error("dkim invalid")]
     InvalidDkim,
@@ -23,3 +23,15 @@ pub enum ContractError {
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
+
+impl From<ark_serialize::SerializationError> for ContractError {
+    fn from(value: ark_serialize::SerializationError) -> Self {
+        Self::ArkSerialization(format!("{:?}", value))
+    }
+}
+
+impl From<ark_relations::r1cs::SynthesisError> for ContractError {
+    fn from(value: ark_relations::r1cs::SynthesisError) -> Self {
+        Self::R1CS(format!("{:?}", value))
+    }
+}
