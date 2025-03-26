@@ -89,7 +89,7 @@ echo "" >> README.md
 echo "#### Usage" >> README.md
 echo "To verify code IDs:" >> README.md
 echo "\`\`\`bash" >> README.md
-echo "node scripts/verify-code-ids.js" >> README.md
+echo "node scripts/verify-contracts.js" >> README.md
 echo "\`\`\`" >> README.md
 echo "" >> README.md
 echo "The utility will:" >> README.md

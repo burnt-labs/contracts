@@ -112,7 +112,7 @@ The repository includes a utility to verify that the code IDs and their correspo
 #### Usage
 To verify code IDs:
 ```bash
-node scripts/verify-code-ids.js
+node scripts/verify-contracts.js
 ```
 
 The utility will:
