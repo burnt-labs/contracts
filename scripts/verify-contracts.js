@@ -154,6 +154,10 @@ async function verifyContracts() {
         // Fetch chain data
         console.log('Fetching code data from Xion mainnet...');
         const response = await fetch('https://api.xion-mainnet-1.burnt.com/cosmwasm/wasm/v1/code');
+        if (!response.ok) {
+            console.error('Failed to fetch chain data:', response.statusText);
+            process.exit(1); // Exit the process with an error code
+        }
         const chainData = await response.json();
 
         // Analyze discrepancies
