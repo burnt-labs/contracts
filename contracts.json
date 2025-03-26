@@ -740,7 +740,7 @@
     "description": "Talis Whitelist",
     "code_id": "48",
     "hash": "37360FDE0EE1384AA56781B0D05D4B0187843AE96335158DFEAD7806106DE779",
-    "governance": "Genesis",
+    "governance": "18",
     "release": {
       "url": "https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8",
       "version": "f084f5b"
@@ -756,7 +756,7 @@
     "description": "Talis Staking",
     "code_id": "49",
     "hash": "9C9047420A5B870D490585C753FFB46C97E310A55E9FCF50EA784BAFC2A701FD",
-    "governance": "Genesis",
+    "governance": "18",
     "release": {
       "url": "https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8",
       "version": "f084f5b"
@@ -772,7 +772,7 @@
     "description": "Talis Frens Proxy",
     "code_id": "50",
     "hash": "919FF797B7F35A40B5D32B506C2C05918DAA1C42B89C6864425F2047B5BC19F7",
-    "governance": "Genesis",
+    "governance": "18",
     "release": {
       "url": "https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8",
       "version": "f084f5b"
@@ -788,7 +788,7 @@
     "description": "Talis Trading Escrow",
     "code_id": "51",
     "hash": "01AA4D93B63871DE8E94B35FECAA0E586C8B4824A8B0EE833416303796B256E2",
-    "governance": "Genesis",
+    "governance": "18",
     "release": {
       "url": "https://github.com/Talis-Art/talis_contracts_v2/commit/f084f5b7950f911b16090dfd38e1c06a177a1da8",
       "version": "f084f5b"
@@ -852,7 +852,7 @@
     "description": "Third version of Xion's MetaAccount implementation",
     "code_id": "55",
     "hash": "6FD7AA76AA9ED8E6F55D16093EE64611CCFB9743AC5A07B71AD4ACB342AF0EBF",
-    "governance": "Genesis",
+    "governance": "26",
     "release": {
       "url": "https://github.com/burnt-labs/contracts",
       "version": "98fb64c9c4d917ba9e4b223b64558a2fd4c09ac7"
