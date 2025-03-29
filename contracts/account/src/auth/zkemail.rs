@@ -26,12 +26,9 @@ pub fn verify(
         dkim_hash: sig.dkim_hash,
     };
 
-    let verification_response: Binary = deps
+    let verified: bool = deps
         .querier
         .query_wasm_smart(verification_contract, &verification_request)?;
 
-    let verified: bool = from_json(verification_response)?;
-
     Ok(verified)
 }
-
