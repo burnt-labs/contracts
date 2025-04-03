@@ -862,5 +862,69 @@
       "url": "https://burnt.com"
     },
     "deprecated": false
+  },
+  {
+    "name": "XION Markets Factory Contract",
+    "description": "Protocol's proxy/deployer contract for all the markets. Responsible for enumerables and indexing of data and statistics across the XIONMarkets protocol.",
+    "code_id": "56",
+    "hash": "C877A97EDEA41408088644E7CE205C141C472C822EA7033E0439274928CC1D99",
+    "release": {
+      "url": "https://github.com/XIONMarkets/xionmarkets-smart-contracts",
+      "version": "v1.0.0"
+    },
+    "author": {
+      "name": "XION Markets",
+      "url": "https://x.com/xionmarkets"
+    },
+    "governance": "27",
+    "deprecated": false
+  },
+  {
+    "name": "XION Markets Market Contract",
+    "description": "Model for the markets (events) that facilitates trading of shares (Yes or No), provision of liquidity, removal of liquidity and all core functionality of the protocol.",
+    "code_id": "57",
+    "hash": "4CFC7E3BB774D3528749A10582652218910CF9344514F59C88A1EC15C128BAA7",
+    "release": {
+      "url": "https://github.com/XIONMarkets/xionmarkets-smart-contracts",
+      "version": "v1.0.0"
+    },
+    "author": {
+      "name": "XION Markets",
+      "url": "https://x.com/xionmarkets"
+    },
+    "governance": "27",
+    "deprecated": false
+  },
+  {
+    "name": "Pyth Oracle Contract",
+    "description": "Pyth Network price feeds contract providing real-time financial market data to smart contract applications",
+    "code_id": "58",
+    "hash": "CA4DEAD04CFFC986BB05B9FA792327AC4EA2609EC928EF44DD7F48D3E16995F5",
+    "release": {
+      "url": "https://github.com/pyth-network/pyth-crosschain/tree/main/target_chains/cosmwasm",
+      "version": "v1.0.0"
+    },
+    "author": {
+      "name": "Pyth Network",
+      "url": "https://www.pyth.network/"
+    },
+    "governance": "28",
+    "deprecated": false
+  },
+  {
+    "name": "Pyth Oracle Wormhole Dependency",
+    "description": "Wormhole dependency for the Pyth Network oracle implementation",
+    "code_id": "59",
+    "hash": "42133359E82BF07E446F6E75D360A0E1F4E164C66138AA4A5D2EDA3A75005026",
+    "release": {
+      "url": "https://github.com/pyth-network/pyth-crosschain/tree/main/target_chains/cosmwasm",
+      "version": "v1.0.0"
+    },
+    "author": {
+      "name": "Pyth Network",
+      "url": "https://www.pyth.network/"
+    },
+    "governance": "28",
+    "deprecated": false
   }
 ]
