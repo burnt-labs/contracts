@@ -11,7 +11,6 @@ const MAINNET_API = "https://api.xion-mainnet-1.burnt.com";
 const MAINNET_RPC = "https://rpc.xion-mainnet-1.burnt.com:443";
 const TESTNET_RPC = "https://rpc.xion-testnet-2.burnt.com:443";
 const CONTRACTS_FILE = path.join(__dirname, '../contracts.json');
-const TESTNET_CONTRACTS_FILE = path.join(__dirname, '../testnet-contracts.json');
 const WASM_DIR = path.join(__dirname, '../wasm');
 
 interface ContractInfo {
@@ -29,13 +28,13 @@ interface ContractInfo {
     };
     governance: string;
     deprecated: boolean;
-}
-
-interface TestnetContractInfo extends ContractInfo {
-    network: string;
-    mainnet_code_id: string;
-    deployed_by: string;
-    deployed_at: string;
+    testnet?: {
+        code_id: string;
+        hash: string;
+        network: string;
+        deployed_by: string;
+        deployed_at: string;
+    };
 }
 
 // Create wasm directory if it doesn't exist
@@ -90,12 +89,6 @@ async function main() {
     // Read contracts.json
     const contractsData: ContractInfo[] = JSON.parse(fs.readFileSync(CONTRACTS_FILE, 'utf8'));
     
-    // Initialize or read existing testnet contracts
-    let testnetContracts: TestnetContractInfo[] = [];
-    if (fs.existsSync(TESTNET_CONTRACTS_FILE)) {
-        testnetContracts = JSON.parse(fs.readFileSync(TESTNET_CONTRACTS_FILE, 'utf8'));
-    }
-    
     // Process all contracts
     const contractsToProcess = contractsData;
     console.log(`Processing all contracts: ${contractsToProcess.map(c => c.name).join(', ')}`);
@@ -142,32 +135,19 @@ async function main() {
                 `Upload ${contract.name}`
             );
             
-            // Create testnet contract entry
-            const testnetContract: TestnetContractInfo = {
-                ...contract,
+            // Update contract with testnet information
+            contract.testnet = {
                 code_id: storeResult.codeId.toString(),
                 hash: storeResult.transactionHash,
                 network: "xion-testnet-2",
-                mainnet_code_id: contract.code_id,
                 deployed_by: account.address,
                 deployed_at: new Date().toISOString()
             };
 
-            // Update testnet contracts array
-            const existingIndex = testnetContracts.findIndex(
-                (c: TestnetContractInfo) => c.mainnet_code_id === contract.code_id
-            );
-            
-            if (existingIndex !== -1) {
-                testnetContracts[existingIndex] = testnetContract;
-            } else {
-                testnetContracts.push(testnetContract);
-            }
-
-            // Save updated testnet contracts
+            // Save updated contracts
             fs.writeFileSync(
-                TESTNET_CONTRACTS_FILE,
-                JSON.stringify(testnetContracts, null, 2)
+                CONTRACTS_FILE,
+                JSON.stringify(contractsData, null, 2)
             );
             
             console.log(`Code stored on testnet with ID: ${storeResult.codeId}`);
@@ -181,7 +161,7 @@ async function main() {
     }
 }
 
-function updateReadme(contractsData: ContractInfo[], testnetContracts: TestnetContractInfo[]) {
+function updateReadme(contractsData: ContractInfo[]) {
     const readmePath = path.join(__dirname, '../README.md');
     let readmeContent = fs.readFileSync(readmePath, 'utf8');
     
@@ -222,12 +202,8 @@ function updateReadme(contractsData: ContractInfo[], testnetContracts: TestnetCo
     const newRows = existingRows.map(row => {
         const columns = row.split('|');
         const contractName = columns[1].trim();
-        const testnetContract = testnetContracts.find(
-            (c: TestnetContractInfo) => c.mainnet_code_id === contractsData.find(
-                contract => contract.name === contractName
-            )?.code_id
-        );
-        const testnetCodeId = testnetContract ? `\`${testnetContract.code_id}\`` : '-';
+        const contract = contractsData.find(c => c.name === contractName);
+        const testnetCodeId = contract?.testnet ? `\`${contract.testnet.code_id}\`` : '-';
         
         // Insert testnet code ID after mainnet code ID
         columns.splice(codeIdIndex + 1, 0, ` ${testnetCodeId} `);
@@ -249,7 +225,6 @@ function updateReadme(contractsData: ContractInfo[], testnetContracts: TestnetCo
 main()
     .then(() => {
         const contractsData = JSON.parse(fs.readFileSync(CONTRACTS_FILE, 'utf8'));
-        const testnetContracts = JSON.parse(fs.readFileSync(TESTNET_CONTRACTS_FILE, 'utf8'));
-        updateReadme(contractsData, testnetContracts);
+        updateReadme(contractsData);
     })
     .catch(console.error); 
