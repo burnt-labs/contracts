@@ -11,7 +11,6 @@ const MAINNET_API = "https://api.xion-mainnet-1.burnt.com";
 const MAINNET_RPC = "https://rpc.xion-mainnet-1.burnt.com:443";
 const TESTNET_RPC = "https://rpc.xion-testnet-2.burnt.com:443";
 const CONTRACTS_FILE = path.join(__dirname, '../contracts.json');
-const WASM_DIR = path.join(__dirname, '../wasm');
 
 interface ContractInfo {
     name: string;
@@ -37,20 +36,7 @@ interface ContractInfo {
     };
 }
 
-// Create wasm directory if it doesn't exist
-if (!fs.existsSync(WASM_DIR)) {
-    fs.mkdirSync(WASM_DIR, { recursive: true });
-}
-
 async function downloadWasm(codeId: number, contractName: string): Promise<Uint8Array> {
-    const wasmPath = path.join(WASM_DIR, `${contractName}_${codeId}.wasm`);
-
-    // Check if we already have the file
-    if (fs.existsSync(wasmPath)) {
-        console.log(`Using cached WASM file for ${contractName} (${codeId})`);
-        return new Uint8Array(fs.readFileSync(wasmPath));
-    }
-
     try {
         const response = await axios.get(
             `${MAINNET_API}/cosmwasm/wasm/v1/code/${codeId}`,
@@ -71,13 +57,7 @@ async function downloadWasm(codeId: number, contractName: string): Promise<Uint8
 
         // Convert base64 to Uint8Array
         const binaryString = Buffer.from(base64Wasm, 'base64');
-        const wasmBinary = new Uint8Array(binaryString);
-
-        // Save to file
-        fs.writeFileSync(wasmPath, wasmBinary);
-        console.log(`Saved WASM file to ${wasmPath}`);
-
-        return wasmBinary;
+        return new Uint8Array(binaryString);
 
     } catch (error) {
         console.error('Error downloading WASM:', error.response?.data || error.message);
