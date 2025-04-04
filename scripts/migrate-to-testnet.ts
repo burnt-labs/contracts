@@ -89,9 +89,14 @@ async function main() {
     // Read contracts.json
     const contractsData: ContractInfo[] = JSON.parse(fs.readFileSync(CONTRACTS_FILE, 'utf8'));
     
-    // Process all contracts
-    const contractsToProcess = contractsData;
-    console.log(`Processing all contracts: ${contractsToProcess.map(c => c.name).join(', ')}`);
+    // Process only contracts that don't have testnet information
+    const contractsToProcess = contractsData.filter(contract => !contract.testnet);
+    console.log(`Processing contracts without testnet deployments: ${contractsToProcess.map(c => c.name).join(', ')}`);
+    
+    if (contractsToProcess.length === 0) {
+        console.log('All contracts have already been migrated to testnet.');
+        return 0;
+    }
 
     // Get wallet from mnemonic
     const mnemonic = process.env.MNEMONIC;
@@ -159,6 +164,7 @@ async function main() {
             console.error(`Error processing contract ${contract.name}:`, error);
         }
     }
+    return contractsToProcess.length;
 }
 
 function updateReadme(contractsData: ContractInfo[]) {
@@ -178,6 +184,44 @@ function updateReadme(contractsData: ContractInfo[]) {
     const headerEndIndex = readmeContent.indexOf('\n', tableStart);
     const existingHeader = readmeContent.slice(tableStart, headerEndIndex);
     
+    // Check if testnet column already exists
+    if (existingHeader.includes('Code ID (Testnet)')) {
+        console.log('Testnet column already exists, updating values only');
+        // Update existing rows without adding new column
+        const tableEndRegex = /\n\n/;
+        const tableEnd = readmeContent.slice(tableStart).search(tableEndRegex) + tableStart;
+        const existingRows = readmeContent
+            .slice(headerEndIndex + 1, tableEnd)
+            .trim()
+            .split('\n');
+
+        const newRows = existingRows.map(row => {
+            const columns = row.split('|');
+            const contractName = columns[1].trim();
+            const contract = contractsData.find(c => c.name === contractName);
+            const testnetCodeId = contract?.testnet ? `\`${contract.testnet.code_id}\`` : '-';
+            
+            // Find and update the testnet code ID column
+            const testnetColumnIndex = columns.findIndex(col => col.includes('Code ID (Testnet)'));
+            if (testnetColumnIndex !== -1) {
+                columns[testnetColumnIndex] = ` ${testnetCodeId} `;
+            }
+            return columns.join('|');
+        });
+
+        // Combine all parts
+        const newTableContent = [existingHeader, existingRows[0], ...newRows.slice(1)].join('\n');
+
+        // Replace old table with new one
+        const newContent = readmeContent.slice(0, tableStart) + 
+                          newTableContent + 
+                          readmeContent.slice(tableEnd);
+        
+        fs.writeFileSync(readmePath, newContent);
+        console.log('Updated README.md with new testnet code IDs');
+        return;
+    }
+
     // Insert the new column while preserving existing ones
     const headers = existingHeader.split('|');
     // Find the "Code ID" column index
@@ -219,12 +263,15 @@ function updateReadme(contractsData: ContractInfo[]) {
                       readmeContent.slice(tableEnd);
     
     fs.writeFileSync(readmePath, newContent);
-    console.log('Updated README.md with testnet code IDs');
+    console.log('Added testnet column and updated README.md with testnet code IDs');
 }
 
 main()
-    .then(() => {
+    .then((processedCount) => {
         const contractsData = JSON.parse(fs.readFileSync(CONTRACTS_FILE, 'utf8'));
-        updateReadme(contractsData);
+        // Only update README if new migrations happened
+        if (processedCount > 0) {
+            updateReadme(contractsData);
+        }
     })
     .catch(console.error); 
