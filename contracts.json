@@ -13,7 +13,14 @@
       "name": "Burnt Labs",
       "url": "https://burnt.com"
     },
-    "deprecated": true
+    "deprecated": true,
+    "testnet": {
+      "code_id": "347",
+      "hash": "AC98D75F07AE5CD8F603015F6E1DD8960D1A7EEA28A37F88C73F3672E683095A",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:54:58.503Z"
+    }
   },
   {
     "name": "Polytone Proxy",
@@ -29,7 +36,14 @@
       "url": "https://daodao.zone/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "348",
+      "hash": "EB4C7498B630A14FDF39D0ADFA9044CC4DE5C90BBF160C40AD3B14154F0B72E1",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:03.371Z"
+    }
   },
   {
     "name": "Polytone Voice",
@@ -45,7 +59,14 @@
       "url": "https://daodao.zone/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "349",
+      "hash": "DF2F443F869A557E77583D05CFEA9E9B43D427E41927FC4872B62EC468FDD215",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:08.275Z"
+    }
   },
   {
     "name": "Polytone Note",
@@ -61,7 +82,14 @@
       "url": "https://daodao.zone/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "350",
+      "hash": "E37AD66D3EBE4108350A20F85FC53FC3FE626ADF89824E1CCC64C889962BD560",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:13.473Z"
+    }
   },
   {
     "name": "MetaAccount (v2)",
@@ -77,7 +105,14 @@
       "url": "https://burnt.com"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "351",
+      "hash": "BEB8C35C6AC21D0B13A1E86D14CFE0C02AE6391C342BF2BCF645D98171BA4EE0",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:18.336Z"
+    }
   },
   {
     "name": "cw1 Subkeys",
@@ -93,7 +128,14 @@
       "url": "https://cosmwasm.com/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "352",
+      "hash": "C76B8C474CDEAE528B4E8A4934941BA4A551B36616A4E8EC5B1F459CF2707148",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:23.168Z"
+    }
   },
   {
     "name": "cw1 Whitelist",
@@ -109,7 +151,14 @@
       "url": "https://cosmwasm.com/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "353",
+      "hash": "E270D3CAD4FB6169BECCBFFD38322B8D53ADF63296D1C79CC80C031314161F84",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:27.866Z"
+    }
   },
   {
     "name": "cw3 Fixed Multisig",
@@ -125,7 +174,14 @@
       "url": "https://cosmwasm.com/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "354",
+      "hash": "856BDCDCC7432904F115559F710F50AE91B72AFC81995F0A93FED2AF33DCA475",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:32.670Z"
+    }
   },
   {
     "name": "cw3 Flex Multisig",
@@ -141,7 +197,14 @@
       "url": "https://cosmwasm.com/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "355",
+      "hash": "BCB1ADB1D56B8A8A1FC9F37F0FE78988DFE0C49DF82649E35D390DD38DCD3D0F",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:37.686Z"
+    }
   },
   {
     "name": "cw4 Group",
@@ -157,7 +220,14 @@
       "url": "https://cosmwasm.com/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "356",
+      "hash": "9437DAB33B26350F99371EF6106E2C86F7E8A01CFBAC8437CB02350840C6ACE2",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:42.362Z"
+    }
   },
   {
     "name": "cw4 Stake",
@@ -173,6 +243,13 @@
     "author": {
       "name": "CosmWasm",
       "url": "https://cosmwasm.com/"
+    },
+    "testnet": {
+      "code_id": "357",
+      "hash": "D343E9173C0DA89D6061D3C43292E11A1E1D6CDE673C57E4B2332232389B113B",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:47.030Z"
     }
   },
   {
@@ -189,7 +266,14 @@
       "url": "https://cosmwasm.com/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "358",
+      "hash": "10E4145AF6B6A28A52DD649E937B7EF2753C80D3FFF03EFC45EF0EBB9E459A64",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:51.727Z"
+    }
   },
   {
     "name": "cw20 Base",
@@ -205,7 +289,14 @@
       "url": "https://cosmwasm.com/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "359",
+      "hash": "901B84E60F3EC6AAAA9B988B17DA857929B245E42293BA9DB848F1C427F0E7D0",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:55:56.545Z"
+    }
   },
   {
     "name": "cw20 ics20",
@@ -221,7 +312,14 @@
       "url": "https://cosmwasm.com/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "360",
+      "hash": "29EC066E92A75BBF178F5D6A3DBCF88B3969F226A9AA0892278C1879110AE51C",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:01.438Z"
+    }
   },
   {
     "name": "Treasury",
@@ -237,7 +335,14 @@
       "url": "https://burnt.com"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "361",
+      "hash": "36DAB35DD5B3FFB7A02161ED5CB00EA2DB6AB751FEA71C65F100BDA59E1915FA",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:06.635Z"
+    }
   },
   {
     "name": "Abstract Account",
@@ -253,7 +358,14 @@
       "url": "https://abstract.money/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "362",
+      "hash": "DAC1BD612277C896C0E8A590797C2D76014E3859FAC5BC193651C617FAB23ED8",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:11.832Z"
+    }
   },
   {
     "name": "Abstract Acccount (XION)",
@@ -269,7 +381,14 @@
       "url": "https://abstract.money/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "363",
+      "hash": "947AD3609D05F3F5DAA453F42CD0D7E199DF58046540A300B0410B5113483F3B",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:17.137Z"
+    }
   },
   {
     "name": "Abstract ANS Host",
@@ -285,7 +404,14 @@
       "name": "Abstract Money",
       "url": "https://abstract.money/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "364",
+      "hash": "4B750DAE44514264E1EE39BFD85590671B5EA7642AAAAC76B4024BBED1336873",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:21.991Z"
+    }
   },
   {
     "name": "Abstract IBC Client",
@@ -301,7 +427,14 @@
       "name": "Abstract Money",
       "url": "https://abstract.money/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "365",
+      "hash": "32823D4A925E72F0B55446F32D5378F517E46AFE3C1B54CD47BAFC8BAC33FC07",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:26.909Z"
+    }
   },
   {
     "name": "Abstract IBC Host",
@@ -317,7 +450,14 @@
       "name": "Abstract Money",
       "url": "https://abstract.money/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "366",
+      "hash": "90DFA73EC0F12EB7982E7917670254FD2C5DFB6E9D4D71DB35ED20941006BB5D",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:31.946Z"
+    }
   },
   {
     "name": "Abstract ICA Client",
@@ -333,7 +473,14 @@
       "name": "Abstract Money",
       "url": "https://abstract.money/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "367",
+      "hash": "70E784BA46411412A00A3C42AF17B01807C30C53F716BB6D12FF8EC209889B75",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:36.980Z"
+    }
   },
   {
     "name": "Abstract Module Factory",
@@ -349,7 +496,14 @@
       "name": "Abstract Money",
       "url": "https://abstract.money/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "368",
+      "hash": "EEBA89F502F83854E22F7820D5B4A2DA2583E9125BE6F4542B3D82FAC8153C31",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:41.746Z"
+    }
   },
   {
     "name": "Abstract Registry",
@@ -365,7 +519,14 @@
       "name": "Abstract Money",
       "url": "https://abstract.money/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "369",
+      "hash": "6733223C3169B9098E4F04782FD1E75589042F171F0E09FD4F62BA5C08AB001F",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:46.626Z"
+    }
   },
   {
     "name": "Multiquery",
@@ -381,7 +542,14 @@
       "name": "Abstract Money",
       "url": "https://abstract.money/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "370",
+      "hash": "0266DDBDB1D6DAE68905642FDF5764FF880FCAD421470457746A3C582AA7D59A",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:51.118Z"
+    }
   },
   {
     "name": "cw721 Base",
@@ -397,7 +565,14 @@
       "name": "CosmWasm",
       "url": "https://cosmwasm.com/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "371",
+      "hash": "93F0C5B8976924DCA90F7CCEF63FE2810EDCA4E10F634AC547180476128A3D82",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:56:56.241Z"
+    }
   },
   {
     "name": "cw721 Expiration",
@@ -413,7 +588,14 @@
       "name": "CosmWasm",
       "url": "https://cosmwasm.com/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "372",
+      "hash": "6D729EF3457E8A7D28985137166372C07AFE8229256EC92FFBB3D1760501D982",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:01.401Z"
+    }
   },
   {
     "name": "cw721 Fixed Price",
@@ -429,7 +611,14 @@
       "name": "CosmWasm",
       "url": "https://cosmwasm.com/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "373",
+      "hash": "1DB6FCD3C409A61D41F6020C8B680DC755933367AE210A1F153F7D9A780DF7A2",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:05.980Z"
+    }
   },
   {
     "name": "cw721 Metadata Onchain",
@@ -445,7 +634,14 @@
       "name": "CosmWasm",
       "url": "https://cosmwasm.com/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "374",
+      "hash": "43D2404E2CD0FD7AA868F3C3762A8F93544D9C3C8BA96FA543EEC29DAFE9233D",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:10.956Z"
+    }
   },
   {
     "name": "cw721 Non-Transferable",
@@ -461,7 +657,14 @@
       "name": "CosmWasm",
       "url": "https://cosmwasm.com/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "375",
+      "hash": "60C6B5AB16E8DE57B496F3D7C505D50943754E258061D0D8182334BD7AAEFA4C",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:16.076Z"
+    }
   },
   {
     "name": "cw721 Receiver Tester",
@@ -477,7 +680,14 @@
       "name": "CosmWasm",
       "url": "https://cosmwasm.com/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "376",
+      "hash": "725457C109C33A08AED67C3CE22438A65008C880F3D35CAC0B7D94365776CE5C",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:20.640Z"
+    }
   },
   {
     "name": "cw2981 Royalties",
@@ -493,7 +703,14 @@
       "name": "CosmWasm",
       "url": "https://cosmwasm.com/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "377",
+      "hash": "C040CA60656DBED84F0A6B03286DF846FD93E8117319DDB63537532760A52457",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:25.771Z"
+    }
   },
   {
     "name": "Mercle Mint with Claim",
@@ -509,7 +726,14 @@
       "name": "Mercle",
       "url": "https://mercle.xyz/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "378",
+      "hash": "F2EBC5D2A1DA7CABFD0866C43F77AB6B1AD4E3399172EE53B2A8519C7B95D05D",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:30.373Z"
+    }
   },
   {
     "name": "Mercle NFT Membership",
@@ -525,7 +749,14 @@
       "name": "Mercle",
       "url": "https://mercle.xyz/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "379",
+      "hash": "9FEE91EC6E12193EF013A449A1A80212A53ACDEEAEF95001C6E9F3AEF761FA9D",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:35.282Z"
+    }
   },
   {
     "name": "BonusBlock Badge Minter",
@@ -541,7 +772,14 @@
       "name": "BonusBlock",
       "url": "https://www.bonusblock.io/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "380",
+      "hash": "4426EF23025346EB3211BEDD455E41BCDE3E580BB489A7A6219FCB44EE251931",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:40.024Z"
+    }
   },
   {
     "name": "Talis Collection Offer",
@@ -557,7 +795,14 @@
       "name": "Talis",
       "url": "https://talis.art/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "381",
+      "hash": "CD360783AD4A4EEC33B4BE4484AAC53D3BA2C0AFE4BA617C13857BACB80C6A36",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:44.768Z"
+    }
   },
   {
     "name": "Talis English Auction",
@@ -573,7 +818,14 @@
       "name": "Talis",
       "url": "https://talis.art/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "382",
+      "hash": "B6BB8CD91E1BABD30E829D53D8EB7FB7CA088A7DA0300C0EA42FCFCDFED31C79",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:49.667Z"
+    }
   },
   {
     "name": "Talis Marketplace",
@@ -589,7 +841,14 @@
       "name": "Talis",
       "url": "https://talis.art/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "383",
+      "hash": "4A65C0B3407D3AEFDE30C97B7BDB4F38C08D8BF5400F6CBE0E120490077CF133",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:54.292Z"
+    }
   },
   {
     "name": "Talis Multi-Flavor",
@@ -605,7 +864,14 @@
       "name": "Talis",
       "url": "https://talis.art/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "384",
+      "hash": "275F1E24E41F30E3F8E8754BA15651A9511552F6C104ECB1909537C021FE0034",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:57:59.112Z"
+    }
   },
   {
     "name": "Talis PoC Candy Mint",
@@ -621,7 +887,14 @@
       "name": "Talis",
       "url": "https://talis.art/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "385",
+      "hash": "64E6A012F3030F1B02726B9BF1D081132B87DB0560556D832A8AB2C7DE4996CE",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:03.818Z"
+    }
   },
   {
     "name": "Talis Xion Proxy",
@@ -637,7 +910,14 @@
       "name": "Talis",
       "url": "https://talis.art/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "386",
+      "hash": "77D108CF4D24A19BD046E0D6A4D11F54E912E26057B5FF3D8695839A3D949144",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:08.347Z"
+    }
   },
   {
     "name": "Astroport Factory",
@@ -653,7 +933,14 @@
       "name": "Astroport",
       "url": "https://astroport.fi/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "387",
+      "hash": "C87F745968706A2F453577FC1B4356F15A2B5502BC4B5DF16CD63E99E793EB59",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:13.001Z"
+    }
   },
   {
     "name": "Astroport Maker",
@@ -669,7 +956,14 @@
       "name": "Astroport",
       "url": "https://astroport.fi/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "388",
+      "hash": "6AEAD94849FE432B468225ED43EB00630DB0179D9B692FF8CF0C4A8E99C448CD",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:17.979Z"
+    }
   },
   {
     "name": "Astroport Native Coin Registry",
@@ -685,7 +979,14 @@
       "name": "Astroport",
       "url": "https://astroport.fi/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "389",
+      "hash": "B122A3396F1402D172C2A25D45C0813125FADF0721B7FC6B355FEFDF2995025C",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:22.505Z"
+    }
   },
   {
     "name": "Astroport Pair",
@@ -701,7 +1002,14 @@
       "name": "Astroport",
       "url": "https://astroport.fi/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "390",
+      "hash": "8AE8A692747D405528003D1DAA8933836B26B4D158B5E9B3B1D9EA6CB009AA9F",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:27.231Z"
+    }
   },
   {
     "name": "Astroport Router",
@@ -717,7 +1025,14 @@
       "name": "Astroport",
       "url": "https://astroport.fi/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "391",
+      "hash": "6030582BA8A96A00F3EB26108FE6765B28620CD0594B0D349B56202C1EF39F71",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:31.951Z"
+    }
   },
   {
     "name": "Astroport TokenFactory Tracker",
@@ -733,7 +1048,14 @@
       "name": "Astroport",
       "url": "https://astroport.fi/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "392",
+      "hash": "74A9D349103E25028B51EB8D2A9DECA32C86D662536DFEAD546B5AD1A4E4D550",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:36.520Z"
+    }
   },
   {
     "name": "Talis Whitelist",
@@ -749,7 +1071,14 @@
       "name": "Talis",
       "url": "https://talis.art/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "393",
+      "hash": "EC8C621DE895BEDBC22A3D1D57004EC94FC7E66CD7E779356B6F99327BF4CB3C",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:41.166Z"
+    }
   },
   {
     "name": "Talis Staking",
@@ -765,7 +1094,14 @@
       "name": "Talis",
       "url": "https://talis.art/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "394",
+      "hash": "10A2961D31CEC4D2E703A96DE9F79EB6DD8BE93719352545164E7B5C04B4F671",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:45.823Z"
+    }
   },
   {
     "name": "Talis Frens Proxy",
@@ -781,7 +1117,14 @@
       "name": "Talis",
       "url": "https://talis.art/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "395",
+      "hash": "5335E2691329383C61A242B3CB4864261CF4011C88B5F4B2138F52B1A48A4A87",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:50.339Z"
+    }
   },
   {
     "name": "Talis Trading Escrow",
@@ -797,7 +1140,14 @@
       "name": "Talis",
       "url": "https://talis.art/"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "396",
+      "hash": "698E41FCC1B4F2972F2DC0D5DA673B99C99D0A3D4645C3EA0E3BE3859FB5A94D",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:58:55.303Z"
+    }
   },
   {
     "name": "Fractit",
@@ -813,7 +1163,14 @@
       "url": "https://fractit.com"
     },
     "governance": "21",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "397",
+      "hash": "8AF90DDE842BFFA825DF4E2F2EFFC5E0409DCACDB538E1F95B9095A80D2DE4EF",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:59:00.000Z"
+    }
   },
   {
     "name": "Fractit Inception Pass",
@@ -829,7 +1186,14 @@
       "url": "https://fractit.com"
     },
     "governance": "22",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "398",
+      "hash": "7759CE1DA3F99723EEA4F8F539CFDD4370632CD86A1ED167559893608E35FC88",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:59:04.678Z"
+    }
   },
   {
     "name": "Thrive Protocol",
@@ -845,7 +1209,14 @@
       "url": "https://thriveprotocol.com"
     },
     "governance": "24",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "399",
+      "hash": "BFDD4A875147E9B559F503ABB864F1FA8B4BF608C7CF0C92129E7B6E4514EFF0",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:59:09.281Z"
+    }
   },
   {
     "name": "MetaAccount (v3)",
@@ -861,6 +1232,13 @@
       "name": "Burnt Labs",
       "url": "https://burnt.com"
     },
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "400",
+      "hash": "91112B0B365F77817CD7BD523B9A0C5EF49E2701B894BA6A8320ECE69E2C63DB",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-03T19:59:14.113Z"
+    }
   }
 ]
