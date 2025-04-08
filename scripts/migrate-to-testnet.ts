@@ -75,7 +75,7 @@ async function main() {
     
     if (contractsToProcess.length === 0) {
         console.log('All contracts have already been migrated to testnet.');
-        return false;
+        return;
     }
 
     // Get wallet from mnemonic
@@ -144,61 +144,6 @@ async function main() {
             console.error(`Error processing contract ${contract.name}:`, error);
         }
     }
-    return true;
 }
 
-function updateReadme(contractsData: ContractInfo[]) {
-    const readmePath = path.join(__dirname, '../README.md');
-    let readmeContent = fs.readFileSync(readmePath, 'utf8');
-    
-    // Find the table in the README - look specifically for the Active Contracts section
-    const sectionRegex = /## Active Contracts\n/;
-    const tableStart = readmeContent.search(sectionRegex);
-    
-    if (tableStart === -1) {
-        console.log('Could not find Active Contracts section in README');
-        return;
-    }
-
-    // Find the actual table start after the section header
-    const tableContentStart = readmeContent.indexOf('|', tableStart);
-    const tableEndRegex = /\n\n/;
-    const tableEnd = readmeContent.indexOf('\n\n', tableContentStart);
-    
-    // Get current table content
-    const currentTable = readmeContent.slice(tableContentStart, tableEnd);
-    
-    // Create new table content
-    const headers = [
-        '| Name | Description | Release | Author | Code ID | Code ID (Testnet) | Hash | Governance Proposal |',
-        '|------|-------------|----------|---------|----------|-----------------|------|-------------------|'
-    ];
-
-    // Create rows for each contract
-    const rows = contractsData.map(contract => {
-        const testnetCodeId = contract.testnet ? `\`${contract.testnet.code_id}\`` : '-';
-        return `| ${contract.name} | ${contract.description} | [${contract.release.version}](${contract.release.url}) | [${contract.author.name}](${contract.author.url}) | \`${contract.code_id}\` | ${testnetCodeId} | \`${contract.hash}\` | ${contract.governance} |`;
-    });
-
-    // Combine into new table
-    const newTableContent = [...headers, ...rows].join('\n');
-    
-    // Replace old table with new one
-    const newContent = readmeContent.slice(0, tableContentStart) + 
-                      newTableContent + 
-                      readmeContent.slice(tableEnd);
-    
-    fs.writeFileSync(readmePath, newContent);
-    console.log('Updated README.md with new contract information');
-}
-
-// Update the main execution
-main()
-    .then((contractsWereProcessed) => {
-        if (contractsWereProcessed) {
-            // Always read the latest data from file when updating README
-            const contractsData = JSON.parse(fs.readFileSync(CONTRACTS_FILE, 'utf8'));
-            updateReadme(contractsData);
-        }
-    })
-    .catch(console.error); 
+main().catch(console.error); 
