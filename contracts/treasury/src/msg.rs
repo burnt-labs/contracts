@@ -60,5 +60,8 @@ pub enum QueryMsg {
     Admin {},
 
     #[returns(Binary)]
+    PendingAdmin {},
+
+    #[returns(Binary)]
     Params {},
 }
