@@ -72,6 +72,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::FeeConfig {} => to_json_binary(&query::fee_config(deps.storage)?),
         QueryMsg::Admin {} => to_json_binary(&query::admin(deps.storage)?),
+        QueryMsg::PendingAdmin {} => to_json_binary(&query::pending_admin(deps.storage)?),
         QueryMsg::Params {} => to_json_binary(&query::params(deps.storage)?),
     }
 }
