@@ -69,9 +69,9 @@ async function main() {
     // Read contracts.json
     const contractsData: ContractInfo[] = JSON.parse(fs.readFileSync(CONTRACTS_FILE, 'utf8'));
     
-    // Process only contracts that don't have testnet information
-    const contractsToProcess = contractsData.filter(contract => !contract.testnet);
-    console.log(`Processing contracts without testnet deployments: ${contractsToProcess.map(c => c.name).join(', ')}`);
+    // Process only non-deprecated contracts that don't have testnet information
+    const contractsToProcess = contractsData.filter(contract => !contract.testnet && !contract.deprecated);
+    console.log(`Processing non-deprecated contracts without testnet deployments: ${contractsToProcess.map(c => c.name).join(', ')}`);
     
     if (contractsToProcess.length === 0) {
         console.log('All contracts have already been migrated to testnet.');
