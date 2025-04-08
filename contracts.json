@@ -15,11 +15,11 @@
     },
     "deprecated": true,
     "testnet": {
-      "code_id": "347",
-      "hash": "AC98D75F07AE5CD8F603015F6E1DD8960D1A7EEA28A37F88C73F3672E683095A",
+      "code_id": "498",
+      "hash": "0BAF8B87B5EFA9BD638DA5997F3870A8171714E7260A4031BAC029BC0C09BEEC",
       "network": "xion-testnet-2",
       "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
-      "deployed_at": "2025-04-03T19:54:58.503Z"
+      "deployed_at": "2025-04-08T17:36:10.806Z"
     }
   },
   {
@@ -38,11 +38,11 @@
     "governance": "Genesis",
     "deprecated": false,
     "testnet": {
-      "code_id": "348",
-      "hash": "EB4C7498B630A14FDF39D0ADFA9044CC4DE5C90BBF160C40AD3B14154F0B72E1",
+      "code_id": "500",
+      "hash": "C26DF0D430FBD7259A4AD727E9063FE5FF30A3BF46E3378F435C2DA52CD806B9",
       "network": "xion-testnet-2",
       "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
-      "deployed_at": "2025-04-03T19:55:03.371Z"
+      "deployed_at": "2025-04-08T17:38:57.054Z"
     }
   },
   {
