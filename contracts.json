@@ -167,7 +167,14 @@
       "url": "https://cosmwasm.com/"
     },
     "governance": "Genesis",
-    "deprecated": false
+    "deprecated": false,
+    "testnet": {
+      "code_id": "685",
+      "hash": "AB82C1BAF5692B2F809DBEC059A88621234389756EA56DF3F51288EC0379630F",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-09T20:42:29.982Z"
+    }
   },
   {
     "name": "cw3 Flex Multisig",
@@ -1218,6 +1225,98 @@
       "network": "xion-testnet-2",
       "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
       "deployed_at": "2025-04-08T18:26:38.357Z"
+    }
+  },
+  {
+    "name": "XION Markets Factory Contract",
+    "description": "Protocol's proxy/deployer contract for all the markets. Responsible for enumerables and indexing of data and statistics across the XIONMarkets protocol.",
+    "code_id": "56",
+    "hash": "C877A97EDEA41408088644E7CE205C141C472C822EA7033E0439274928CC1D99",
+    "release": {
+      "url": "https://github.com/XIONMarkets/xionmarkets-smart-contracts",
+      "version": "v1.0.0"
+    },
+    "author": {
+      "name": "XION Markets",
+      "url": "https://x.com/xionmarkets"
+    },
+    "governance": "27",
+    "deprecated": false,
+    "testnet": {
+      "code_id": "686",
+      "hash": "4F307BBA545B806243B3698C2A6B3B3F110406AEA506D30F82745DC45F4BCA28",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-09T20:42:38.376Z"
+    }
+  },
+  {
+    "name": "XION Markets Market Contract",
+    "description": "Model for the markets (events) that facilitates trading of shares (Yes or No), provision of liquidity, removal of liquidity and all core functionality of the protocol.",
+    "code_id": "57",
+    "hash": "4CFC7E3BB774D3528749A10582652218910CF9344514F59C88A1EC15C128BAA7",
+    "release": {
+      "url": "https://github.com/XIONMarkets/xionmarkets-smart-contracts",
+      "version": "v1.0.0"
+    },
+    "author": {
+      "name": "XION Markets",
+      "url": "https://x.com/xionmarkets"
+    },
+    "governance": "27",
+    "deprecated": false,
+    "testnet": {
+      "code_id": "687",
+      "hash": "768FC939D65F3F0CE7ECDDBEE1CE523144D418652F04BED7F041AC7AB19CB495",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-09T20:42:43.181Z"
+    }
+  },
+  {
+    "name": "Pyth Oracle Contract",
+    "description": "Pyth Network price feeds contract providing real-time financial market data to smart contract applications",
+    "code_id": "58",
+    "hash": "CA4DEAD04CFFC986BB05B9FA792327AC4EA2609EC928EF44DD7F48D3E16995F5",
+    "release": {
+      "url": "https://github.com/pyth-network/pyth-crosschain/tree/main/target_chains/cosmwasm",
+      "version": "v1.0.0"
+    },
+    "author": {
+      "name": "Pyth Network",
+      "url": "https://www.pyth.network/"
+    },
+    "governance": "28",
+    "deprecated": false,
+    "testnet": {
+      "code_id": "688",
+      "hash": "F02A5159C8FE050BA6C59BA65BAC1DEA3E344D5EBCAA2332F75D01EC41F06FD9",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-09T20:42:47.931Z"
+    }
+  },
+  {
+    "name": "Pyth Oracle Wormhole Dependency",
+    "description": "Wormhole dependency for the Pyth Network oracle implementation",
+    "code_id": "59",
+    "hash": "42133359E82BF07E446F6E75D360A0E1F4E164C66138AA4A5D2EDA3A75005026",
+    "release": {
+      "url": "https://github.com/pyth-network/pyth-crosschain/tree/main/target_chains/cosmwasm",
+      "version": "v1.0.0"
+    },
+    "author": {
+      "name": "Pyth Network",
+      "url": "https://www.pyth.network/"
+    },
+    "governance": "28",
+    "deprecated": false,
+    "testnet": {
+      "code_id": "689",
+      "hash": "E20591A2DE1423E7EB528453F4A52B4C089F5FE0316F73E1BEEE13DFAD8527EF",
+      "network": "xion-testnet-2",
+      "deployed_by": "xion1q9lqzpc73fewqva98pwaqvezaf9vqqulw3hmmx",
+      "deployed_at": "2025-04-09T20:42:52.745Z"
     }
   }
 ]
