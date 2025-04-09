@@ -14,6 +14,7 @@ use cosmos_sdk_proto::Timestamp;
 use cosmwasm_std::BankMsg::Send;
 use cosmwasm_std::{
     Addr, AnyMsg, Binary, Coin, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
+    WasmMsg,
 };
 use url::Url;
 
@@ -110,6 +111,36 @@ pub fn cancel_proposed_admin(deps: DepsMut, info: MessageInfo) -> ContractResult
     Ok(Response::new().add_event(
         Event::new("cancelled_proposed_admin").add_attribute("action", "cancel_proposed_admin"),
     ))
+}
+
+pub fn migrate(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    new_code_id: u64,
+    migrate_msg: Binary,
+) -> ContractResult<Response> {
+    // Load the current admin
+    let admin = ADMIN.load(deps.storage)?;
+
+    // Check if the caller is the current admin
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    // this assumes that the contract's wasmd admin is itself
+    let migrate_msg = CosmosMsg::Wasm(WasmMsg::Migrate {
+        contract_addr: env.contract.address.into_string(),
+        new_code_id,
+        msg: migrate_msg,
+    });
+
+    Ok(Response::new()
+        .add_event(Event::new("migrate_treasury_instance").add_attributes(vec![
+            ("new_code_id", new_code_id.to_string()),
+            ("admin", admin.to_string()),
+        ]))
+        .add_message(migrate_msg))
 }
 
 pub fn update_grant_config(

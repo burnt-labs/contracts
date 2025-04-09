@@ -58,6 +58,7 @@ pub fn execute(
         ExecuteMsg::RevokeAllowance { grantee } => revoke_allowance(deps, env, info, grantee),
         ExecuteMsg::UpdateParams { params } => update_params(deps, info, params),
         ExecuteMsg::Withdraw { coins } => withdraw_coins(deps, info, coins),
+        ExecuteMsg::Migrate { new_code_id, migrate_msg } => execute::migrate(deps, env, info, new_code_id, migrate_msg),
     }
 }
 
