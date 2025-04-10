@@ -41,6 +41,10 @@ pub enum ExecuteMsg {
     Withdraw {
         coins: Vec<Coin>,
     },
+    Migrate {
+        new_code_id: u64,
+        migrate_msg: Binary,
+    },
 }
 
 #[cw_serde]
@@ -65,3 +69,6 @@ pub enum QueryMsg {
     #[returns(Binary)]
     Params {},
 }
+
+#[cw_serde]
+pub struct MigrateMsg {}
