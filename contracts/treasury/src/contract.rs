@@ -1,6 +1,6 @@
 use crate::error::{ContractError, ContractResult};
 use crate::execute::{revoke_allowance, update_fee_config, update_params, withdraw_coins};
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::{execute, query, CONTRACT_NAME, CONTRACT_VERSION};
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
@@ -76,4 +76,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::PendingAdmin {} => to_json_binary(&query::pending_admin(deps.storage)?),
         QueryMsg::Params {} => to_json_binary(&query::params(deps.storage)?),
     }
+}
+
+#[entry_point]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    // No state migrations performed, just returned a Response
+    Ok(Response::default())
 }
