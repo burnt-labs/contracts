@@ -220,6 +220,7 @@ pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> Contra
     }
     
     Url::parse(params.icon_url.as_str())?;
+    serde_json::from_str(params.metadata.as_str())?;
 
     PARAMS.save(deps.storage, &params)?;
 
