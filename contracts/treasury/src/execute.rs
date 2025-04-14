@@ -214,6 +214,7 @@ pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> Contra
         return Err(Unauthorized);
     }
     
+    Url::parse(params.display_url.as_str())?;
     for url in params.redirect_urls.iter() {
         Url::parse(url.as_str())?;
     }
