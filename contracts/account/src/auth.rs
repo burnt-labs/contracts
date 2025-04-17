@@ -1,5 +1,6 @@
 use crate::auth::secp256r1::verify;
 use crate::error::ContractError;
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Binary, Deps, Env};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -63,7 +64,7 @@ impl AddAuthenticator {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
+#[cw_serde]
 pub enum Authenticator {
     Secp256K1 { pubkey: Binary },
     Ed25519 { pubkey: Binary },

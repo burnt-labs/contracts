@@ -1,4 +1,4 @@
-use crate::auth::AddAuthenticator;
+use crate::auth::{AddAuthenticator, Authenticator};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Binary;
 
@@ -12,6 +12,7 @@ pub enum ExecuteMsg {
     AddAuthMethod { add_authenticator: AddAuthenticator },
     RemoveAuthMethod { id: u8 },
     Emit { data: String },
+    Unused { authenticator: Authenticator },
 }
 
 #[cw_serde]

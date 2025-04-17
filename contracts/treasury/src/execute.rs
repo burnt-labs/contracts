@@ -213,12 +213,12 @@ pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> Contra
     if admin != info.sender {
         return Err(Unauthorized);
     }
-    
+
     Url::parse(params.display_url.as_str())?;
     for url in params.redirect_urls.iter() {
         Url::parse(url.as_str())?;
     }
-    
+
     Url::parse(params.icon_url.as_str())?;
     serde_json::from_str::<()>(params.metadata.as_str())?;
 
