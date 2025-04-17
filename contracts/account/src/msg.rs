@@ -12,17 +12,16 @@ pub enum ExecuteMsg {
     AddAuthMethod { add_authenticator: AddAuthenticator },
     RemoveAuthMethod { id: u8 },
     Emit { data: String },
-    Unused { authenticator: Authenticator },
 }
 
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     /// Query the pubkey associated with this account.
-    #[returns(Binary)]
+    #[returns(Vec<u8>)]
     AuthenticatorIDs {},
 
-    #[returns(Binary)]
+    #[returns(Authenticator)]
     AuthenticatorByID { id: u8 },
 }
 
