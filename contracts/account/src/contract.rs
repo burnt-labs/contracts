@@ -91,6 +91,7 @@ pub fn execute(
         }
         ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, *id),
         ExecuteMsg::Emit { data } => emit(env, data.to_string()),
+        ExecuteMsg::Unused { .. } => Ok(Response::default()),
     }
 }
 
