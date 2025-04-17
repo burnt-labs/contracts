@@ -51,22 +51,22 @@ pub enum ExecuteMsg {
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     /// Query the grant config by type url
-    #[returns(Binary)]
+    #[returns(GrantConfig)]
     GrantConfigByTypeUrl { msg_type_url: String },
 
-    #[returns(Binary)]
+    #[returns(Vec<String>)]
     GrantConfigTypeUrls {},
 
-    #[returns(Binary)]
+    #[returns(FeeConfig)]
     FeeConfig {},
 
-    #[returns(Binary)]
+    #[returns(Option<Addr>)]
     Admin {},
 
-    #[returns(Binary)]
+    #[returns(Option<Addr>)]
     PendingAdmin {},
 
-    #[returns(Binary)]
+    #[returns(Params)]
     Params {},
 }
 
