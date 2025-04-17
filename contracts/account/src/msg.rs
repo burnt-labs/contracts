@@ -12,7 +12,6 @@ pub enum ExecuteMsg {
     AddAuthMethod { add_authenticator: AddAuthenticator },
     RemoveAuthMethod { id: u8 },
     Emit { data: String },
-    Unused { auth: Authenticator }
 }
 
 #[cw_serde]
