@@ -6,9 +6,7 @@ pub struct InstantiateMsg {}
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    Update {
-        value: String,
-    }
+    Update { value: String },
 }
 
 #[cw_serde]
@@ -17,11 +15,9 @@ pub enum QueryMsg {
     #[returns(Vec<Addr>)]
     GetUsers {},
     #[returns(String)]
-    GetValueByUser {
-        address: Addr,
-    },
+    GetValueByUser { address: Addr },
     #[returns(Vec<(Addr, String)>)]
-    GetMap {}
+    GetMap {},
 }
 
 #[cw_serde]

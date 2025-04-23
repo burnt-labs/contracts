@@ -1,9 +1,12 @@
-use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult};
+use crate::error::ContractError;
 use crate::error::ContractResult;
+use crate::msg::InstantiateMsg;
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::state::USER_MAP;
-use crate::error::ContractError;
-use crate::msg::InstantiateMsg;
+use cosmwasm_std::{
+    entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response,
+    StdResult,
+};
 
 #[entry_point]
 pub fn instantiate(
@@ -27,7 +30,7 @@ pub fn execute(
         ExecuteMsg::Update { value } => {
             // validate JSON
             serde_json::from_str::<serde_json::Value>(&value)?;
-            
+
             USER_MAP.save(deps.storage, info.sender, &value)?;
             Ok(Response::default())
         }

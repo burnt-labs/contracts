@@ -2,7 +2,7 @@
 pub enum ContractError {
     #[error(transparent)]
     Std(#[from] cosmwasm_std::StdError),
-    
+
     #[error(transparent)]
     JsonError(#[from] serde_json::Error),
 }
