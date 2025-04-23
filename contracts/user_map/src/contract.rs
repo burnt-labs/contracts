@@ -2,7 +2,20 @@ use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env
 use crate::error::ContractResult;
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::state::USER_MAP;
+use crate::error::ContractError;
+use crate::msg::InstantiateMsg;
 
+#[entry_point]
+pub fn instantiate(
+    _deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    _msg: InstantiateMsg,
+) -> Result<Response, ContractError> {
+    Ok(Response::new()
+        .add_attribute("method", "instantiate")
+        .add_attribute("owner", info.sender))
+}
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
