@@ -26,7 +26,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::Update { value } => {
             // validate JSON
-            serde_json::from_str::<()>(value.as_str())?;
+            serde_json::from_str::<serde_json::Value>(&value)?;
             
             USER_MAP.save(deps.storage, info.sender, &value)?;
             Ok(Response::default())
