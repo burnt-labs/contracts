@@ -25,6 +25,7 @@ pub fn init(
     type_urls: Vec<String>,
     grant_configs: Vec<GrantConfig>,
     fee_config: FeeConfig,
+    params: Params,
 ) -> ContractResult<Response> {
     let treasury_admin = match admin {
         None => info.sender,
@@ -41,6 +42,9 @@ pub fn init(
     }
 
     FEE_CONFIG.save(deps.storage, &fee_config)?;
+
+    validate_params(&params)?;
+    PARAMS.save(deps.storage, &params)?;
 
     Ok(Response::new().add_event(
         Event::new("create_treasury_instance")
@@ -208,19 +212,25 @@ pub fn update_fee_config(
     Ok(Response::new().add_event(Event::new("updated_treasury_fee_config")))
 }
 
+pub fn validate_params(params: &Params) -> ContractResult<()> {
+    Url::parse(params.display_url.as_str())?;
+    for url in params.redirect_urls.iter() {
+        Url::parse(url.as_str())?;
+    }
+
+    Url::parse(params.icon_url.as_str())?;
+    serde_json::from_str::<()>(params.metadata.as_str())?;
+
+    Ok(())
+}
+
 pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> ContractResult<Response> {
     let admin = ADMIN.load(deps.storage)?;
     if admin != info.sender {
         return Err(Unauthorized);
     }
-    
-    Url::parse(params.display_url.as_str())?;
-    for url in params.redirect_urls.iter() {
-        Url::parse(url.as_str())?;
-    }
-    
-    Url::parse(params.icon_url.as_str())?;
-    serde_json::from_str::<()>(params.metadata.as_str())?;
+
+    validate_params(&params)?;
 
     PARAMS.save(deps.storage, &params)?;
 

@@ -27,6 +27,7 @@ pub fn instantiate(
         msg.type_urls,
         msg.grant_configs,
         msg.fee_config,
+        msg.params,
     )
 }
 
