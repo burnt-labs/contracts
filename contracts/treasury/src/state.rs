@@ -15,7 +15,7 @@ pub const PENDING_ADMIN: Item<Addr> = Item::new("pending_admin");
 #[cw_serde]
 pub struct Params {
     pub display_url: String,
-    pub redirect_urls: Vec<String>,
+    pub redirect_url: String,
     pub icon_url: String,
     pub metadata: String,
 }
