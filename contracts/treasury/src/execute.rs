@@ -215,7 +215,7 @@ pub fn update_fee_config(
 pub fn validate_params(params: &Params) -> ContractResult<()> {
     Url::parse(params.redirect_url.as_str())?;
     Url::parse(params.icon_url.as_str())?;
-    serde_json::from_str::<()>(params.metadata.as_str())?;
+    serde_json::from_str::<serde_json::Value>(&params.metadata)?;
 
     Ok(())
 }
