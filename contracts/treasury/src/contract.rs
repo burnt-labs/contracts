@@ -64,6 +64,9 @@ pub fn execute(
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
+        QueryMsg::RawGrantConfigByTypeUrl { msg_type_url } => to_json_binary(
+            &query::raw_grant_config_by_type_url(deps.storage, msg_type_url)?,
+        ),
         QueryMsg::GrantConfigByTypeUrl {
             msg_type_url,
             account_address,
@@ -75,7 +78,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GrantConfigTypeUrls {} => {
             to_json_binary(&query::grant_config_type_urls(deps.storage)?)
         }
-        QueryMsg::FeeConfig {} => to_json_binary(&query::fee_config(deps.storage)?),
+        QueryMsg::FeeConfig { address } => {
+            to_json_binary(&query::fee_config(deps.storage, address)?)
+        }
+        QueryMsg::RawFeeConfig {} => to_json_binary(&query::raw_fee_config(deps.storage)?),
         QueryMsg::Admin {} => to_json_binary(&query::admin(deps.storage)?),
         QueryMsg::PendingAdmin {} => to_json_binary(&query::pending_admin(deps.storage)?),
         QueryMsg::Params {} => to_json_binary(&query::params(deps.storage)?),

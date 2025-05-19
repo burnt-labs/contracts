@@ -1,14 +1,14 @@
-use crate::grant::{FeeConfig, GrantConfigStorage};
+use crate::grant::{FeeConfig, FeeConfigStorage, GrantConfig, GrantConfigStorage};
 use crate::state::Params;
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Binary, Coin};
+use cosmwasm_std::{Addr, Coin};
 
 #[cw_serde]
 pub struct InstantiateMsg {
     pub admin: Option<Addr>,
     pub type_urls: Vec<String>,
     pub grant_configs: Vec<GrantConfigStorage>,
-    pub fee_config: FeeConfig,
+    pub fee_config: FeeConfigStorage,
 }
 
 #[cw_serde]
@@ -26,7 +26,7 @@ pub enum ExecuteMsg {
         msg_type_url: String,
     },
     UpdateFeeConfig {
-        fee_config: FeeConfig,
+        fee_config: FeeConfigStorage,
     },
     DeployFeeGrant {
         authz_granter: Addr,
@@ -47,24 +47,30 @@ pub enum ExecuteMsg {
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     /// Query the grant config by type url
-    #[returns(Binary)]
+    #[returns(GrantConfig)]
     GrantConfigByTypeUrl {
         msg_type_url: String,
         account_address: String,
     },
+    /// Query the grant config by type url
+    #[returns(GrantConfigStorage)]
+    RawGrantConfigByTypeUrl { msg_type_url: String },
 
-    #[returns(Binary)]
+    #[returns(Vec<String>)]
     GrantConfigTypeUrls {},
 
-    #[returns(Binary)]
-    FeeConfig {},
+    #[returns(FeeConfig)]
+    FeeConfig { address: String },
 
-    #[returns(Binary)]
+    #[returns(FeeConfigStorage)]
+    RawFeeConfig {},
+
+    #[returns(Addr)]
     Admin {},
 
-    #[returns(Binary)]
+    #[returns(Addr)]
     PendingAdmin {},
 
-    #[returns(Binary)]
+    #[returns(Params)]
     Params {},
 }
