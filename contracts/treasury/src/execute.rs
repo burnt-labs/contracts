@@ -4,7 +4,7 @@ use crate::error::ContractError::{
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
-use crate::grant::{FeeConfig, GrantConfig};
+use crate::grant::{FeeConfigStorage, GrantConfigStorage};
 use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS, PENDING_ADMIN};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
@@ -22,8 +22,8 @@ pub fn init(
     info: MessageInfo,
     admin: Option<Addr>,
     type_urls: Vec<String>,
-    grant_configs: Vec<GrantConfig>,
-    fee_config: FeeConfig,
+    grant_configs: Vec<GrantConfigStorage>,
+    fee_config: FeeConfigStorage,
 ) -> ContractResult<Response> {
     let treasury_admin = match admin {
         None => info.sender,
@@ -116,7 +116,7 @@ pub fn update_grant_config(
     deps: DepsMut,
     info: MessageInfo,
     msg_type_url: String,
-    grant_config: GrantConfig,
+    grant_config: GrantConfigStorage,
 ) -> ContractResult<Response> {
     let admin = ADMIN.load(deps.storage)?;
     if admin != info.sender {
@@ -165,7 +165,7 @@ pub fn remove_grant_config(
 pub fn update_fee_config(
     deps: DepsMut,
     info: MessageInfo,
-    fee_config: FeeConfig,
+    fee_config: FeeConfigStorage,
 ) -> ContractResult<Response> {
     let admin = ADMIN.load(deps.storage)?;
     if admin != info.sender {
@@ -246,7 +246,12 @@ pub fn deploy_fee_grant(
                         None => return Err(AuthzGrantNotFound { msg_type_url }),
                         Some(auth) => {
                             // the authorization must match the one in the config
-                            if grant_config.authorization.ne(&auth.into()) {
+                            // Here authz_granter is supposed to be the abstract account (giving permissions)
+                            if grant_config
+                                .try_into_grant_config(authz_granter.to_string())?
+                                .authorization
+                                .ne(&auth.into())
+                            {
                                 return Err(AuthzGrantMismatch);
                             }
                         }
@@ -259,7 +264,12 @@ pub fn deploy_fee_grant(
 
     let fee_config = FEE_CONFIG.load(deps.storage)?;
     // create feegrant, if needed
-    match fee_config.allowance {
+    // Here authz_granter is supposed to be the abstract account (giving authz permissions)
+    match fee_config
+        .allowance
+        .map(|a| a.try_into_any(authz_granter.to_string()))
+        .transpose()?
+    {
         // this treasury doesn't deploy any fees, and can return
         None => Ok(Response::new()),
         // allowance should be stored as a prost proto from the feegrant definition
