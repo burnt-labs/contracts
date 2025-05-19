@@ -12,8 +12,15 @@ pub fn grant_config_type_urls(store: &dyn Storage) -> StdResult<Vec<String>> {
 pub fn grant_config_by_type_url(
     store: &dyn Storage,
     msg_type_url: String,
+    account_address: String,
 ) -> StdResult<GrantConfig> {
-    GRANT_CONFIGS.load(store, msg_type_url)
+    GRANT_CONFIGS
+        .load(store, msg_type_url)
+        .and_then(|grant_config| {
+            grant_config
+                .try_into_grant_config(account_address)
+                .map_err(Into::into)
+        })
 }
 
 pub fn fee_config(store: &dyn Storage) -> StdResult<FeeConfig> {

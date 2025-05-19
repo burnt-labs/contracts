@@ -1,4 +1,4 @@
-use crate::grant::{FeeConfig, GrantConfig};
+use crate::grant::{FeeConfig, GrantConfigStorage};
 use crate::state::Params;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Binary, Coin};
@@ -7,7 +7,7 @@ use cosmwasm_std::{Addr, Binary, Coin};
 pub struct InstantiateMsg {
     pub admin: Option<Addr>,
     pub type_urls: Vec<String>,
-    pub grant_configs: Vec<GrantConfig>,
+    pub grant_configs: Vec<GrantConfigStorage>,
     pub fee_config: FeeConfig,
 }
 
@@ -20,7 +20,7 @@ pub enum ExecuteMsg {
     CancelProposedAdmin {},
     UpdateGrantConfig {
         msg_type_url: String,
-        grant_config: GrantConfig,
+        grant_config: GrantConfigStorage,
     },
     RemoveGrantConfig {
         msg_type_url: String,
@@ -48,7 +48,10 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     /// Query the grant config by type url
     #[returns(Binary)]
-    GrantConfigByTypeUrl { msg_type_url: String },
+    GrantConfigByTypeUrl {
+        msg_type_url: String,
+        account_address: String,
+    },
 
     #[returns(Binary)]
     GrantConfigTypeUrls {},

@@ -1,3 +1,5 @@
+use cosmwasm_std::StdError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ContractError {
     #[error(transparent)]
@@ -38,3 +40,12 @@ pub enum ContractError {
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
+
+impl From<ContractError> for StdError {
+    fn from(val: ContractError) -> Self {
+        match val {
+            ContractError::Std(err) => err,
+            _ => StdError::generic_err(val.to_string()),
+        }
+    }
+}
