@@ -14,6 +14,7 @@ use cosmos_sdk_proto::Timestamp;
 use cosmwasm_std::BankMsg::Send;
 use cosmwasm_std::{
     Addr, AnyMsg, Binary, Coin, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
+    WasmMsg,
 };
 use url::Url;
 
@@ -24,6 +25,7 @@ pub fn init(
     type_urls: Vec<String>,
     grant_configs: Vec<GrantConfig>,
     fee_config: FeeConfig,
+    params: Params,
 ) -> ContractResult<Response> {
     let treasury_admin = match admin {
         None => info.sender,
@@ -40,6 +42,9 @@ pub fn init(
     }
 
     FEE_CONFIG.save(deps.storage, &fee_config)?;
+
+    validate_params(&params)?;
+    PARAMS.save(deps.storage, &params)?;
 
     Ok(Response::new().add_event(
         Event::new("create_treasury_instance")
@@ -112,6 +117,36 @@ pub fn cancel_proposed_admin(deps: DepsMut, info: MessageInfo) -> ContractResult
     ))
 }
 
+pub fn migrate(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    new_code_id: u64,
+    migrate_msg: Binary,
+) -> ContractResult<Response> {
+    // Load the current admin
+    let admin = ADMIN.load(deps.storage)?;
+
+    // Check if the caller is the current admin
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    // this assumes that the contract's wasmd admin is itself
+    let migrate_msg = CosmosMsg::Wasm(WasmMsg::Migrate {
+        contract_addr: env.contract.address.into_string(),
+        new_code_id,
+        msg: migrate_msg,
+    });
+
+    Ok(Response::new()
+        .add_event(Event::new("migrate_treasury_instance").add_attributes(vec![
+            ("new_code_id", new_code_id.to_string()),
+            ("admin", admin.to_string()),
+        ]))
+        .add_message(migrate_msg))
+}
+
 pub fn update_grant_config(
     deps: DepsMut,
     info: MessageInfo,
@@ -177,15 +212,21 @@ pub fn update_fee_config(
     Ok(Response::new().add_event(Event::new("updated_treasury_fee_config")))
 }
 
+pub fn validate_params(params: &Params) -> ContractResult<()> {
+    Url::parse(params.redirect_url.as_str())?;
+    Url::parse(params.icon_url.as_str())?;
+    serde_json::from_str::<serde_json::Value>(&params.metadata)?;
+
+    Ok(())
+}
+
 pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> ContractResult<Response> {
     let admin = ADMIN.load(deps.storage)?;
     if admin != info.sender {
         return Err(Unauthorized);
     }
 
-    Url::parse(params.display_url.as_str())?;
-    Url::parse(params.redirect_url.as_str())?;
-    Url::parse(params.icon_url.as_str())?;
+    validate_params(&params)?;
 
     PARAMS.save(deps.storage, &params)?;
 
