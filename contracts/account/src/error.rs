@@ -99,12 +99,12 @@ pub type ContractResult<T> = Result<T, ContractError>;
 
 impl From<p256::ecdsa::Error> for ContractError {
     fn from(value: p256::ecdsa::Error) -> Self {
-        Self::P256EcdsaCurve(format!("{:?}", value))
+        Self::P256EcdsaCurve(format!("{value:?}"))
     }
 }
 
 impl From<serde_json::Error> for ContractError {
     fn from(value: serde_json::Error) -> Self {
-        Self::SerdeJSON(format!("{:?}", value))
+        Self::SerdeJSON(format!("{value:?}"))
     }
 }

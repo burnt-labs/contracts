@@ -136,7 +136,7 @@ mod tests {
             deps.as_mut().into_empty(),
             env.clone(),
             info,
-            instantiate_msg,
+            &instantiate_msg,
         )
         .unwrap();
     }

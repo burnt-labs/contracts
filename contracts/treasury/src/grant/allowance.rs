@@ -12,7 +12,7 @@ use cosmwasm_std::Addr;
 
 pub fn format_allowance(
     allowance_any: Any,
-    _granter: Addr,
+    granter: Addr,
     grantee: Addr,
     expiration: Option<Timestamp>,
 ) -> ContractResult<Any> {
@@ -49,7 +49,7 @@ pub fn format_allowance(
             let mut allowance = AllowedMsgAllowance::decode(allowance_any.value.as_slice())?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
-                _granter,
+                granter,
                 grantee,
                 expiration,
             )?;
@@ -65,7 +65,7 @@ pub fn format_allowance(
             let mut allowance = AuthzAllowance::decode(allowance_any.value.as_slice())?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
-                _granter,
+                granter,
                 grantee.clone(),
                 expiration,
             )?;
@@ -85,7 +85,7 @@ pub fn format_allowance(
             let mut allowance = ContractsAllowance::decode(allowance_any.value.as_slice())?;
             let inner_allowance = format_allowance(
                 allowance.allowance.ok_or(AllowanceUnset)?.into(),
-                _granter,
+                granter,
                 grantee.clone(),
                 expiration,
             )?;
@@ -102,7 +102,7 @@ pub fn format_allowance(
             for inner_allowance in allowance.allowances.iter_mut() {
                 *inner_allowance = format_allowance(
                     inner_allowance.clone().into(),
-                    _granter.clone(),
+                    granter.clone(),
                     grantee.clone(),
                     expiration,
                 )?

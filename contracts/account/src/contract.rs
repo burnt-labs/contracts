@@ -18,7 +18,7 @@ pub fn instantiate(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
-    msg: InstantiateMsg,
+    msg: &InstantiateMsg,
 ) -> ContractResult<Response> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     execute::init(deps, env, &mut msg.authenticator.clone())
@@ -58,7 +58,7 @@ pub enum AccountSudoMsg {
 }
 
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
-pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Response> {
+pub fn sudo(deps: DepsMut, env: &Env, msg: &AccountSudoMsg) -> ContractResult<Response> {
     match msg {
         AccountSudoMsg::BeforeTx {
             tx_bytes,
@@ -70,7 +70,7 @@ pub fn sudo(deps: DepsMut, env: Env, msg: AccountSudoMsg) -> ContractResult<Resp
             &env,
             &Binary::from(tx_bytes.as_slice()),
             cred_bytes.as_ref(),
-            simulate,
+            *simulate,
         ),
         AccountSudoMsg::AfterTx { .. } => execute::after_tx(),
     }

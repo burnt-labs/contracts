@@ -204,7 +204,7 @@ pub fn add_auth_method(
             credential,
         } => {
             let passkey = passkey::register(
-                deps.as_ref(),
+                &deps.as_ref(),
                 env.contract.address.clone(),
                 (*url).clone(),
                 (*credential).clone(),

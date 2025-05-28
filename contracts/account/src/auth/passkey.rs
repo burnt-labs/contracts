@@ -26,7 +26,7 @@ struct QueryRegisterResponse {
 #[cw_serde]
 struct QueryAuthenticateResponse {}
 
-pub fn register(deps: Deps, addr: Addr, rp: String, data: Binary) -> ContractResult<Binary> {
+pub fn register(deps: &Deps, addr: Addr, rp: String, data: Binary) -> ContractResult<Binary> {
     let query = QueryWebAuthNVerifyRegisterRequest {
         addr: addr.clone().into(),
         challenge: Binary::from(addr.as_bytes()).to_base64(),

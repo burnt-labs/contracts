@@ -73,7 +73,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             &query::grant_config_by_type_url(deps.storage, msg_type_url)?,
         ),
         QueryMsg::GrantConfigTypeUrls {} => {
-            to_json_binary(&query::grant_config_type_urls(deps.storage)?)
+            to_json_binary(&query::grant_config_type_urls(deps.storage))
         }
         QueryMsg::FeeConfig {} => to_json_binary(&query::fee_config(deps.storage)?),
         QueryMsg::Admin {} => to_json_binary(&query::admin(deps.storage)?),
