@@ -8,14 +8,15 @@ mod error;
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{Addr, Empty};
+    use cosmwasm_std::{Addr, Uint128};
     use cw_orch::interface;
     use cw_orch::mock::Mock;
     use cw_orch::prelude::*;
     use reclaim_cosmwasm::claims::{ClaimInfo, CompleteClaimData, Proof, SignedClaim};
-    use reclaim_cosmwasm::msg::{InstantiateMsg, QueryMsg, ExecuteMsg, ProofMsg};
+    use reclaim_cosmwasm::msg::{InstantiateMsg, QueryMsg, ExecuteMsg, ProofMsg, GetAllEpochResponse, GetEpochResponse};
+    use reclaim_cosmwasm::state::Witness;
 
-    #[interface(InstantiateMsg, QueryMsg, ExecuteMsg, Empty)]
+    #[interface(InstantiateMsg, ExecuteMsg, QueryMsg, Empty)]
     pub struct ReclaimVerifier;
 
     // Implement the Uploadable trait so it can be uploaded to the mock. 
@@ -46,7 +47,22 @@ mod tests {
             owner: sender.to_string(),
         };
         
-        reclaim_verifier.instantiate(&reclaim_verifier_init_msg, None, &[]).unwrap();
+        let instance = reclaim_verifier.instantiate(&reclaim_verifier_init_msg, None, None).unwrap();
+
+        // add reclaim epoch
+        let witness = Witness{ 
+            address: "0x244897572368Eadf65bfBc5aec98D8e5443a9072".to_string(), 
+            host: "".to_string() 
+        };
+        let app_epoch_msg = ExecuteMsg::AddEpoch {
+            witness: vec![witness],
+            minimum_witness: Uint128::one(),
+        };
+        reclaim_verifier.execute(&app_epoch_msg, None).unwrap();
+
+        // query epochs
+        let epoch_response: GetEpochResponse = reclaim_verifier.query(&QueryMsg::GetEpoch {id: 1}).unwrap();
+        println!("epoch response: {:?}", epoch_response);
         
         let signatures = Vec::from(["0x04fac06fb875a8a4896912461655f039b9b7726b1eacc1727f4b87c04b3971951387dc60b884e80e5c866722c1e34738a41c163f6c6bca2e33759a5ed34538201b".to_string()]);
         
@@ -76,7 +92,9 @@ mod tests {
         };
         
         let proof_msg: ProofMsg = ProofMsg {
-            proof: proof,
+            proof,
         };
+
+        reclaim_verifier.execute(&ExecuteMsg::VerifyProof(proof_msg), None).unwrap();
     }
 }
