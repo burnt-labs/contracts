@@ -277,8 +277,12 @@ pub fn deploy_fee_grant(
         let response = QueryGrantsResponse::decode(authz_query_res.as_slice())?;
         let grants = response.grants;
 
-        if grants.clone().is_empty() && !grant_config.optional {
-            return Err(AuthzGrantNotFound { msg_type_url });
+        if grants.clone().is_empty() {
+            if grant_config.optional {
+                continue;
+            } else {
+                return Err(AuthzGrantNotFound { msg_type_url });
+            }
         } else {
             match grants.first() {
                 None => return Err(AuthzGrantNotFound { msg_type_url }),
