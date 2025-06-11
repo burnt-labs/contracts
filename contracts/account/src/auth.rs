@@ -176,14 +176,8 @@ impl Authenticator {
                 email_hash,
                 dkim_domain,
             } => {
-                let verification = zkemail::verify(
-                    deps,
-                    verification_contract,
-                    tx_bytes,
-                    sig_bytes,
-                    email_hash,
-                    dkim_domain,
-                )?;
+                let verification =
+                    zkemail::verify(deps, tx_bytes, sig_bytes, email_hash, dkim_domain)?;
                 Ok(verification)
             }
         }
