@@ -228,14 +228,12 @@ pub fn add_auth_method(
         }
         AddAuthenticator::ZKEmail {
             id,
-            verification_contract,
             email_hash,
             dkim_domain,
         } => {
             // todo: how does verification work in a situation like this?
 
             let auth = Authenticator::ZKEmail {
-                verification_contract: verification_contract.clone(),
                 email_hash: email_hash.clone(),
                 dkim_domain: dkim_domain.clone(),
             };
