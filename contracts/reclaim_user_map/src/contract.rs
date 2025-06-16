@@ -20,7 +20,7 @@ pub fn instantiate(
         return Err(ClaimKeyInvalid)
     }
     CLAIM_VALUE_KEY.save(deps.storage, &msg.claim_key)?;
-    
+
     Ok(Response::new()
         .add_attribute("method", "instantiate")
         .add_attribute("owner", info.sender))

@@ -1,5 +1,5 @@
 use cosmwasm_schema::write_api;
-use user_map::msg::*;
+use reclaim_user_map::msg::*;
 
 fn main() {
     write_api! {
