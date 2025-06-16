@@ -51,7 +51,6 @@ pub enum AddAuthenticator {
     },
     ZKEmail {
         id: u8,
-        verification_contract: Addr,
         email_hash: Binary,
         dkim_domain: String,
     },
@@ -94,7 +93,6 @@ pub enum Authenticator {
         passkey: Binary,
     },
     ZKEmail {
-        verification_contract: Addr,
         email_hash: Binary,
         dkim_domain: String,
     },
@@ -172,7 +170,6 @@ impl Authenticator {
                 Ok(true)
             }
             Authenticator::ZKEmail {
-                verification_contract,
                 email_hash,
                 dkim_domain,
             } => {

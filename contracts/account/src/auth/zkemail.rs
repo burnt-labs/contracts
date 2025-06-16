@@ -1,10 +1,9 @@
 use crate::error::ContractResult;
 use cosmos_sdk_proto::{
-    traits::MessageExt,
-    xion::v1::dkim::{QueryVerifyRequest, QueryVerifyResponse},
+    prost::Message, traits::MessageExt, xion::v1::dkim::{QueryVerifyRequest, QueryVerifyResponse}
 };
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{from_json, Addr, Binary, Deps};
+use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, Deps};
 
 #[cw_serde]
 pub struct SnarkJsProof {
@@ -26,9 +25,11 @@ pub fn verify(
     dkim_domain: &str,
 ) -> ContractResult<bool> {
     let sig: ZKEmailSignature = from_json(sig_bytes.clone())?;
+    let proof: SnarkJsProof = sig.proof;
+    let proof_bz = to_json_vec(&proof)?;
 
     let verification_request = QueryVerifyRequest {
-        proof: sig_bytes.to_vec(),
+        proof: proof_bz,
         dkim_domain: dkim_domain.to_owned(),
         tx_bytes: tx_bytes.to_vec(),
         email_hash: email_hash.to_vec(),
@@ -40,7 +41,7 @@ pub fn verify(
         Binary::from(verification_request_byte),
     )?;
 
-    let res: QueryVerifyResponse = from_json(verification_response)?;
+    let res: QueryVerifyResponse = QueryVerifyResponse::decode(verification_response.as_slice())?;
 
     Ok(res.verified)
 }
