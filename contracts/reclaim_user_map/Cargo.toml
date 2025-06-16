@@ -18,4 +18,4 @@ thiserror          = { workspace = true }
 serde              = { workspace = true }
 serde_json         = { workspace = true }
 getrandom          = { workspace = true }
-reclaim_xion = { package = "reclaim-xion", git = "https://github.com/reclaimprotocol/xion-sdk-onchain-integration.git", features = ["library"]}
+reclaim_xion = { package = "reclaim-xion", git = "https://github.com/burnt-labs/xion-sdk-onchain-integration.git", features = ["library"], rev = "5c67c33d0575c2ede6d2512c5d724b52019974bb"}
