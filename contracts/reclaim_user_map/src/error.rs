@@ -5,6 +5,12 @@ pub enum ContractError {
 
     #[error(transparent)]
     JsonError(#[from] serde_json::Error),
+    
+    #[error("json key missing")]
+    JSONKeyMissing,
+    
+    #[error("claim key invalid")]
+    ClaimKeyInvalid,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;

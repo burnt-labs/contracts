@@ -1,5 +1,5 @@
 [package]
-name = "reclaim-verifier"
+name = "reclaim-user-map"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,11 +12,9 @@ library = []
 
 [dependencies]
 cosmwasm-schema    = { workspace = true }
-cosmwasm-std       = { version = "1.5.0"}
+cosmwasm-std       = { workspace = true }
+cw-storage-plus    = { workspace = true }
 thiserror          = { workspace = true }
 serde              = { workspace = true }
 serde_json         = { workspace = true }
-
-[dev-dependencies]
-cw-orch = "0.24.1"
-reclaim-cosmwasm = {git="https://github.com/reclaimprotocol/cosmwasm-sdk-onchain-integration", default-features = false, features = ["vanilla"]}
+reclaim_xion = { package = "reclaim-xion", git = "https://github.com/reclaimprotocol/xion-sdk-onchain-integration.git"}
