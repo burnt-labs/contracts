@@ -35,7 +35,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::Update { value } => {
             // validate JSON
-            let context: HashMap<&str, String> = serde_json::from_str(&value.proof.claimInfo.context)?;
+            let context: HashMap<&str, serde_json::value::Value> = serde_json::from_str(&value.proof.claimInfo.context)?;
             let verified_value = match context.get(CLAIM_VALUE_KEY.load(deps.storage)?.as_str()) {
                 Some(v) => v.to_string(),
                 None => return Err(ContractError::JSONKeyMissing {}),
