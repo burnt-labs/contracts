@@ -5,6 +5,7 @@ use crate::msg::InstantiateMsg;
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::state::{CLAIM_VALUE_KEY, USER_MAP, VERIFICATION_ADDR};
 use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg};
+use serde_json::Value;
 use crate::error::ContractError::ClaimKeyInvalid;
 
 #[entry_point]
@@ -35,8 +36,14 @@ pub fn execute(
     match msg {
         ExecuteMsg::Update { value } => {
             // validate JSON
-            let context: HashMap<&str, serde_json::value::Value> = serde_json::from_str(&value.proof.claimInfo.context)?;
-            let verified_value = match context.get(CLAIM_VALUE_KEY.load(deps.storage)?.as_str()) {
+            let context: HashMap<&str, Value> = serde_json::from_str(&value.proof.claimInfo.context)?;
+            
+            let extracted_parameters = match context.get("extractedParameters") {
+                None => return Err(ContractError::ExtractedParametersMissing {}),
+                Some(v) => v
+            };
+            
+            let verified_value = match extracted_parameters.get(CLAIM_VALUE_KEY.load(deps.storage)?.as_str()) {
                 Some(v) => v.to_string(),
                 None => return Err(ContractError::JSONKeyMissing {}),
             };

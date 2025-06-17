@@ -8,6 +8,9 @@ pub enum ContractError {
     
     #[error("json key missing")]
     JSONKeyMissing,
+
+    #[error("extracted paramters missing")]
+    ExtractedParametersMissing,
     
     #[error("claim key invalid")]
     ClaimKeyInvalid,
