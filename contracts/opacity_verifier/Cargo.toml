@@ -1,6 +1,23 @@
 [package]
 name = "opacity_verifier"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# enable feature if you want to disable entry points
+library = []
 
 [dependencies]
+alloy-signer = "1.0.13"
+hex = { workspace = true }
+cosmwasm-std = { workspace = true }
+cosmwasm-schema    = { workspace = true }
+cw-storage-plus    = { workspace = true }
+thiserror          = { workspace = true }
+alloy-primitives = "1.2.1"
+cw2                = { workspace = true }
+
