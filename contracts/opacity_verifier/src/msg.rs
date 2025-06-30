@@ -17,7 +17,7 @@ pub enum ExecuteMsg {
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     #[returns(bool)]
-    Verify { 
+    Verify {
         signature: String,
         message: String,
     },

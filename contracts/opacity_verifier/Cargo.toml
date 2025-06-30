@@ -21,3 +21,5 @@ thiserror          = { workspace = true }
 alloy-primitives = "1.2.1"
 cw2                = { workspace = true }
 
+[dev-dependencies]
+cw-orch = "0.28.0"
