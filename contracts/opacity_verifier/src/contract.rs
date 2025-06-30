@@ -1,4 +1,4 @@
-use cosmwasm_std::{to_json_binary, Api, Binary, Deps, DepsMut, Empty, Env, Event, MessageInfo, Response, StdResult};
+use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Empty, Env, Event, MessageInfo, Response, StdResult};
 use crate::error::{ContractError, ContractResult};
 use crate::msg::{QueryMsg, ExecuteMsg, InstantiateMsg};
 use crate::{query, CONTRACT_NAME, CONTRACT_VERSION};

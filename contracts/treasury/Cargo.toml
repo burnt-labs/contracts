@@ -22,3 +22,4 @@ serde_json         = { workspace = true }
 schemars           = { workspace = true }
 cosmos-sdk-proto   = { workspace = true }
 url                = { workspace = true }
+base64ct = { workspace = true }
