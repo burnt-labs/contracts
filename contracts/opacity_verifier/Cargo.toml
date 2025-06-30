@@ -1,7 +1,7 @@
 [package]
 name = "opacity_verifier"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -12,7 +12,7 @@ crate-type = ["cdylib", "rlib"]
 library = []
 
 [dependencies]
-alloy-signer = "1.0.13"
+alloy-signer = "1.0.16"
 hex = { workspace = true }
 cosmwasm-std = { workspace = true }
 cosmwasm-schema    = { workspace = true }
