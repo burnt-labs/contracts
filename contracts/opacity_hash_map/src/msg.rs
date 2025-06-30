@@ -1,6 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Addr;
-use opacity_verifier::msg::QueryMsg::Verify;
 
 #[cw_serde]
 pub struct InstantiateMsg {

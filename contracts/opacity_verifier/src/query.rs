@@ -1,5 +1,4 @@
 use alloy_signer::Signature;
-use alloy_primitives::utils::eip191_hash_message;
 use cosmwasm_std::{Addr, Order, StdError, StdResult, Storage};
 use crate::error::ContractResult;
 use crate::state::{ADMIN, VERIFICATION_KEY_ALLOW_LIST};

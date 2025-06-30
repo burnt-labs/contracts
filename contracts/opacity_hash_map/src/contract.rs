@@ -3,7 +3,7 @@ use crate::error::ContractResult;
 use crate::msg::InstantiateMsg;
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::state::{USER_MAP, OPACITY_VERIFIER};
-use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg};
+use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult};
 use serde_json::Value;
 use crate::error::ContractError::VerificationError;
 
