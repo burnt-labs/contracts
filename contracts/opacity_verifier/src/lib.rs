@@ -3,6 +3,7 @@ pub mod msg;
 mod query;
 mod state;
 mod error;
+mod eth_crypto;
 
 pub const CONTRACT_NAME: &str = "opacity_verifier";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");

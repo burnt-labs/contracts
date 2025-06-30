@@ -1,4 +1,4 @@
-use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Empty, Env, Event, MessageInfo, Response, StdResult};
+use cosmwasm_std::{to_json_binary, Api, Binary, Deps, DepsMut, Empty, Env, Event, MessageInfo, Response, StdResult};
 use crate::error::{ContractError, ContractResult};
 use crate::msg::{QueryMsg, ExecuteMsg, InstantiateMsg};
 use crate::{query, CONTRACT_NAME, CONTRACT_VERSION};
@@ -51,7 +51,7 @@ pub fn execute(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Verify { signature, message } => to_json_binary(
-            &query::verify_query(deps.storage, signature, message)?),
+            &query::verify_query(deps.storage, deps.api, signature, message)?),
         QueryMsg::VerificationKeys {} => to_json_binary(&query::verification_keys(deps.storage)?),
         QueryMsg::Admin {} => to_json_binary(&query::admin(deps.storage)?),
     }
@@ -59,7 +59,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::format;
     use super::*;
     use cosmwasm_std::{Addr};
     use cw_orch::interface;
@@ -72,9 +71,9 @@ mod tests {
         fn wrapper() -> Box<dyn MockContract<Empty>> {
             Box::new(
                 ContractWrapper::new_with_empty(
-                    crate::contract::execute,
-                    crate::contract::instantiate,
-                    crate::contract::query,
+                    execute,
+                    instantiate,
+                    query,
                 )
             )
         }
@@ -83,7 +82,7 @@ mod tests {
     #[test]
     fn test_verify_proof() {
         let allowlist_keys_raw = ["322df8c3146a9891c8d63deec562db5f325f7a28","3ac1e280b6b5d8e15cf428229eccb20d9b824a53","5a29af4859ebc29ac0819c178bd293ba7f7bdfcf","9b776cbbd434d7d8f32b8cb369c37442760457b5","90cbfa246fb5bd65192aeaaa41483e311a13f109","ae16d88cd1f4ba016da8909ebc7c9c4a4fb112b8","8a4ca92581fb9b569ef8152c70a031569ee971b5","bdd5b7410abf138da1008906191188f4b5543be7","5d92cf96045bb80d869ee7bfa5d894be4782cfab","7775b5ffbcd55e7fce07672895145c5961ff828f","cf203ffb676fad5c8924ceebe91ebe3e617f01af"];
-        let allowlist_keys: Vec<String> = allowlist_keys_raw.iter().map(|x| format!("0x{}", x.to_string())).collect();
+        let allowlist_keys: Vec<String> = allowlist_keys_raw.iter().map(|x| x.to_string()).collect();
 
         let sender = Addr::unchecked("sender");
         // Create a new mock chain (backed by cw-multi-test)

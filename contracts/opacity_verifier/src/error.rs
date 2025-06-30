@@ -7,10 +7,22 @@ pub enum ContractError {
     HexError(#[from] hex::FromHexError),
 
     #[error(transparent)]
-    AlloySignatureError(#[from] alloy_primitives::SignatureError),
+    UTF8Error(#[from] std::str::Utf8Error),
+
+    #[error(transparent)]
+    RecoverPubkeyError(#[from] cosmwasm_std::RecoverPubkeyError),
+
+    // #[error(transparent)]
+    // AlloySignatureError(#[from] alloy_primitives::SignatureError),
 
     #[error("only the admin can call this method")]
     Unauthorized,
+
+    #[error("short signature")]
+    ShortSignature,
+
+    #[error("recovery id can only be one of 0, 1, 27, 28")]
+    InvalidRecoveryId,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;
