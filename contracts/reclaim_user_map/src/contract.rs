@@ -80,5 +80,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             }
             to_json_binary(&response)
         }
+        QueryMsg::GetClaimKey {} => {
+            let claim_key = CLAIM_VALUE_KEY.load(deps.storage)?;
+            to_json_binary(&claim_key)
+        }
     }
 }
