@@ -40,7 +40,3 @@ docker run --rm -v "$(pwd)":/code \
 ## Development
 
 For contract development and deployment information, please refer to the individual contract directories.
-
-## License
-
-See LICENSE file for details.
