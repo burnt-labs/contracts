@@ -1,5 +1,5 @@
 [package]
-name = "treasury"
+name = "opacity_verifier"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,14 +12,15 @@ crate-type = ["cdylib", "rlib"]
 library = []
 
 [dependencies]
-cosmwasm-schema    = { workspace = true }
+hex                = { workspace = true }
 cosmwasm-std       = { workspace = true }
-cw2                = { workspace = true }
+cosmwasm-schema    = { workspace = true }
 cw-storage-plus    = { workspace = true }
 thiserror          = { workspace = true }
-serde              = { workspace = true }
-serde_json         = { workspace = true }
-schemars           = { workspace = true }
-cosmos-sdk-proto   = { workspace = true }
-url                = { workspace = true }
+cw2                = { workspace = true }
+getrandom          = { workspace = true }
+tiny-keccak        = { workspace = true }
 base64ct = { workspace = true }
+
+[dev-dependencies]
+cw-orch = "0.28.0"
