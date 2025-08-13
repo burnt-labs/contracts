@@ -1,0 +1,32 @@
+[package]
+name = "zkemail"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+# enable feature if you want to disable entry points
+library = []
+
+
+[dependencies]
+cosmwasm-schema    = { workspace = true }
+serde              = { workspace = true }
+serde_json = { workspace = true }
+cw-storage-plus    = { workspace = true }
+cosmwasm-std       = { workspace = true }
+cw2                = { workspace = true }
+thiserror          = { workspace = true }
+base64             = { workspace = true }
+cosmos-sdk-proto   = { workspace = true }
+getrandom          = { workspace = true }
+
+ark-crypto-primitives = { version = "=0.4.0" }
+ark-ec = { version = "=0.4.2", default-features = false  }
+ark-ff = { version = "=0.4.2", default-features = false, features = [ "asm"] }
+ark-std = { version = "=0.4.0", default-features = false }
+ark-bn254 = { version = "=0.4.0" }
+ark-groth16 = { version = "=0.4.0", default-features = false }
+ark-relations = { version = "=0.4.0", default-features = false }
+ark-serialize = { version = "=0.4.2", default-features = false }
+ark-poly = { version = "=0.4.2", default-features = false }
+poseidon-ark = {git = "https://github.com/arnaucube/poseidon-ark"}
