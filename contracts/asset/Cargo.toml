@@ -1,0 +1,21 @@
+[package]
+name = "asset"
+version = "0.1.0"
+edition = "2024"
+description = "Primary Asset Contract implementation for XION network"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+cosmwasm-schema = { workspace = true }
+cosmwasm-std    = { workspace = true }
+cw2             = { workspace = true }
+cw721           = { workspace = true }
+schemars        = { workspace = true }
+serde           = { workspace = true }
+thiserror       = { workspace = true }
+
+[features]
+"library" = []
