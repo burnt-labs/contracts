@@ -22,4 +22,16 @@ pub enum ContractError {
     
 }
 
+impl From<ContractError> for cw721::error::Cw721ContractError {
+    fn from(value: ContractError) -> Self {
+        cw721::error::Cw721ContractError::Std(cosmwasm_std::StdError::generic_err(value.to_string()))
+    }
+}
+
+impl From<cw721::error::Cw721ContractError> for ContractError {
+    fn from(value: cw721::error::Cw721ContractError) -> Self {
+        ContractError::Std(cosmwasm_std::StdError::generic_err(value.to_string()))
+    }
+}
+
 pub type ContractResult<T> = Result<T, ContractError>;
