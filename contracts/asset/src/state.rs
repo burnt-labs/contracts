@@ -1,7 +1,9 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{from_json, to_json_binary, Addr, Binary};
-use cw721::{state::NftInfo, traits::{Cw721State, FromAttributesState, ToAttributesState}, NftExtension};
-use cw_storage_plus::{IndexList, IndexedMap, MultiIndex};
+use cosmwasm_std::{Addr, Binary, from_json, to_json_binary};
+use cw_storage_plus::{IndexList, IndexedMap, Map, MultiIndex};
+use cw721::{
+    state::NftInfo, traits::{Cw721State, FromAttributesState, ToAttributesState}, Expiration, NftExtension
+};
 
 #[cw_serde]
 pub struct XionAssetCollectionMetadata {
@@ -15,7 +17,9 @@ pub struct XionAssetCollectionMetadata {
 }
 
 impl FromAttributesState for XionAssetCollectionMetadata {
-    fn from_attributes_state(attrs: &[cw721::Attribute]) -> Result<Self, cw721::error::Cw721ContractError> {
+    fn from_attributes_state(
+        attrs: &[cw721::Attribute],
+    ) -> Result<Self, cw721::error::Cw721ContractError> {
         let mut royalty_bps: Option<u16> = None;
         let mut royalty_recipient: Option<Addr> = None;
         let mut royalty_on_primary: Option<bool> = None;
@@ -30,7 +34,8 @@ impl FromAttributesState for XionAssetCollectionMetadata {
                     royalty_bps = Some(from_json(attr.value.clone())?);
                 }
                 "royalty_recipient" => {
-                    royalty_recipient = Some(Addr::unchecked(from_json::<String>(attr.value.clone())?));
+                    royalty_recipient =
+                        Some(Addr::unchecked(from_json::<String>(attr.value.clone())?));
                 }
                 "royalty_on_primary" => {
                     royalty_on_primary = Some(from_json(attr.value.clone())?);
@@ -64,7 +69,9 @@ impl FromAttributesState for XionAssetCollectionMetadata {
 }
 
 impl ToAttributesState for XionAssetCollectionMetadata {
-    fn to_attributes_state(&self) -> Result<Vec<cw721::Attribute>, cw721::error::Cw721ContractError> {
+    fn to_attributes_state(
+        &self,
+    ) -> Result<Vec<cw721::Attribute>, cw721::error::Cw721ContractError> {
         let mut attrs: Vec<cw721::Attribute> = vec![];
 
         if let Some(bps) = self.royalty_bps {
@@ -123,28 +130,66 @@ impl ToAttributesState for XionAssetCollectionMetadata {
 impl Cw721State for XionAssetCollectionMetadata {}
 
 #[cw_serde]
-pub struct ListingInfo {
+pub struct ListingInfo<TNftExtension> {
     pub id: String,
     pub price: u128,
     pub seller: Addr,
     pub is_frozen: bool,
+    pub nft_info: NftInfo<TNftExtension>,
 }
 
-pub const LISTINGS_TOKEN_INFO: IndexedMap<&str, NftInfo<NftExtension>, ListingIndexes> = IndexedMap::new("listings_token_info", ListingIndexes{
-    seller: MultiIndex::new(
-        |_key: &[u8], d: &NftInfo<NftExtension>| d.owner.clone(),
-        "tokens",
-        "listings_token_info__by_seller",
-    ),
-});
-
-pub struct ListingIndexes<'a> {
-    pub seller: MultiIndex<'a, Addr, NftInfo<NftExtension>, String>,
+pub struct AssetConfig<'a, TNftExtension> {
+    pub listings:
+        IndexedMap<&'a str, ListingInfo<TNftExtension>, ListingIndexes<'a, TNftExtension>>,
+        /// Stored as (granter, operator) giving operator full control over granter's account.
+    /// NOTE: granter is the owner, so operator has only control for NFTs owned by granter!
+    /// This is copied from cw721-base and would point to the same storage as the cw721-base contract
+    /// so that we can leverage the existing operator logic in cw721-base
+    /// See: https://github.com/CosmWasm/cw721/blob/main/contracts/cw721-base/src/state.rs
+    pub operators: Map<(&'a Addr, &'a Addr), Expiration>,
 }
 
-impl IndexList<NftInfo<NftExtension>> for ListingIndexes<'_> {
-    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn cw_storage_plus::Index<NftInfo<NftExtension>>> + '_> {
-        let v: Vec<&dyn cw_storage_plus::Index<NftInfo<NftExtension>>> = vec![&self.seller];
+impl<TNftExtension> Default for AssetConfig<'static, TNftExtension> 
+where
+    TNftExtension: Cw721State,
+{
+    fn default() -> Self {
+        Self::new("listings_token_info", "listings_token_info__by_seller", "operators")
+    }
+}
+
+impl<'a, TNftExtension> AssetConfig<'a, TNftExtension>
+where
+    TNftExtension: Cw721State,
+{
+    pub fn new(listing_info_key: &'static str, listing_info_seller_key: &'static str, operator_keys: &'static str) -> Self {
+        let indexes = ListingIndexes {
+            seller: MultiIndex::new(seller_index, listing_info_key, listing_info_seller_key),
+        };
+        Self {
+            listings: IndexedMap::new(listing_info_key, indexes),
+            operators: Map::new(operator_keys),
+        }
+    }
+}
+
+pub fn seller_index<TNftExtension>(_pk: &[u8], d: &ListingInfo<TNftExtension>) -> Addr {
+    d.seller.clone()
+}
+
+pub struct ListingIndexes<'a, TNftExtension> {
+    pub seller: MultiIndex<'a, Addr, ListingInfo<TNftExtension>, String>,
+}
+
+impl<'a, TNftExtension> IndexList<ListingInfo<TNftExtension>> for ListingIndexes<'a, TNftExtension>
+where
+    TNftExtension: Cw721State,
+{
+    fn get_indexes(
+        &'_ self,
+    ) -> Box<dyn Iterator<Item = &'_ dyn cw_storage_plus::Index<ListingInfo<TNftExtension>>> + '_>
+    {
+        let v: Vec<&dyn cw_storage_plus::Index<ListingInfo<TNftExtension>>> = vec![&self.seller];
         Box::new(v.into_iter())
     }
 }
