@@ -7,15 +7,14 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
-    #[error("Invalid input: {msg}")]
-    InvalidInput { msg: String },
+    #[error("Listing already exists: {id}")]
+    ListingAlreadyExists { id: String },
 
-    #[error("Not found: {msg}")]
-    NotFound { msg: String },
+    #[error("Listing not found: {id}")]
+    ListingNotFound { id: String },
 
-    // Specific errors
-    #[error("Extension error: {msg}")]
-    ExtensionError { msg: String },
+    #[error("Invalid listing price: {price}")]
+    InvalidListingPrice { price: u128 },
 
     #[error("Plugin error: {msg}")]
     PluginError { msg: String },
@@ -31,6 +30,18 @@ impl From<ContractError> for cw721::error::Cw721ContractError {
 impl From<cw721::error::Cw721ContractError> for ContractError {
     fn from(value: cw721::error::Cw721ContractError) -> Self {
         ContractError::Std(cosmwasm_std::StdError::generic_err(value.to_string()))
+    }
+}
+
+impl From<cosmwasm_std::StdError> for ContractError {
+    fn from(value: cosmwasm_std::StdError) -> Self {
+        ContractError::Std(value)
+    }
+}
+
+impl From<ContractError> for cosmwasm_std::StdError {
+    fn from(value: ContractError) -> Self {
+        cosmwasm_std::StdError::generic_err(value.to_string())
     }
 }
 

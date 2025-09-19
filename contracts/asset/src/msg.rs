@@ -1,10 +1,10 @@
 use std::fmt::Debug;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr};
-use cw721::{error::Cw721ContractError, traits::{Cw721CustomMsg, Cw721Execute, FromAttributesState, StateFactory, ToAttributesState}, DefaultOptionalNftExtension, DefaultOptionalNftExtensionMsg};
+use cw721::{error::Cw721ContractError, traits::{Cw721CustomMsg, FromAttributesState, StateFactory, ToAttributesState}};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{plugin::Plugin, state::XionAssetCollectionMetadata};
+use crate::state::XionAssetCollectionMetadata;
 
 pub trait Extensions: Serialize + DeserializeOwned + Clone + Debug + ToAttributesState + FromAttributesState {}
 /// Default collection extension metadata
