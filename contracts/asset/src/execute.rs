@@ -1,10 +1,9 @@
 use cosmwasm_std::{
-    Addr, BankMsg, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    BankMsg, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError
 };
 use cw721::{
-    Expiration,
     state::NftInfo,
-    traits::{Cw721CustomMsg, Cw721State},
+    traits::Cw721State, Expiration,
 };
 
 use crate::{
@@ -22,7 +21,7 @@ pub fn list<TNftExtension, TCustomResponseMsg>(
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
 where
     TNftExtension: Cw721State,
-    TCustomResponseMsg: Cw721CustomMsg,
+    TCustomResponseMsg: CustomMsg,
 {
     let asset_config = AssetConfig::<TNftExtension>::default();
     // make sure the caller is the owner of the token
@@ -69,7 +68,7 @@ pub fn delist<TNftExtension, TCustomResponseMsg>(
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
 where
     TNftExtension: Cw721State,
-    TCustomResponseMsg: Cw721CustomMsg,
+    TCustomResponseMsg: CustomMsg,
 {
     let asset_config = AssetConfig::<TNftExtension>::default();
 
@@ -104,7 +103,7 @@ pub fn reserve<TNftExtension, TCustomResponseMsg>(
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
 where
     TNftExtension: Cw721State,
-    TCustomResponseMsg: Cw721CustomMsg,
+    TCustomResponseMsg: CustomMsg,
 {
     let asset_config = AssetConfig::<TNftExtension>::default();
 
@@ -144,7 +143,7 @@ pub fn buy<TNftExtension, TCustomResponseMsg>(
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
 where
     TNftExtension: Cw721State,
-    TCustomResponseMsg: Cw721CustomMsg,
+    TCustomResponseMsg: CustomMsg,
 {
     let asset_config = AssetConfig::<TNftExtension>::default();
 
