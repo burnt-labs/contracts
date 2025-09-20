@@ -1,7 +1,7 @@
 use crate::{
-    execute::list,
+    execute::{list, reserve},
     msg::{XionAssetCollectionMetadataMsg, XionAssetExtensionExecuteMsg},
-    state::{XionAssetCollectionMetadata},
+    state::XionAssetCollectionMetadata,
 };
 use cosmwasm_std::{DepsMut, Empty, Env, MessageInfo, Response};
 use cw721::{DefaultOptionalNftExtension, DefaultOptionalNftExtensionMsg, traits::Cw721Execute};
@@ -31,18 +31,24 @@ impl
         msg: XionAssetExtensionExecuteMsg,
     ) -> Result<Response<Empty>, cw721::error::Cw721ContractError> {
         match msg {
-            XionAssetExtensionExecuteMsg::List { id, price, reserve } => {
+            XionAssetExtensionExecuteMsg::List { id, price, reservation } => {
                 Ok(list::<DefaultOptionalNftExtension, Empty>(
                     deps,
                     env,
                     info,
                     id,
                     price,
-                    reserve,
+                    reservation,
                 )?)
             }
-            XionAssetExtensionExecuteMsg::Reserve { id, until } => {
-                todo!()
+            XionAssetExtensionExecuteMsg::Reserve { id, reservation } => {
+                Ok(reserve::<DefaultOptionalNftExtension, Empty>(
+                    deps,
+                    env,
+                    info,
+                    id,
+                    reservation,
+                )?)
             }
             XionAssetExtensionExecuteMsg::Delist { id } => todo!(),
             XionAssetExtensionExecuteMsg::Buy { id, recipient } => {

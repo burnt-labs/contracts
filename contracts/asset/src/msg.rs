@@ -70,8 +70,8 @@ pub type InstantiateMsg<CollectionExtension: Extensions> = cw721::msg::Cw721Inst
 
 #[cw_serde]
 pub enum XionAssetExtensionExecuteMsg{
-    List { id: String, price: Coin, reserve: Option<Reserve> },
-    Reserve { id: String, until: Expiration },
+    List { id: String, price: Coin, reservation: Option<Reserve> },
+    Reserve { id: String, reservation: Reserve },
     Delist { id: String },
     Buy { id: String, recipient: Option<String> },
 }
