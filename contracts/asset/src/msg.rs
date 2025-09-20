@@ -4,7 +4,7 @@ use cosmwasm_std::{Addr, Coin};
 use cw721::{error::Cw721ContractError, traits::{Cw721CustomMsg, FromAttributesState, StateFactory, ToAttributesState}, Expiration};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::state::XionAssetCollectionMetadata;
+use crate::state::{Reserve, XionAssetCollectionMetadata};
 
 pub trait Extensions: Serialize + DeserializeOwned + Clone + Debug + ToAttributesState + FromAttributesState {}
 /// Default collection extension metadata
@@ -70,7 +70,7 @@ pub type InstantiateMsg<CollectionExtension: Extensions> = cw721::msg::Cw721Inst
 
 #[cw_serde]
 pub enum XionAssetExtensionExecuteMsg{
-    List { id: String, price: Coin },
+    List { id: String, price: Coin, reserve: Option<Reserve> },
     Reserve { id: String, until: Expiration },
     Delist { id: String },
     Buy { id: String, recipient: Option<String> },

@@ -31,13 +31,14 @@ impl
         msg: XionAssetExtensionExecuteMsg,
     ) -> Result<Response<Empty>, cw721::error::Cw721ContractError> {
         match msg {
-            XionAssetExtensionExecuteMsg::List { id, price } => {
+            XionAssetExtensionExecuteMsg::List { id, price, reserve } => {
                 Ok(list::<DefaultOptionalNftExtension, Empty>(
                     deps,
                     env,
                     info,
                     id,
                     price,
+                    reserve,
                 )?)
             }
             XionAssetExtensionExecuteMsg::Reserve { id, until } => {
