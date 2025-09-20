@@ -1,8 +1,8 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Binary, from_json, to_json_binary};
+use cosmwasm_std::{from_json, to_json_binary, Addr, Binary, Coin};
 use cw_storage_plus::{IndexList, IndexedMap, Map, MultiIndex};
 use cw721::{
-    state::NftInfo, traits::{Cw721State, FromAttributesState, ToAttributesState}, Expiration, NftExtension
+    state::{Cw721Config, NftInfo}, traits::{Cw721State, FromAttributesState, ToAttributesState}, Expiration, NftExtension
 };
 
 #[cw_serde]
@@ -132,21 +132,19 @@ impl Cw721State for XionAssetCollectionMetadata {}
 #[cw_serde]
 pub struct ListingInfo<TNftExtension> {
     pub id: String,
-    pub price: u128,
+    pub price: Coin,
     pub seller: Addr,
     pub is_frozen: bool,
     pub nft_info: NftInfo<TNftExtension>,
 }
 
-pub struct AssetConfig<'a, TNftExtension> {
+pub struct AssetConfig<'a, TNftExtension>
+where
+    TNftExtension: Cw721State,{
     pub listings:
         IndexedMap<&'a str, ListingInfo<TNftExtension>, ListingIndexes<'a, TNftExtension>>,
-        /// Stored as (granter, operator) giving operator full control over granter's account.
-    /// NOTE: granter is the owner, so operator has only control for NFTs owned by granter!
-    /// This is copied from cw721-base and would point to the same storage as the cw721-base contract
-    /// so that we can leverage the existing operator logic in cw721-base
-    /// See: https://github.com/CosmWasm/cw721/blob/main/contracts/cw721-base/src/state.rs
-    pub operators: Map<(&'a Addr, &'a Addr), Expiration>,
+        /// We create a reference to the cw721 states
+        pub cw721_config: Cw721Config<'a, TNftExtension>,
 }
 
 impl<TNftExtension> Default for AssetConfig<'static, TNftExtension> 
@@ -168,7 +166,7 @@ where
         };
         Self {
             listings: IndexedMap::new(listing_info_key, indexes),
-            operators: Map::new(operator_keys),
+            cw721_config: Cw721Config::default(),
         }
     }
 }

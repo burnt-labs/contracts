@@ -3,9 +3,7 @@
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use cw721::traits::Cw721Execute;
 
-use crate::{error::ContractResult, msg::{InstantiateMsg, XionAssetCollectionMetadataMsg}, CONTRACT_NAME, CONTRACT_VERSION};
-
-pub struct AssetContract {}
+use crate::{error::ContractResult, msg::{InstantiateMsg, XionAssetCollectionMetadataMsg}, traits::AssetContract, CONTRACT_NAME, CONTRACT_VERSION};
 
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn instantiate(

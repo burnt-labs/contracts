@@ -33,12 +33,6 @@ impl From<cw721::error::Cw721ContractError> for ContractError {
     }
 }
 
-impl From<cosmwasm_std::StdError> for ContractError {
-    fn from(value: cosmwasm_std::StdError) -> Self {
-        ContractError::Std(value)
-    }
-}
-
 impl From<ContractError> for cosmwasm_std::StdError {
     fn from(value: ContractError) -> Self {
         cosmwasm_std::StdError::generic_err(value.to_string())
