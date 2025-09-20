@@ -56,7 +56,10 @@ where
         .add_attribute("price", price.amount.to_string())
         .add_attribute("denom", price.denom.to_string())
         .add_attribute("seller", info.sender.clone().to_string())
-        .add_attribute("reserved_until", reserved.map_or("none".to_string(), |r| r.reserved_until.to_string())))
+        .add_attribute(
+            "reserved_until",
+            reserved.map_or("none".to_string(), |r| r.reserved_until.to_string()),
+        ))
 }
 pub fn delist<TNftExtension, TCustomResponseMsg>(
     deps: DepsMut,
@@ -92,18 +95,49 @@ where
         .add_attribute("collection", env.contract.address.clone())
         .add_attribute("seller", listing.seller.to_string()))
 }
-pub fn reserve<TCustomResponseMsg>(
+pub fn reserve<TNftExtension, TCustomResponseMsg>(
     deps: DepsMut,
     env: &Env,
     info: &MessageInfo,
     id: String,
-    until: Expiration,
-) -> Result<Response<TCustomResponseMsg>, ContractError> {
-    todo!()
+    reservation: Reserve,
+) -> Result<Response<TCustomResponseMsg>, ContractError>
+where
+    TNftExtension: Cw721State,
+    TCustomResponseMsg: Cw721CustomMsg,
+{
+    let asset_config = AssetConfig::<TNftExtension>::default();
+
+    let mut listing = asset_config
+        .listings
+        .may_load(deps.storage, &id)?
+        .ok_or_else(|| ContractError::ListingNotFound { id: id.clone() })?;
+
+    // only the ones who can list can reserve
+    check_can_list(deps.as_ref(), &env, info.sender.as_ref(), &listing.nft_info)?;
+
+    if let Some(reserved) = &listing.reserved {
+        if !reserved.reserved_until.is_expired(&env.block) {
+            return Err(ContractError::ReservedAsset { id: id.clone() });
+        }
+    }
+
+    listing.reserved = Some(Reserve {
+        reserver: reservation.reserver.clone(),
+        reserved_until: reservation.reserved_until,
+    });
+    asset_config.listings.save(deps.storage, &id, &listing)?;
+
+    Ok(Response::default()
+        .add_attribute("action", "reserve")
+        .add_attribute("id", id)
+        .add_attribute("collection", env.contract.address.clone())
+        .add_attribute("reserver", reservation.reserver.to_string())
+        .add_attribute("reserved_until", reservation.reserved_until.to_string()))
 }
 pub fn buy<TNftExtension, TCustomResponseMsg>(
     deps: DepsMut,
-    env: &Env,
+    _env: &Env,
     info: &MessageInfo,
     id: String,
     recipient: Option<String>,
@@ -244,7 +278,7 @@ fn test_list() {
             &message_info(&owner_addr, &[]),
             "token-1".to_string(),
             price.clone(),
-            None
+            None,
         )
         .unwrap();
 
@@ -281,7 +315,7 @@ fn test_list() {
             &message_info(&owner_addr, &[]),
             "token-1".to_string(),
             Coin::new(200 as u128, "uxion"),
-            None
+            None,
         )
         .unwrap_err();
         assert_eq!(
@@ -315,7 +349,7 @@ fn test_list() {
             &message_info(&intruder_addr, &[]),
             "token-2".to_string(),
             Coin::new(100 as u128, "uxion"),
-            None
+            None,
         )
         .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
@@ -349,7 +383,7 @@ fn test_list() {
             &message_info(&approver_addr, &[]),
             "token-3".to_string(),
             price.clone(),
-            None
+            None,
         )
         .unwrap();
 
@@ -416,7 +450,7 @@ fn test_list() {
             &message_info(&operator_addr, &[]),
             "token-4".to_string(),
             price.clone(),
-            None
+            None,
         )
         .unwrap();
 
@@ -485,7 +519,7 @@ fn test_list() {
             &message_info(&exp_approval_addr, &[]),
             "token-5".to_string(),
             Coin::new(100 as u128, "uxion"),
-            None
+            None,
         )
         .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
@@ -514,7 +548,7 @@ fn test_list() {
             &message_info(&owner_addr, &[]),
             "token-3".to_string(),
             Coin::new(0 as u128, "uxion"),
-            None
+            None,
         )
         .unwrap_err();
         assert_eq!(err, ContractError::InvalidListingPrice { price: 0 });
@@ -531,7 +565,7 @@ fn test_list() {
             &message_info(&owner_addr, &[]),
             "token-999".to_string(),
             Coin::new(100 as u128, "uxion"),
-            None
+            None,
         )
         .unwrap_err();
         match err {
@@ -1010,6 +1044,116 @@ fn test_delist() {
             err,
             ContractError::ReservedAsset {
                 id: "token-4".to_string()
+            }
+        );
+    }
+}
+
+#[test]
+fn test_reserve() {
+    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
+    use cosmwasm_std::{Empty};
+
+    // successful reserve stores state and emits attributes
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let owner_addr = deps.api.addr_make("owner");
+        let buyer_addr = deps.api.addr_make("buyer");
+        let nft_info = NftInfo {
+            owner: owner_addr.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        AssetConfig::<Empty>::default()
+            .cw721_config
+            .nft_info
+            .save(deps.as_mut().storage, "token-1", &nft_info)
+            .unwrap();
+
+        // cannot reserve unlisted item
+        let reservation = Reserve {
+            reserver: buyer_addr.clone(),
+            reserved_until: Expiration::AtHeight(env.block.height + 100),
+        };
+        let err = reserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&owner_addr, &[]),
+            "token-1".to_string(),
+            reservation.clone(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            ContractError::ListingNotFound { id: "token-1".to_string() }
+        );
+        // list item first
+        let price = cosmwasm_std::Coin::new(100 as u128, "uxion");
+        AssetConfig::<Empty>::default()
+            .listings
+            .save(
+                deps.as_mut().storage,
+                "token-1",
+                &ListingInfo {
+                    id: "token-1".to_string(),
+                    seller: owner_addr.clone(),
+                    price: price.clone(),
+                    reserved: None,
+                    nft_info: nft_info.clone(),
+                },
+            )
+            .unwrap();
+        let response = reserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&owner_addr, &[]),
+            "token-1".to_string(),
+            reservation.clone(),
+        )
+        .unwrap();
+
+        let attrs: Vec<(String, String)> = response
+            .attributes
+            .iter()
+            .map(|attr| (attr.key.clone(), attr.value.clone()))
+            .collect();
+        assert_eq!(
+            attrs,
+            vec![
+                ("action".to_string(), "reserve".to_string()),
+                ("id".to_string(), "token-1".to_string()),
+                ("collection".to_string(), env.contract.address.to_string()),
+                ("reserver".to_string(), buyer_addr.to_string()),
+                ("reserved_until".to_string(), reservation.reserved_until.to_string()),
+            ],
+        );
+
+        let stored = AssetConfig::<Empty>::default()
+            .listings
+            .load(deps.as_ref().storage, "token-1")
+            .unwrap();
+        assert_eq!(stored.seller, owner_addr);
+        assert_eq!(stored.nft_info.owner, stored.seller);
+        assert!(stored.reserved.is_some());
+        let reserved = stored.reserved.unwrap();
+        assert_eq!(reserved.reserver, buyer_addr);
+        assert_eq!(reserved.reserved_until, reservation.reserved_until);
+
+        // cannot reserve already reserved item
+        let err = reserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&owner_addr, &[]),
+            "token-1".to_string(),
+            reservation.clone(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            ContractError::ReservedAsset {
+                id: "token-1".to_string()
             }
         );
     }
