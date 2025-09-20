@@ -2,13 +2,14 @@ use cosmwasm_std::{
     Addr, BankMsg, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
 };
 use cw721::{
+    Expiration,
     state::NftInfo,
-    traits::{Cw721CustomMsg, Cw721State}, Expiration,
+    traits::{Cw721CustomMsg, Cw721State},
 };
 
 use crate::{
     error::ContractError,
-    state::{AssetConfig, ListingInfo},
+    state::{AssetConfig, ListingInfo, Reserve},
 };
 
 pub fn list<TNftExtension, TCustomResponseMsg>(
@@ -17,6 +18,7 @@ pub fn list<TNftExtension, TCustomResponseMsg>(
     info: &MessageInfo,
     id: String,
     price: Coin,
+    reserved: Option<Reserve>,
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
 where
     TNftExtension: Cw721State,
@@ -43,16 +45,18 @@ where
         id: id.clone(),
         seller: info.sender.clone(),
         price: price.clone(),
-        reserved_until: None,
+        reserved: reserved.clone(),
         nft_info,
     };
     asset_config.listings.save(deps.storage, &id, &listing)?;
     Ok(Response::default()
         .add_attribute("action", "list")
         .add_attribute("id", id)
+        .add_attribute("collection", env.contract.address.clone())
         .add_attribute("price", price.amount.to_string())
         .add_attribute("denom", price.denom.to_string())
-        .add_attribute("seller", info.sender.clone().to_string()))
+        .add_attribute("seller", info.sender.clone().to_string())
+        .add_attribute("reserved_until", reserved.map_or("none".to_string(), |r| r.reserved_until.to_string())))
 }
 pub fn delist<TNftExtension, TCustomResponseMsg>(
     deps: DepsMut,
@@ -71,30 +75,22 @@ where
         .may_load(deps.storage, &id)?
         .ok_or_else(|| ContractError::ListingNotFound { id: id.clone() })?;
 
-    if listing.seller != info.sender {
-        return Err(ContractError::Unauthorized {});
-    }
+    // only the ones who can list can delist
+    check_can_list(deps.as_ref(), &env, info.sender.as_ref(), &listing.nft_info)?;
 
-    let reserved_listing = asset_config
-        .reserved_listings
-        .may_load(deps.storage, &id)?;
-    if let Some(reserved_listing) = reserved_listing {
-        if let Some(until) = reserved_listing.reserved_until {
-            if !until.is_expired(&env.block) {
-                return Err(ContractError::ReservedAsset { id: id.clone() });
-            } // else the reservation has expired, we can delist
-            asset_config.reserved_listings.remove(deps.storage, &id)?;
+    if let Some(reserved) = listing.reserved {
+        if !reserved.reserved_until.is_expired(&env.block) {
+            return Err(ContractError::ReservedAsset { id: id.clone() });
         }
     }
 
     asset_config.listings.remove(deps.storage, &id)?;
 
-    let listing_id = listing.id;
-
     Ok(Response::default()
         .add_attribute("action", "delist")
-        .add_attribute("id", listing_id)
-        .add_attribute("seller", info.sender.to_string()))
+        .add_attribute("id", listing.id)
+        .add_attribute("collection", env.contract.address.clone())
+        .add_attribute("seller", listing.seller.to_string()))
 }
 pub fn reserve<TCustomResponseMsg>(
     deps: DepsMut,
@@ -143,16 +139,10 @@ where
         Some(addr) => deps.api.addr_validate(&addr)?,
         None => info.sender.clone(),
     };
-    let reserved_listing = asset_config
-        .reserved_listings
-        .may_load(deps.storage, &id)?;
-    if let Some(reserved_listing) = reserved_listing {
-        if let Some(until) = reserved_listing.reserved_until {
-            if !until.is_expired(&env.block) {
-                return Err(ContractError::ReservedAsset { id: id.clone() });
-            }
-            // else the reservation has expired, we can buy
-            asset_config.reserved_listings.remove(deps.storage, &id)?;
+
+    if let Some(reserved) = listing.reserved {
+        if reserved.reserver != info.sender && reserved.reserver != buyer {
+            return Err(ContractError::Unauthorized {});
         }
     }
 
@@ -166,15 +156,12 @@ where
         .save(deps.storage, &id, &nft_info)?;
 
     asset_config.listings.remove(deps.storage, &id)?;
-    let mut response = Response::default();
 
-    if !seller.eq(&env.contract.address) {
-        response = response.add_message(BankMsg::Send {
+    Ok(Response::default()
+        .add_message(BankMsg::Send {
             to_address: seller.to_string(),
             amount: vec![payment.clone()], // we send the entire payment to the seller
-        });
-    }
-    Ok(response
+        })
         .add_attribute("action", "buy")
         .add_attribute("id", id)
         .add_attribute("price", price.amount.to_string())
@@ -257,6 +244,7 @@ fn test_list() {
             &message_info(&owner_addr, &[]),
             "token-1".to_string(),
             price.clone(),
+            None
         )
         .unwrap();
 
@@ -270,9 +258,11 @@ fn test_list() {
             vec![
                 ("action".to_string(), "list".to_string()),
                 ("id".to_string(), "token-1".to_string()),
+                ("collection".to_string(), env.contract.address.to_string()),
                 ("price".to_string(), price.amount.to_string()),
                 ("denom".to_string(), "uxion".to_string()),
                 ("seller".to_string(), owner_addr.to_string()),
+                ("reserved_until".to_string(), "none".to_string()),
             ],
         );
 
@@ -282,7 +272,7 @@ fn test_list() {
             .unwrap();
         assert_eq!(stored.price, price);
         assert_eq!(stored.seller, owner_addr);
-        assert!(stored.reserved_until.is_none());
+        assert!(stored.reserved.is_none());
         assert_eq!(stored.nft_info.owner, stored.seller);
 
         let duplicate_err = list::<Empty, Empty>(
@@ -291,6 +281,7 @@ fn test_list() {
             &message_info(&owner_addr, &[]),
             "token-1".to_string(),
             Coin::new(200 as u128, "uxion"),
+            None
         )
         .unwrap_err();
         assert_eq!(
@@ -324,6 +315,7 @@ fn test_list() {
             &message_info(&intruder_addr, &[]),
             "token-2".to_string(),
             Coin::new(100 as u128, "uxion"),
+            None
         )
         .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
@@ -357,6 +349,7 @@ fn test_list() {
             &message_info(&approver_addr, &[]),
             "token-3".to_string(),
             price.clone(),
+            None
         )
         .unwrap();
 
@@ -370,9 +363,11 @@ fn test_list() {
             vec![
                 ("action".to_string(), "list".to_string()),
                 ("id".to_string(), "token-3".to_string()),
+                ("collection".to_string(), env.contract.address.to_string()),
                 ("price".to_string(), price.amount.to_string()),
                 ("denom".to_string(), "uxion".to_string()),
                 ("seller".to_string(), approver_addr.to_string()),
+                ("reserved_until".to_string(), "none".to_string()),
             ],
         );
 
@@ -382,7 +377,7 @@ fn test_list() {
             .unwrap();
         assert_eq!(stored.price, price);
         assert_eq!(stored.seller, approver_addr);
-        assert!(stored.reserved_until.is_none());
+        assert!(stored.reserved.is_none());
         assert_eq!(stored.nft_info.owner, owner_addr);
     }
 
@@ -421,6 +416,7 @@ fn test_list() {
             &message_info(&operator_addr, &[]),
             "token-4".to_string(),
             price.clone(),
+            None
         )
         .unwrap();
 
@@ -434,9 +430,11 @@ fn test_list() {
             vec![
                 ("action".to_string(), "list".to_string()),
                 ("id".to_string(), "token-4".to_string()),
+                ("collection".to_string(), env.contract.address.to_string()),
                 ("price".to_string(), price.amount.to_string()),
                 ("denom".to_string(), "uxion".to_string()),
                 ("seller".to_string(), operator_addr.to_string()),
+                ("reserved_until".to_string(), "none".to_string()),
             ],
         );
 
@@ -446,7 +444,7 @@ fn test_list() {
             .unwrap();
         assert_eq!(stored.price, price);
         assert_eq!(stored.seller, operator_addr);
-        assert!(stored.reserved_until.is_none());
+        assert!(stored.reserved.is_none());
         assert_eq!(stored.nft_info.owner, owner_addr);
     }
 
@@ -487,6 +485,7 @@ fn test_list() {
             &message_info(&exp_approval_addr, &[]),
             "token-5".to_string(),
             Coin::new(100 as u128, "uxion"),
+            None
         )
         .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
@@ -515,9 +514,30 @@ fn test_list() {
             &message_info(&owner_addr, &[]),
             "token-3".to_string(),
             Coin::new(0 as u128, "uxion"),
+            None
         )
         .unwrap_err();
         assert_eq!(err, ContractError::InvalidListingPrice { price: 0 });
+    }
+    // non-existent item cannot be listed
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let owner_addr = deps.api.addr_make("owner");
+
+        let err = list::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&owner_addr, &[]),
+            "token-999".to_string(),
+            Coin::new(100 as u128, "uxion"),
+            None
+        )
+        .unwrap_err();
+        match err {
+            ContractError::Std(StdError::NotFound { .. }) => {}
+            _ => panic!("expected NotFound error"),
+        }
     }
 }
 
@@ -553,7 +573,7 @@ fn test_buy() {
                     id: "token-1".to_string(),
                     seller: seller_addr.clone(),
                     price: price.clone(),
-                    reserved_until: None,
+                    reserved: None,
                     nft_info: nft_info.clone(),
                 },
             )
@@ -639,7 +659,7 @@ fn test_buy() {
                     id: "token-2".to_string(),
                     seller: seller_addr.clone(),
                     price: price.clone(),
-                    reserved_until: None,
+                    reserved: None,
                     nft_info: nft_info.clone(),
                 },
             )
@@ -681,7 +701,7 @@ fn test_buy() {
             }
         );
     }
-    // reserved assets cannot be bought
+    // reserved assets can only be bought by reserver
     {
         let mut deps = mock_dependencies();
         let env = mock_env();
@@ -708,7 +728,27 @@ fn test_buy() {
                     id: "token-4".to_string(),
                     seller: seller_addr.clone(),
                     price: price.clone(),
-                    reserved_until: Some(Expiration::AtHeight(env.block.height + 100)),
+                    reserved: Some(Reserve {
+                        reserver: buyer_addr.clone(),
+                        reserved_until: Expiration::AtHeight(env.block.height + 100),
+                    }),
+                    nft_info: nft_info.clone(),
+                },
+            )
+            .unwrap();
+        AssetConfig::<Empty>::default()
+            .listings
+            .save(
+                deps.as_mut().storage,
+                "token-4",
+                &ListingInfo {
+                    id: "token-4".to_string(),
+                    seller: seller_addr.clone(),
+                    price: price.clone(),
+                    reserved: Some(Reserve {
+                        reserver: buyer_addr.clone(),
+                        reserved_until: Expiration::AtHeight(env.block.height + 100),
+                    }),
                     nft_info: nft_info.clone(),
                 },
             )
@@ -717,12 +757,81 @@ fn test_buy() {
         let err = buy::<Empty, Empty>(
             deps.as_mut(),
             &env,
-            &message_info(&buyer_addr, &[price.clone()]),
+            &message_info(&seller_addr, &[price.clone()]),
             "token-4".to_string(),
             None,
         )
         .unwrap_err();
-        assert_eq!(err, ContractError::ReservedAsset { id: "token-4".to_string() });
+        assert_eq!(err, ContractError::Unauthorized {});
+
+        // successful buy by reserver
+        let response = buy::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&buyer_addr, &[price.clone()]),
+            "token-4".to_string(),
+            None,
+        )
+        .unwrap();
+        let attrs: Vec<(String, String)> = response
+            .attributes
+            .iter()
+            .map(|attr| (attr.key.clone(), attr.value.clone()))
+            .collect();
+        assert_eq!(
+            attrs,
+            vec![
+                ("action".to_string(), "buy".to_string()),
+                ("id".to_string(), "token-4".to_string()),
+                ("price".to_string(), price.amount.to_string()),
+                ("denom".to_string(), price.denom.to_string()),
+                ("seller".to_string(), seller_addr.to_string()),
+                ("buyer".to_string(), buyer_addr.to_string()),
+            ],
+        );
+        // successful buy on behalf of reserver
+        AssetConfig::<Empty>::default()
+            .listings
+            .save(
+                deps.as_mut().storage,
+                "token-4",
+                &ListingInfo {
+                    id: "token-4".to_string(),
+                    seller: seller_addr.clone(),
+                    price: price.clone(),
+                    reserved: Some(Reserve {
+                        reserver: buyer_addr.clone(),
+                        reserved_until: Expiration::AtHeight(env.block.height + 100),
+                    }),
+                    nft_info: nft_info.clone(),
+                },
+            )
+            .unwrap();
+        let mut deps = deps;
+        let response = buy::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&seller_addr, &[price.clone()]),
+            "token-4".to_string(),
+            Some(buyer_addr.to_string()), // buyer is the reserver
+        )
+        .unwrap();
+        let attrs: Vec<(String, String)> = response
+            .attributes
+            .iter()
+            .map(|attr| (attr.key.clone(), attr.value.clone()))
+            .collect();
+        assert_eq!(
+            attrs,
+            vec![
+                ("action".to_string(), "buy".to_string()),
+                ("id".to_string(), "token-4".to_string()),
+                ("price".to_string(), price.amount.to_string()),
+                ("denom".to_string(), price.denom.to_string()),
+                ("seller".to_string(), seller_addr.to_string()),
+                ("buyer".to_string(), buyer_addr.to_string()),
+            ],
+        );
     }
 }
 
@@ -757,7 +866,7 @@ fn test_delist() {
                     id: "token-1".to_string(),
                     seller: seller_addr.clone(),
                     price: price.clone(),
-                    reserved_until: None,
+                    reserved: None,
                     nft_info: nft_info.clone(),
                 },
             )
@@ -781,6 +890,7 @@ fn test_delist() {
             vec![
                 ("action".to_string(), "delist".to_string()),
                 ("id".to_string(), "token-1".to_string()),
+                ("collection".to_string(), env.contract.address.to_string()),
                 ("seller".to_string(), seller_addr.to_string()),
             ],
         );
@@ -794,7 +904,7 @@ fn test_delist() {
         );
     }
 
-    // non-seller cannot delist
+    // non-admin cannot delist
     {
         let mut deps = mock_dependencies();
         let env = mock_env();
@@ -821,7 +931,7 @@ fn test_delist() {
                     id: "token-2".to_string(),
                     seller: seller_addr.clone(),
                     price: price.clone(),
-                    reserved_until: None,
+                    reserved: None,
                     nft_info: nft_info.clone(),
                 },
             )
@@ -880,7 +990,10 @@ fn test_delist() {
                     id: "token-4".to_string(),
                     seller: seller_addr.clone(),
                     price: price.clone(),
-                    reserved_until: Some(Expiration::AtHeight(env.block.height + 100)),
+                    reserved: Some(Reserve {
+                        reserved_until: Expiration::AtHeight(env.block.height + 100),
+                        reserver: seller_addr.clone(),
+                    }),
                     nft_info: nft_info.clone(),
                 },
             )
@@ -893,6 +1006,11 @@ fn test_delist() {
             "token-4".to_string(),
         )
         .unwrap_err();
-        assert_eq!(err, ContractError::ReservedAsset { id: "token-4".to_string() });
+        assert_eq!(
+            err,
+            ContractError::ReservedAsset {
+                id: "token-4".to_string()
+            }
+        );
     }
 }
