@@ -69,7 +69,7 @@ impl Cw721CustomMsg for XionAssetCollectionMetadataMsg {}
 pub type InstantiateMsg<CollectionExtension: Extensions> = cw721::msg::Cw721InstantiateMsg<CollectionExtension>;
 
 #[cw_serde]
-pub enum XionAssetExtensionExecuteMsg{
+pub enum AssetExtensionExecuteMsg{
     List { id: String, price: Coin, reservation: Option<Reserve> },
     Reserve { id: String, reservation: Reserve },
     Delist { id: String },
