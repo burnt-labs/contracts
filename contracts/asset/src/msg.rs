@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr};
+use cosmwasm_std::{Addr, Coin};
 use cw721::{error::Cw721ContractError, traits::{Cw721CustomMsg, FromAttributesState, StateFactory, ToAttributesState}};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -70,7 +70,7 @@ pub type InstantiateMsg<CollectionExtension: Extensions> = cw721::msg::Cw721Inst
 
 #[cw_serde]
 pub enum XionAssetExtensionExecuteMsg{
-    List { id: String, price: u128 },
+    List { id: String, price: Coin },
     FreezeListing { id: String },
     Delist { id: String },
     Buy { id: String, recipient: Option<String> },
