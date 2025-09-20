@@ -134,7 +134,7 @@ pub struct ListingInfo<TNftExtension> {
     pub id: String,
     pub price: Coin,
     pub seller: Addr,
-    pub is_frozen: bool,
+    pub reserved_until: Option<Expiration>,
     pub nft_info: NftInfo<TNftExtension>,
 }
 
@@ -143,6 +143,7 @@ where
     TNftExtension: Cw721State,{
     pub listings:
         IndexedMap<&'a str, ListingInfo<TNftExtension>, ListingIndexes<'a, TNftExtension>>,
+        pub reserved_listings: IndexedMap<&'a str, ListingInfo<TNftExtension>, ListingIndexes<'a, TNftExtension>>,
         /// We create a reference to the cw721 states
         pub cw721_config: Cw721Config<'a, TNftExtension>,
 }
@@ -152,7 +153,7 @@ where
     TNftExtension: Cw721State,
 {
     fn default() -> Self {
-        Self::new("listings_token_info", "listings_token_info__by_seller", "operators")
+        Self::new("listings_token_info", "listings_token_info__by_seller", "frozen_listings_token_info", "frozen_listings_token_info__by_seller", "operators")
     }
 }
 
@@ -160,12 +161,16 @@ impl<'a, TNftExtension> AssetConfig<'a, TNftExtension>
 where
     TNftExtension: Cw721State,
 {
-    pub fn new(listing_info_key: &'static str, listing_info_seller_key: &'static str, operator_keys: &'static str) -> Self {
-        let indexes = ListingIndexes {
+    pub fn new(listing_info_key: &'static str, listing_info_seller_key: &'static str, reserved_listing_info_key: &'static str, reserved_listing_seller_key: &'static str, operator_keys: &'static str) -> Self {
+        let listing_indexes = ListingIndexes {
             seller: MultiIndex::new(seller_index, listing_info_key, listing_info_seller_key),
         };
+        let reserved_listing_indexes = ListingIndexes {
+            seller: MultiIndex::new(seller_index, reserved_listing_info_key, reserved_listing_seller_key),
+        };
         Self {
-            listings: IndexedMap::new(listing_info_key, indexes),
+            listings: IndexedMap::new(listing_info_key, listing_indexes),
+            reserved_listings: IndexedMap::new(reserved_listing_info_key, reserved_listing_indexes),
             cw721_config: Cw721Config::default(),
         }
     }
