@@ -13,17 +13,27 @@ pub enum ContractError {
     #[error("Listing not found: {id}")]
     ListingNotFound { id: String },
 
+    #[error("Reserved asset: {id}")]
+    ReservedAsset { id: String }, // e.g. listing is reserved
+
     #[error("Invalid listing price: {price}")]
     InvalidListingPrice { price: u128 },
 
+    #[error("Invalid payment: {price} {denom}")]
+    InvalidPayment { price: u128, denom: String },
+
+    #[error("No payment")]
+    NoPayment {},
+
     #[error("Plugin error: {msg}")]
     PluginError { msg: String },
-    
 }
 
 impl From<ContractError> for cw721::error::Cw721ContractError {
     fn from(value: ContractError) -> Self {
-        cw721::error::Cw721ContractError::Std(cosmwasm_std::StdError::generic_err(value.to_string()))
+        cw721::error::Cw721ContractError::Std(cosmwasm_std::StdError::generic_err(
+            value.to_string(),
+        ))
     }
 }
 

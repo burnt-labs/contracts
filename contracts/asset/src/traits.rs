@@ -40,7 +40,7 @@ impl
                     price,
                 )?)
             }
-            XionAssetExtensionExecuteMsg::FreezeListing { id } => {
+            XionAssetExtensionExecuteMsg::Reserve { id, until } => {
                 todo!()
             }
             XionAssetExtensionExecuteMsg::Delist { id } => todo!(),
