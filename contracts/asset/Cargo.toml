@@ -1,9 +1,9 @@
 [package]
-name = "asset"
-version = "0.1.0"
-edition = "2024"
 description = "Primary Asset Contract implementation for XION network"
-license = "Apache-2.0"
+edition     = "2024"
+license     = "Apache-2.0"
+name        = "asset"
+version     = "0.1.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
