@@ -1145,18 +1145,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
 
 [[package]]
-name = "marketplace"
-version = "0.1.0"
-dependencies = [
- "cosmwasm-schema 2.2.2",
- "cosmwasm-std 2.2.2",
- "cw-storage-plus 2.0.0",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "memchr"
 version = "2.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
