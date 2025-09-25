@@ -1,12 +1,18 @@
-use std::fmt::Debug;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin};
-use cw721::{error::Cw721ContractError, traits::{Cw721CustomMsg, FromAttributesState, StateFactory, ToAttributesState}, Expiration};
-use serde::{de::DeserializeOwned, Serialize};
+use cw721::{
+    error::Cw721ContractError,
+    traits::{Cw721CustomMsg, FromAttributesState, StateFactory, ToAttributesState},
+};
+use serde::{Serialize, de::DeserializeOwned};
+use std::fmt::Debug;
 
 use crate::state::{Reserve, XionAssetCollectionMetadata};
 
-pub trait Extensions: Serialize + DeserializeOwned + Clone + Debug + ToAttributesState + FromAttributesState {}
+pub trait Extensions:
+    Serialize + DeserializeOwned + Clone + Debug + ToAttributesState + FromAttributesState
+{
+}
 /// Default collection extension metadata
 #[cw_serde]
 pub struct XionAssetCollectionMetadataMsg {
@@ -26,12 +32,16 @@ pub struct XionAssetCollectionMetadataMsg {
     pub plugins: Vec<String>,
 }
 
-impl FromAttributesState for XionAssetCollectionMetadataMsg{
-    fn from_attributes_state(_: &[cw721::Attribute]) -> Result<Self, Cw721ContractError> { todo!() }
+impl FromAttributesState for XionAssetCollectionMetadataMsg {
+    fn from_attributes_state(_: &[cw721::Attribute]) -> Result<Self, Cw721ContractError> {
+        todo!()
+    }
 }
 
 impl ToAttributesState for XionAssetCollectionMetadataMsg {
-    fn to_attributes_state(&self) -> Result<std::vec::Vec<cw721::Attribute>, Cw721ContractError> { todo!() }
+    fn to_attributes_state(&self) -> Result<std::vec::Vec<cw721::Attribute>, Cw721ContractError> {
+        todo!()
+    }
 }
 
 impl StateFactory<XionAssetCollectionMetadata> for XionAssetCollectionMetadataMsg {
@@ -66,14 +76,28 @@ impl StateFactory<XionAssetCollectionMetadata> for XionAssetCollectionMetadataMs
 
 impl Cw721CustomMsg for XionAssetCollectionMetadataMsg {}
 
-pub type InstantiateMsg<CollectionExtension: Extensions> = cw721::msg::Cw721InstantiateMsg<CollectionExtension>;
+pub type InstantiateMsg<CollectionExtension: Extensions> =
+    cw721::msg::Cw721InstantiateMsg<CollectionExtension>;
 
 #[cw_serde]
-pub enum AssetExtensionExecuteMsg{
-    List { id: String, price: Coin, reservation: Option<Reserve> },
-    Reserve { id: String, reservation: Reserve },
-    Delist { id: String },
-    Buy { id: String, recipient: Option<String> },
+pub enum AssetExtensionExecuteMsg {
+    List {
+        token_id: String,
+        price: Coin,
+        reservation: Option<Reserve>,
+    },
+    Reserve {
+        token_id: String,
+        reservation: Reserve,
+    },
+    Delist {
+        token_id: String,
+    },
+    Buy {
+        token_id: String,
+        recipient: Option<String>,
+    },
 }
 
-pub type ExecuteMsg<TNftExtensionMsg, TCollectionExtensionMsg, TExtentionMsg> = cw721::msg::Cw721ExecuteMsg<TNftExtensionMsg, TCollectionExtensionMsg, TExtentionMsg>;
+pub type ExecuteMsg<TNftExtensionMsg, TCollectionExtensionMsg, TExtentionMsg> =
+    cw721::msg::Cw721ExecuteMsg<TNftExtensionMsg, TCollectionExtensionMsg, TExtentionMsg>;

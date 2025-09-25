@@ -1,10 +1,7 @@
 use cosmwasm_std::{
-    BankMsg, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError
+    BankMsg, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
 };
-use cw721::{
-    state::NftInfo,
-    traits::Cw721State, Expiration,
-};
+use cw721::{Expiration, state::NftInfo, traits::Cw721State};
 
 use crate::{
     error::ContractError,
@@ -17,7 +14,7 @@ pub fn list<TNftExtension, TCustomResponseMsg>(
     info: &MessageInfo,
     id: String,
     price: Coin,
-    reserved: Option<Reserve>,
+    reservation: Option<Reserve>,
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
 where
     TNftExtension: Cw721State,
@@ -44,7 +41,7 @@ where
         id: id.clone(),
         seller: info.sender.clone(),
         price: price.clone(),
-        reserved: reserved.clone(),
+        reserved: reservation.clone(),
         nft_info,
     };
     asset_config.listings.save(deps.storage, &id, &listing)?;
@@ -57,7 +54,7 @@ where
         .add_attribute("seller", info.sender.clone().to_string())
         .add_attribute(
             "reserved_until",
-            reserved.map_or("none".to_string(), |r| r.reserved_until.to_string()),
+            reservation.map_or("none".to_string(), |r| r.reserved_until.to_string()),
         ))
 }
 pub fn delist<TNftExtension, TCustomResponseMsg>(
@@ -1050,8 +1047,8 @@ fn test_delist() {
 
 #[test]
 fn test_reserve() {
+    use cosmwasm_std::Empty;
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
-    use cosmwasm_std::{Empty};
 
     // successful reserve stores state and emits attributes
     {
@@ -1086,7 +1083,9 @@ fn test_reserve() {
         .unwrap_err();
         assert_eq!(
             err,
-            ContractError::ListingNotFound { id: "token-1".to_string() }
+            ContractError::ListingNotFound {
+                id: "token-1".to_string()
+            }
         );
         // list item first
         let price = cosmwasm_std::Coin::new(100 as u128, "uxion");
@@ -1125,7 +1124,10 @@ fn test_reserve() {
                 ("id".to_string(), "token-1".to_string()),
                 ("collection".to_string(), env.contract.address.to_string()),
                 ("reserver".to_string(), buyer_addr.to_string()),
-                ("reserved_until".to_string(), reservation.reserved_until.to_string()),
+                (
+                    "reserved_until".to_string(),
+                    reservation.reserved_until.to_string()
+                ),
             ],
         );
 

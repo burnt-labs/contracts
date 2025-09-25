@@ -3,7 +3,12 @@
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use cw721::traits::Cw721Execute;
 
-use crate::{error::ContractResult, msg::{InstantiateMsg, XionAssetCollectionMetadataMsg}, traits::AssetContract, CONTRACT_NAME, CONTRACT_VERSION};
+use crate::{
+    CONTRACT_NAME, CONTRACT_VERSION,
+    error::ContractResult,
+    msg::{InstantiateMsg, XionAssetCollectionMetadataMsg},
+    traits::AssetContract,
+};
 
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn instantiate(
@@ -13,5 +18,12 @@ pub fn instantiate(
     msg: InstantiateMsg<XionAssetCollectionMetadataMsg>,
 ) -> ContractResult<Response> {
     let contract = AssetContract::default();
-    Ok(contract.instantiate_with_version(deps, &env, &info, msg, CONTRACT_NAME, CONTRACT_VERSION)?)
+    Ok(contract.instantiate_with_version(
+        deps,
+        &env,
+        &info,
+        msg,
+        CONTRACT_NAME,
+        CONTRACT_VERSION,
+    )?)
 }
