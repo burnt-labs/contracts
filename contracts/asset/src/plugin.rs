@@ -31,10 +31,32 @@ where
     pub env: Env,
     pub info: MessageInfo,
 
+    // royalty info
+    pub royalty: RoyaltyInfo,
+
     /// The response being built up by the plugins.
     pub response: Response<TCustomResponseMsg>,
 
     pub data: Context,
+}
+
+pub struct RoyaltyInfo {
+    pub collection_royalty_bps: Option<u16>,
+    pub collection_royalty_recipient: Option<Addr>,
+    pub collection_royalty_on_primary: Option<bool>,
+
+    pub primary_complete: bool,
+}
+
+impl Default for RoyaltyInfo {
+    fn default() -> Self {
+        RoyaltyInfo {
+            collection_royalty_bps: None,
+            collection_royalty_recipient: None,
+            collection_royalty_on_primary: None,
+            primary_complete: false,
+        }
+    }
 }
 
 pub struct DefaultXionAssetContext {
@@ -49,16 +71,6 @@ pub struct DefaultXionAssetContext {
     pub not_after: Expiration,  // timestamp after which an asset cannot be listed
     pub reservation: Option<Reserve>,
     pub time_lock: Option<Duration>,
-
-    pub collection_royalty_bps: Option<u16>,
-    pub collection_royalty_recipient: Option<Addr>,
-    pub collection_royalty_on_primary: Option<bool>,
-
-    pub nft_royalty_bps: Option<u16>,
-    pub nft_royalty_recipient: Option<Addr>,
-    pub nft_royalty_on_primary: Option<bool>,
-
-    pub primary_complete: bool,
 
     pub allowed_marketplaces: Option<Vec<Addr>>,
     pub allowed_currencies: Option<Vec<Coin>>,
@@ -75,13 +87,6 @@ impl Default for DefaultXionAssetContext {
             not_before: Expiration::Never {},
             not_after: Expiration::Never {},
             reservation: None,
-            collection_royalty_bps: None,
-            collection_royalty_recipient: None,
-            collection_royalty_on_primary: None,
-            nft_royalty_bps: None,
-            nft_royalty_recipient: None,
-            nft_royalty_on_primary: None,
-            primary_complete: false,
             allowed_marketplaces: None,
             allowed_currencies: None,
             time_lock: None,
@@ -155,9 +160,9 @@ impl Plugin {
                 recipient,
                 on_primary,
             } => {
-                ctx.data.collection_royalty_bps = Some(*bps);
-                ctx.data.collection_royalty_recipient = Some((*recipient).clone());
-                ctx.data.collection_royalty_on_primary = Some(*on_primary);
+                ctx.royalty.collection_royalty_bps = Some(*bps);
+                ctx.royalty.collection_royalty_recipient = Some((*recipient).clone());
+                ctx.royalty.collection_royalty_on_primary = Some(*on_primary);
                 default_plugins::royalty_plugin(ctx)?;
             }
             Plugin::AllowedMarketplaces { marketplaces } => {
@@ -172,6 +177,23 @@ impl Plugin {
                 ctx.data.time_lock = Some(*time);
                 default_plugins::time_lock_plugin(ctx)?;
             }
+        }
+        Ok(true)
+    }
+
+    pub fn run_raw_transfer_plugin<T, U: CustomMsg>(&self, ctx: &mut PluginCtx<T, U>) -> StdResult<bool> {
+        match self {
+            Plugin::Royalty {
+                bps,
+                recipient,
+                on_primary,
+            } => {
+                ctx.royalty.collection_royalty_bps = Some(*bps);
+                ctx.royalty.collection_royalty_recipient = Some((*recipient).clone());
+                ctx.royalty.collection_royalty_on_primary = Some(*on_primary);
+                default_plugins::is_transfer_enabled_plugin(ctx)?;
+            }
+            _ => {}
         }
         Ok(true)
     }
@@ -263,8 +285,15 @@ pub trait PluggableAsset<
         &self,
         _recipient: &String,
         _token_id: &String,
-        _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
+        ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
+        // for transfers we run the royalty plugin if set
+        let royalty_plugin = AssetConfig::<TNftExtension>::default()
+            .collection_plugins
+            .may_load(ctx.deps.storage, "Royalty")?;
+        if let Some(plugin) = royalty_plugin {
+            plugin.run_raw_transfer_plugin(ctx)?;
+        }
         Ok(true)
     }
 
@@ -343,25 +372,6 @@ where
     TNftExtensionMsg: Cw721CustomMsg,
     TNftExtensionMsg: StateFactory<TNftExtension>,
 {
-    fn on_transfer_plugin(
-        &self,
-        recipient: &String,
-        token_id: &String,
-        ctx: &mut DefaultPluginCtx,
-    ) -> StdResult<bool> {
-        // for transfers we run the royalty plugin if set
-        let royalty_plugin = AssetConfig::<TNftExtension>::default()
-            .collection_plugins
-            .may_load(ctx.deps.storage, "Royalty")?;
-        ctx.data.token_id = token_id.to_string();
-        ctx.data.buyer = Some(ctx.deps.api.addr_validate(&recipient)?);
-        ctx.data.seller = Some(ctx.info.sender.clone());
-        if let Some(plugin) = royalty_plugin {
-            plugin.run_asset_plugin(ctx)?;
-        }
-        Ok(true)
-    }
-
     fn on_update_extension_plugin<'a>(
         &self,
         msg: &AssetExtensionExecuteMsg,
@@ -509,6 +519,7 @@ where
             env: env.clone(),
             info: info.clone(),
             response: Response::default(),
+            royalty: RoyaltyInfo::default(),
             data: DefaultXionAssetContext::default(),
         }
     }
@@ -626,26 +637,19 @@ pub mod default_plugins {
 
     pub fn royalty_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> StdResult<bool> {
         let (recipient, bps, on_primary) = match (
-            ctx.data.nft_royalty_recipient.clone(),
-            ctx.data.nft_royalty_bps,
-            ctx.data.nft_royalty_on_primary,
+            ctx.royalty.collection_royalty_recipient.clone(),
+            ctx.royalty.collection_royalty_bps,
+            ctx.royalty.collection_royalty_on_primary,
         ) {
             (Some(recipient), Some(bps), on_primary) => (recipient, bps, on_primary),
-            _ => match (
-                ctx.data.collection_royalty_recipient.clone(),
-                ctx.data.collection_royalty_bps,
-                ctx.data.collection_royalty_on_primary,
-            ) {
-                (Some(recipient), Some(bps), on_primary) => (recipient, bps, on_primary),
-                _ => return Ok(true),
-            },
+            _ => return Ok(true),
         };
 
         if bps == 0 {
             return Ok(true);
         }
 
-        let is_primary_sale = !ctx.data.primary_complete;
+        let is_primary_sale = !ctx.royalty.primary_complete;
         let collect_on_primary = on_primary.unwrap_or(false);
         let should_collect = !is_primary_sale || collect_on_primary;
 
@@ -653,6 +657,15 @@ pub mod default_plugins {
             return Ok(true);
         }
 
+        if let Some(ask_price) = &ctx.data.ask_price {
+            if ask_price.amount.is_zero() {
+                return Ok(true);
+            }
+        } else {
+            return Err(cosmwasm_std::StdError::generic_err(
+                "No ask price set for royalty calculation".to_string(),
+            ))?;
+        }
         let fund = ctx
             .info
             .funds
@@ -753,6 +766,18 @@ pub mod default_plugins {
                     coin.denom
                 )));
             }
+        }
+        Ok(true)
+    }
+    /// This plugin checks that raw transfers are enabled. If royalty info is set,
+    /// transfers are disabled and all transfers must go through the buy flow.
+    pub fn is_transfer_enabled_plugin<T, U: CustomMsg>(ctx: &mut PluginCtx<T, U>) -> StdResult<bool> {
+        if ctx.royalty.collection_royalty_bps.is_some()
+            && ctx.royalty.collection_royalty_recipient.is_some()
+        {
+            return Err(cosmwasm_std::StdError::generic_err(
+                "raw transfers are disabled when royalty info is set",
+            ));
         }
 
         Ok(true)
