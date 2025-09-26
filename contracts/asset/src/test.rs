@@ -28,6 +28,7 @@ mod plugins_test {
             env,
             info,
             response: Response::default(),
+            royalty: Default::default(),
             data: DefaultXionAssetContext::default(),
         }
     }
@@ -161,10 +162,11 @@ mod plugins_test {
             &[Coin::new(1_000u128, "uxion")],
         );
         let mut ctx = build_ctx(deps.as_ref(), env, info);
+
         ctx.data.ask_price = Some(Coin::new(1_000u128, "uxion"));
-        ctx.data.nft_royalty_recipient = Some(Addr::unchecked("artist"));
-        ctx.data.nft_royalty_bps = Some(500);
-        ctx.data.primary_complete = true;
+        ctx.royalty.collection_royalty_recipient = Some(Addr::unchecked("artist"));
+        ctx.royalty.collection_royalty_bps = Some(500);
+        ctx.royalty.primary_complete = true;
 
         assert!(default_plugins::royalty_plugin(&mut ctx).is_ok());
         let attr = &ctx.response.attributes[0];
@@ -191,9 +193,9 @@ mod plugins_test {
         let info = message_info(&deps.api.addr_make("buyer"), &[]);
         let mut ctx = build_ctx(deps.as_ref(), env, info);
         ctx.data.ask_price = Some(Coin::new(1_000u128, "uxion"));
-        ctx.data.nft_royalty_recipient = Some(Addr::unchecked("artist"));
-        ctx.data.nft_royalty_bps = Some(500);
-        ctx.data.primary_complete = true;
+        ctx.royalty.collection_royalty_recipient = Some(Addr::unchecked("artist"));
+        ctx.royalty.collection_royalty_bps = Some(500);
+        ctx.royalty.primary_complete = true;
 
         assert!(default_plugins::royalty_plugin(&mut ctx).is_err());
     }
@@ -246,6 +248,28 @@ mod plugins_test {
 
         assert!(default_plugins::allowed_currencies_plugin(&mut ctx).is_err());
     }
+
+    #[test]
+    fn transfer_enabled_plugin_allows_when_no_royalty() {
+        let deps = mock_dependencies();
+        let env = env_at(1_000);
+        let info = message_info(&deps.api.addr_make("anyone"), &[]);
+        let mut ctx = build_ctx(deps.as_ref(), env, info);
+
+        assert!(default_plugins::is_transfer_enabled_plugin(&mut ctx).is_ok());
+    }
+
+    #[test]
+    fn transfer_enabled_plugin_errors_when_royalty_set() {
+        let deps = mock_dependencies();
+        let env = env_at(1_000);
+        let info = message_info(&deps.api.addr_make("anyone"), &[]);
+        let mut ctx = build_ctx(deps.as_ref(), env, info);
+        ctx.royalty.collection_royalty_bps = Some(500);
+        ctx.royalty.collection_royalty_recipient = Some(Addr::unchecked("artist"));
+
+        assert!(default_plugins::is_transfer_enabled_plugin(&mut ctx).is_err());
+    }
 }
 
 #[cfg(test)]
@@ -254,7 +278,7 @@ mod asset_pluggable_tests {
 
     use crate::{
         msg::AssetExtensionExecuteMsg,
-        plugin::{DefaultXionAssetContext, PluggableAsset, Plugin, PluginCtx},
+        plugin::{DefaultXionAssetContext, PluggableAsset, Plugin, PluginCtx, RoyaltyInfo},
         state::{ListingInfo, Reserve},
         traits::{AssetContract, DefaultAssetContract},
     };
@@ -280,6 +304,7 @@ mod asset_pluggable_tests {
             env,
             info,
             response: Response::default(),
+            royalty: RoyaltyInfo::default(),
             data: DefaultXionAssetContext::default(),
         }
     }
