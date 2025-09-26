@@ -4,12 +4,10 @@ use crate::{
     error::ContractError,
     execute::{buy, delist, list, reserve},
     msg::AssetExtensionExecuteMsg,
-    plugin::PluggableAsset,
     state::{AssetConfig, Reserve},
 };
 use cosmwasm_std::{Coin, CustomMsg, DepsMut, Empty, Env, MessageInfo, Response};
 use cw721::{
-    extension::Cw721BaseExtensions,
     traits::{
         Cw721CustomMsg, Cw721Execute, Cw721State, FromAttributesState, StateFactory,
         ToAttributesState,

@@ -1,19 +1,19 @@
+use std::time::Duration;
+
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    Addr, BankMsg, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response,
-    StdResult, SubMsg,
+    Addr, BankMsg, Binary, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo,
+    Response, StdResult, SubMsg,
 };
 use cw721::{
     Expiration,
     error::Cw721ContractError,
-    extension::Cw721Extensions,
     msg::Cw721ExecuteMsg,
     traits::{
         Cw721CustomMsg, Cw721Execute, Cw721State, FromAttributesState, StateFactory,
         ToAttributesState,
     },
 };
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
     error::ContractError,
@@ -30,7 +30,6 @@ where
     pub deps: Deps<'a>,
     pub env: Env,
     pub info: MessageInfo,
-    pub deductions: Vec<(String, Coin, Addr)>, // (reason, amount, to) to be emitted
 
     /// The response being built up by the plugins.
     pub response: Response<TCustomResponseMsg>,
@@ -49,7 +48,7 @@ pub struct DefaultXionAssetContext {
     pub not_before: Expiration, // timestamp before which an asset cannot be listed
     pub not_after: Expiration,  // timestamp after which an asset cannot be listed
     pub reservation: Option<Reserve>,
-    pub time_lock: Option<Expiration>,
+    pub time_lock: Option<Duration>,
 
     pub collection_royalty_bps: Option<u16>,
     pub collection_royalty_recipient: Option<Addr>,
@@ -110,7 +109,7 @@ pub enum Plugin {
         time: Expiration,
     },
     TimeLock {
-        time: Expiration,
+        time: Duration,
     },
     Royalty {
         bps: u16,
@@ -176,20 +175,6 @@ impl Plugin {
         }
         Ok(true)
     }
-
-    pub fn get_plugin_name(plugin: Plugin) -> String {
-        match plugin {
-            Plugin::ExactPrice { .. } => "ExactPrice".to_string(),
-            Plugin::MinimumPrice { .. } => "MinimumPrice".to_string(),
-            Plugin::RequiresProof { .. } => "RequiresProof".to_string(),
-            Plugin::NotBefore { .. } => "NotBefore".to_string(),
-            Plugin::NotAfter { .. } => "NotAfter".to_string(),
-            Plugin::Royalty { .. } => "Royalty".to_string(),
-            Plugin::AllowedMarketplaces { .. } => "AllowedMarketplaces".to_string(),
-            Plugin::AllowedCurrencies { .. } => "AllowedCurrencies".to_string(),
-            Plugin::TimeLock { .. } => "TimeLock".to_string(),
-        }
-    }
 }
 
 /// The concept of a plugin is to be able to hook into the execution flow when a certain action
@@ -237,21 +222,40 @@ pub trait PluggableAsset<
         info: &MessageInfo,
         msg: Cw721ExecuteMsg<TNftExtensionMsg, TCollectionExtensionMsg, TExtensionMsg>,
     ) -> Result<Response<TCustomResponseMsg>, Cw721ContractError> {
-        let mut plugin_ctx = Self::get_plugin_ctx(deps.as_ref(), env, info);
-        match &msg {
-            Cw721ExecuteMsg::TransferNft {
-                recipient,
-                token_id,
-            } => self.on_transfer_plugin(recipient, token_id, &mut plugin_ctx),
-            Cw721ExecuteMsg::UpdateExtension { msg } => {
-                self.on_update_extension_plugin(&msg, &mut plugin_ctx)
+        let plugin_response: Response<TCustomResponseMsg>;
+        {
+            let mut plugin_ctx = Self::get_plugin_ctx(deps.as_ref(), env, info);
+
+            match &msg {
+                Cw721ExecuteMsg::TransferNft {
+                    recipient,
+                    token_id,
+                } => self.on_transfer_plugin(recipient, token_id, &mut plugin_ctx)?,
+                Cw721ExecuteMsg::UpdateExtension { msg } => {
+                    self.on_update_extension_plugin(&msg, &mut plugin_ctx)?
+                }
+                _ => true,
+            };
+            plugin_response = plugin_ctx.response;
+        }
+        let mut response = self.execute(deps, env, info, msg)?;
+
+        response.messages.extend(plugin_response.messages);
+        response.events.extend(plugin_response.events);
+        response.attributes.extend(plugin_response.attributes);
+
+        if let Some(plugin_data) = plugin_response.data {
+            match &mut response.data {
+                Some(existing) => {
+                    let mut combined = Vec::with_capacity(existing.len() + plugin_data.len());
+                    combined.extend_from_slice(existing.as_slice());
+                    combined.extend_from_slice(plugin_data.as_slice());
+                    *existing = Binary::from(combined);
+                }
+                None => response.data = Some(plugin_data),
             }
-            _ => Ok(true),
-        };
-        let response = self.execute(deps, env, info, msg)?;
-        // TODO check the msg and run the appropriate plugin logic
-        // e.g. if msg is List, run the list plugin
-        // if msg is Delist, run the delist plugin
+        }
+
         Ok(response)
     }
 
@@ -325,13 +329,12 @@ impl<TNftExtension, TNftExtensionMsg, TCollectionExtension, TCollectionExtension
         AssetExtensionExecuteMsg,
         Empty,
     >
-    for AssetContract<
+    for DefaultAssetContract<
         '_,
         TNftExtension,
         TNftExtensionMsg,
         TCollectionExtension,
         TCollectionExtensionMsg,
-        AssetExtensionExecuteMsg,
     >
 where
     TCollectionExtension: Cw721State + FromAttributesState + ToAttributesState,
@@ -450,8 +453,8 @@ where
             .config
             .listings
             .load(ctx.deps.storage, token_id.as_str())
-            .map_err(|_| {
-                ContractError::ListingNotFound { id: token_id.clone() }
+            .map_err(|_| ContractError::ListingNotFound {
+                id: token_id.clone(),
             })?;
         ctx.data.ask_price = Some(listing.price.clone());
         if let Some(plugin) = allowed_currencies_plugin {
@@ -505,7 +508,6 @@ where
             deps,
             env: env.clone(),
             info: info.clone(),
-            deductions: vec![],
             response: Response::default(),
             data: DefaultXionAssetContext::default(),
         }
@@ -516,12 +518,12 @@ where
 pub mod default_plugins {
 
     use super::*;
-    use cosmwasm_std::Empty;
+    use cosmwasm_std::{Attribute, Empty};
 
     /// opinionated plugin functions for some common actions
     /// e.g. listing an asset, delisting an asset, transferring an asset, buying an asset
     /// we only need to check things not already covered by the core logic
- 
+
     /// this plugin checks that the price of purchase matches the ask price exactly
     /// if an ask price is set
     pub fn exact_price_plugin(
@@ -557,8 +559,7 @@ pub mod default_plugins {
                 if ask_price.amount.u128() < min_price.amount.u128() {
                     return Err(cosmwasm_std::StdError::generic_err(format!(
                         "Minimum price not met: {} required, {} provided",
-                        min_price.amount.u128(),
-                        ask_price.amount.u128()
+                        min_price, ask_price
                     )));
                 }
             } else {
@@ -578,8 +579,7 @@ pub mod default_plugins {
         if !ctx.data.not_before.is_expired(&ctx.env.block) {
             return Err(cosmwasm_std::StdError::generic_err(format!(
                 "Current time {} is before the allowed listing time {}",
-                ctx.env.block.time.seconds(),
-                ctx.data.not_before
+                ctx.env.block.time, ctx.data.not_before
             )));
         }
 
@@ -594,8 +594,7 @@ pub mod default_plugins {
         if ctx.data.not_after.is_expired(&ctx.env.block) {
             return Err(cosmwasm_std::StdError::generic_err(format!(
                 "Current time {} is after the allowed listing time {}",
-                ctx.env.block.time.seconds(),
-                ctx.data.not_after
+                ctx.env.block.time, ctx.data.not_after
             )));
         }
         Ok(true)
@@ -611,10 +610,13 @@ pub mod default_plugins {
     ) -> StdResult<bool> {
         if let Some(time_lock) = &ctx.data.time_lock {
             if let Some(reservation) = &ctx.data.reservation {
-                if reservation.reserved_until > *time_lock {
+                if reservation.reserved_until
+                    > Expiration::AtTime(ctx.env.block.time.plus_seconds(time_lock.as_secs()))
+                {
                     return Err(cosmwasm_std::StdError::generic_err(format!(
                         "Reservation end time {} exceeds the collection time lock {}",
-                        reservation.reserved_until, time_lock
+                        reservation.reserved_until,
+                        Expiration::AtTime(ctx.env.block.time.plus_seconds(time_lock.as_secs()))
                     )));
                 }
             }
@@ -662,9 +664,7 @@ pub mod default_plugins {
             ))?;
         }
         let fund = fund.unwrap();
-        let royalty_amount = fund
-            .amount
-            .multiply_ratio(bps as u128, 10_000u128);
+        let royalty_amount = fund.amount.multiply_ratio(bps as u128, 10_000u128);
 
         if royalty_amount.is_zero() {
             return Ok(true);
@@ -675,11 +675,14 @@ pub mod default_plugins {
             amount: royalty_amount,
         };
 
-        ctx.deductions.push((
-            "royalty".to_string(),
-            royalty_coin.clone(),
-            recipient.clone(),
-        ));
+        ctx.response.attributes.push(Attribute {
+            key: "royalty_amount".to_string(),
+            value: royalty_coin.clone().to_string(),
+        });
+        ctx.response.attributes.push(Attribute {
+            key: "royalty_recipient".to_string(),
+            value: recipient.to_string(),
+        });
 
         let msg = SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
             to_address: recipient.to_string(),
@@ -710,9 +713,6 @@ pub mod default_plugins {
                     "buyer is not an allowed marketplace",
                 ));
             }
-
-            
-
         }
 
         Ok(true)
