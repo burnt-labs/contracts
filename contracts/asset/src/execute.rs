@@ -1,7 +1,7 @@
 use cosmwasm_std::{
-    BankMsg, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    BankMsg, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError
 };
-use cw721::{Expiration, state::NftInfo, traits::Cw721State};
+use cw721::{state::NftInfo, traits::Cw721State, Expiration};
 
 use crate::{
     error::ContractError,
