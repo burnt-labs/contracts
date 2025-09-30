@@ -282,11 +282,6 @@ pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Res
         return Err(ContractError::MinimumAuthenticatorCount);
     }
 
-    // Validate that the key exists
-    if !AUTHENTICATORS.has(deps.storage, id) {
-        return Err(ContractError::AuthenticatorNotFound { index: id });
-    }
-
     // Remove the authenticator
     AUTHENTICATORS.remove(deps.storage, id);
 
