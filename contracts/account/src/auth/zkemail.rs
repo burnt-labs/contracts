@@ -1,6 +1,11 @@
 use crate::error::ContractResult;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{from_json, Binary, Deps};
+use cosmos_sdk_proto::{
+    traits::MessageExt,
+    xion::v1::dkim::{QueryVerifyRequest, QueryVerifyResponse},
+};
+
 
 #[cw_serde]
 pub struct SnarkJsProof {
@@ -23,24 +28,27 @@ pub struct ZKEmailSignature {
 
 pub fn verify(
     deps: Deps,
-    dkim_domain: &str,
+    tx_bytes: &Binary,
     sig_bytes: &Binary,
+    email_salt: &str,
+    dkim_domain: &str,
 ) -> ContractResult<bool> {
 
-    // let verification_request = QueryVerifyRequest {
-    //     sig_bytes: sig_bytes.clone(),
-    //     dkim_domain: dkim_domain.to_string(),
-    // };
-    // let verification_request_byte = verification_request.to_bytes()?;
-    // let verification_response: Binary = deps.querier.query_grpc(
-    //     "/xion.dkim.v1.Query/ProofVerify".to_string(),
-    //     Binary::from(verification_request_byte),
-    // )?;
+    let verification_request = QueryVerifyRequest {
+        tx_bytes: tx_bytes.to_vec(),
+        proof: sig_bytes.to_vec(),
+        dkim_domain: dkim_domain.to_owned(),
+        email_salt: email_salt.to_owned(),
+    };
+    let verification_request_byte = verification_request.to_bytes()?;
+    let verification_response: Binary = deps.querier.query_grpc(
+        "/xion.dkim.v1.Query/ProofVerify".to_string(),
+        Binary::from(verification_request_byte),
+    )?;
 
-    // let res: QueryVerifyResponse = from_json(verification_response)?;
+    let res: QueryVerifyResponse = from_json(verification_response)?;
 
-    // Ok(res.verified)
-    Ok(true)
+    Ok(res.verified)
 }
 
 pub fn extract_email_salt(signature: &Binary) -> ContractResult<String> {
@@ -64,7 +72,7 @@ pub fn extract_email_salt(signature: &Binary) -> ContractResult<String> {
 mod tests {
     use super::*;
     use cosmwasm_std::{
-        testing::mock_dependencies,
+        testing::{mock_dependencies, mock_env},
         Binary,
     };
 
@@ -365,13 +373,16 @@ mod tests {
     fn test_verify_with_hardcoded_return() {
         // Since verify() is currently hardcoded to return true, test that behavior
         let deps = mock_dependencies();
+        let env = mock_env();
         let json_str = sample_signature_json();
         let signature_binary = Binary::from(json_str.as_bytes());
 
         let result = verify(
             deps.as_ref(),
-            "any_salt",
+            &Binary::from(env.contract.address.as_bytes()),
             &signature_binary,
+            "any_salt",
+            "any_domain",
         );
 
         assert!(result.is_ok());
@@ -381,13 +392,16 @@ mod tests {
     #[test]
     fn test_verify_with_empty_params() {
         let deps = mock_dependencies();
+        let env = mock_env();
         let json_str = sample_signature_json();
         let signature_binary = Binary::from(json_str.as_bytes());
 
         let result = verify(
             deps.as_ref(),
-            "",
+            &Binary::from(env.contract.address.as_bytes()),
             &signature_binary,
+            "any_salt",
+            "any_domain",
         );
 
         assert!(result.is_ok());
@@ -531,6 +545,7 @@ mod tests {
     #[test]
     fn test_verify_signature_parsing_edge_cases() {
         let deps = mock_dependencies();
+        let env = mock_env();
         
         // Test with minimal valid JSON
         let minimal_json = r#"{
@@ -546,8 +561,10 @@ mod tests {
 
         let result = verify(
             deps.as_ref(),
-            "example.com",
+            &Binary::from(env.contract.address.as_bytes()),
             &signature_binary,
+            "any_salt",
+            "example.com",
         );
 
         // Should succeed because verify is hardcoded to return true

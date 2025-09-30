@@ -173,7 +173,7 @@ impl Authenticator {
                 email_salt,
                 dkim_domain,
             } => {
-                let verification = zkemail::verify(deps, dkim_domain, sig_bytes)?;
+                let verification = zkemail::verify(deps, tx_bytes, sig_bytes, email_salt, dkim_domain)?;
                 Ok(verification)
             }
         }
