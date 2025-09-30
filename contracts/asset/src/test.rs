@@ -810,4 +810,324 @@ mod asset_pluggable_tests {
             .to_string()
         );
     }
+
+    #[test]
+    fn save_plugin_saves_all_plugins() {
+        let mut deps = mock_dependencies();
+        let mut contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
+            Default::default();
+
+        let plugins = vec![
+            Plugin::MinimumPrice {
+                amount: Coin::new(50u128, "uxion"),
+            },
+            Plugin::NotBefore {
+                time: Expiration::AtTime(Timestamp::from_seconds(500)),
+            },
+            Plugin::NotAfter {
+                time: Expiration::AtTime(Timestamp::from_seconds(1_500)),
+            },
+            Plugin::AllowedCurrencies {
+                denoms: vec![Coin::new(0u128, "uxion"), Coin::new(0u128, "uusdc")],
+            },
+        ];
+
+        let env = env_at(1_000);
+        let info = message_info(&deps.api.addr_make("admin"), &[]);
+        contract
+            .save_plugin(deps.as_mut(), &env, &info, &plugins)
+            .unwrap();
+
+        let stored_plugins: Vec<Plugin> = contract
+            .config
+            .collection_plugins
+            .range(deps.as_ref().storage, None, None, cosmwasm_std::Order::Ascending)
+            .map(|item| item.unwrap().1)
+            .collect();
+        assert_eq!(stored_plugins.len(), plugins.len());
+        for plugin in plugins {
+            assert!(stored_plugins.contains(&plugin));
+        }
+    }
+
+    #[test]
+    fn remove_plugin_removes_specified_plugin() {
+        let mut deps = mock_dependencies();
+        let mut contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
+            Default::default();
+
+        let plugins = vec![
+            Plugin::MinimumPrice {
+                amount: Coin::new(50u128, "uxion"),
+            },
+            Plugin::NotBefore {
+                time: Expiration::AtTime(Timestamp::from_seconds(500)),
+            },
+            Plugin::NotAfter {
+                time: Expiration::AtTime(Timestamp::from_seconds(1_500)),
+            },
+            Plugin::AllowedCurrencies {
+                denoms: vec![Coin::new(0u128, "uxion"), Coin::new(0u128, "uusdc")],
+            },
+        ];
+
+        let env = env_at(1_000);
+        let info = message_info(&deps.api.addr_make("admin"), &[]);
+        contract
+            .save_plugin(deps.as_mut(), &env, &info, &plugins)
+            .unwrap();
+
+        contract
+            .remove_plugin(deps.as_mut(), &env, &info, &["NotAfter".to_string()].into())
+            .unwrap();
+
+        let stored_plugins: Vec<Plugin> = contract
+            .config
+            .collection_plugins
+            .range(deps.as_ref().storage, None, None, cosmwasm_std::Order::Ascending)
+            .map(|item| item.unwrap().1)
+            .collect();
+        assert_eq!(stored_plugins.len(), plugins.len() - 1);
+        assert!(!stored_plugins.contains(&Plugin::NotAfter {
+            time: Expiration::AtTime(Timestamp::from_seconds(1_500))
+        }));
+    }
+}
+
+#[cfg(test)]
+mod query_test {
+    use crate::{
+        msg::AssetExtensionQueryMsg,
+        plugin::Plugin,
+        state::ListingInfo,
+        traits::DefaultAssetContract,
+    };
+    use cosmwasm_std::{
+        from_json,
+        testing::{mock_dependencies, mock_env},
+        Coin, Empty,
+    };
+    use cw721::{state::NftInfo, traits::Cw721Query};
+
+    #[test]
+    fn get_listing_returns_saved_listing() {
+        let mut deps = mock_dependencies();
+        let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
+            Default::default();
+
+        let seller = deps.api.addr_make("seller");
+        let listing = ListingInfo {
+            id: "token-1".to_string(),
+            price: Coin::new(100u128, "uxion"),
+            seller: seller.clone(),
+            reserved: None,
+            nft_info: NftInfo {
+                owner: seller,
+                approvals: vec![],
+                token_uri: None,
+                extension: Empty::default(),
+            },
+        };
+
+        contract
+            .config
+            .listings
+            .save(deps.as_mut().storage, "token-1", &listing)
+            .unwrap();
+
+        let binary = contract
+            .query_extension(
+                deps.as_ref(),
+                &mock_env(),
+                AssetExtensionQueryMsg::GetListing {
+                    token_id: "token-1".to_string(),
+                },
+            )
+            .unwrap();
+
+        let fetched: ListingInfo<Empty> = from_json(binary).unwrap();
+        assert_eq!(fetched, listing);
+    }
+
+    #[test]
+    fn get_listings_by_seller_supports_pagination() {
+        let mut deps = mock_dependencies();
+        let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
+            Default::default();
+
+        let seller = deps.api.addr_make("seller");
+        let other = deps.api.addr_make("other");
+
+        for (id, owner) in [
+            ("token-1", seller.clone()),
+            ("token-2", seller.clone()),
+            ("token-3", seller.clone()),
+            ("token-4", other.clone()),
+        ] {
+            let listing = ListingInfo {
+                id: id.to_string(),
+                price: Coin::new(50u128, "uxion"),
+                seller: owner.clone(),
+                reserved: None,
+                nft_info: NftInfo {
+                    owner,
+                    approvals: vec![],
+                    token_uri: None,
+                    extension: Empty::default(),
+                },
+            };
+            contract
+                .config
+                .listings
+                .save(deps.as_mut().storage, id, &listing)
+                .unwrap();
+        }
+
+        let first_page = contract
+            .query_extension(
+                deps.as_ref(),
+                &mock_env(),
+                AssetExtensionQueryMsg::GetListingsBySeller {
+                    seller: deps.api.addr_make("seller").to_string(),
+                    start_after: None,
+                    limit: Some(2),
+                },
+            )
+            .unwrap();
+        let first_page: Vec<ListingInfo<Empty>> = from_json(first_page).unwrap();
+        assert_eq!(first_page.len(), 2);
+        assert_eq!(first_page[0].id, "token-1");
+        assert_eq!(first_page[1].id, "token-2");
+        assert!(first_page.iter().all(|listing| listing.seller == seller));
+
+        let second_page = contract
+            .query_extension(
+                deps.as_ref(),
+                &mock_env(),
+                AssetExtensionQueryMsg::GetListingsBySeller {
+                    seller: deps.api.addr_make("seller").to_string(),
+                    start_after: Some("token-1".to_string()),
+                    limit: None,
+                },
+            )
+            .unwrap();
+        let second_page: Vec<ListingInfo<Empty>> = from_json(second_page).unwrap();
+        assert_eq!(second_page.len(), 2);
+        assert_eq!(second_page[0].id, "token-2");
+        assert_eq!(second_page[1].id, "token-3");
+        assert!(second_page.iter().all(|listing| listing.seller == seller));
+    }
+
+    #[test]
+    fn get_all_listings_supports_pagination() {
+        let mut deps = mock_dependencies();
+        let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
+            Default::default();
+
+        let seller = deps.api.addr_make("seller");
+        let other = deps.api.addr_make("other");
+
+        for (id, owner) in [
+            ("token-1", seller.clone()),
+            ("token-2", seller.clone()),
+            ("token-3", seller.clone()),
+            ("token-4", other.clone()),
+        ] {
+            let listing = ListingInfo {
+                id: id.to_string(),
+                price: Coin::new(50u128, "uxion"),
+                seller: owner.clone(),
+                reserved: None,
+                nft_info: NftInfo {
+                    owner,
+                    approvals: vec![],
+                    token_uri: None,
+                    extension: Empty::default(),
+                },
+            };
+            contract
+                .config
+                .listings
+                .save(deps.as_mut().storage, id, &listing)
+                .unwrap();
+        }
+
+        let first_page = contract
+            .query_extension(
+                deps.as_ref(),
+                &mock_env(),
+                AssetExtensionQueryMsg::GetAllListings {
+                    start_after: None,
+                    limit: Some(2),
+                },
+            )
+            .unwrap();
+        let first_page: Vec<ListingInfo<Empty>> = from_json(first_page).unwrap();
+        assert_eq!(first_page.len(), 2);
+        assert_eq!(first_page[0].id, "token-1");
+        assert_eq!(first_page[1].id, "token-2");
+
+        let second_page = contract
+            .query_extension(
+                deps.as_ref(),
+                &mock_env(),
+                AssetExtensionQueryMsg::GetAllListings {
+                    start_after: Some("token-1".to_string()),
+                    limit: None,
+                },
+            )
+            .unwrap();
+        let second_page: Vec<ListingInfo<Empty>> = from_json(second_page).unwrap();
+        assert_eq!(second_page.len(), 3);
+        assert_eq!(second_page[0].id, "token-2");
+        assert_eq!(second_page[1].id, "token-3");
+        assert_eq!(second_page[2].id, "token-4");
+    }
+    
+    #[test]
+    fn get_collection_plugins_returns_all_plugins() {
+        let mut deps = mock_dependencies();
+        let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
+            Default::default();
+
+        contract
+            .config
+            .collection_plugins
+            .save(
+                deps.as_mut().storage,
+                "MinimumPrice",
+                &Plugin::MinimumPrice {
+                    amount: Coin::new(100u128, "uxion"),
+                },
+            )
+            .unwrap();
+        contract
+            .config
+            .collection_plugins
+            .save(
+                deps.as_mut().storage,
+                "AllowedCurrencies",
+                &Plugin::AllowedCurrencies {
+                    denoms: vec![Coin::new(0u128, "uxion"), Coin::new(0u128, "uusdc")],
+                },
+            )
+            .unwrap();
+
+        let binary = contract
+            .query_extension(
+                deps.as_ref(),
+                &mock_env(),
+                AssetExtensionQueryMsg::GetCollectionPlugins {},
+            )
+            .unwrap();
+        let plugins: Vec<Plugin> = from_json(binary).unwrap();
+
+        assert_eq!(plugins.len(), 2);
+        assert!(plugins.contains(&Plugin::MinimumPrice {
+            amount: Coin::new(100u128, "uxion"),
+        }));
+        assert!(plugins.contains(&Plugin::AllowedCurrencies {
+            denoms: vec![Coin::new(0u128, "uxion"), Coin::new(0u128, "uusdc")],
+        }));
+    }
 }

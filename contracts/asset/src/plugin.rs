@@ -1,9 +1,8 @@
-use std::time::Duration;
+use std::{default, fmt::Display, time::Duration};
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    Addr, BankMsg, Binary, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo,
-    Response, StdResult, SubMsg,
+    coin, Addr, BankMsg, Binary, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult, SubMsg, Timestamp
 };
 use cw721::{
     Expiration,
@@ -18,6 +17,7 @@ use cw721::{
 use crate::{
     error::ContractError,
     msg::AssetExtensionExecuteMsg,
+    plugin,
     state::{AssetConfig, Reserve},
     traits::{AssetContract, DefaultAssetContract},
 };
@@ -129,6 +129,34 @@ pub enum Plugin {
     },
 }
 
+impl Display for Plugin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Plugin::ExactPrice { amount } => write!(f, "ExactPrice: {}", amount),
+            Plugin::MinimumPrice { amount } => write!(f, "MinimumPrice: {}", amount),
+            Plugin::RequiresProof { proof } => write!(f, "RequiresProof: {:?}", proof),
+            Plugin::NotBefore { time } => write!(f, "NotBefore: {}", time),
+            Plugin::NotAfter { time } => write!(f, "NotAfter: {}", time),
+            Plugin::TimeLock { time } => write!(f, "TimeLock: {:?}", time),
+            Plugin::Royalty {
+                bps,
+                recipient,
+                on_primary,
+            } => write!(
+                f,
+                "Royalty: {} bps to {} on_primary: {}",
+                bps, recipient, on_primary
+            ),
+            Plugin::AllowedMarketplaces { marketplaces } => {
+                write!(f, "AllowedMarketplaces: {:?}", marketplaces)
+            }
+            Plugin::AllowedCurrencies { denoms } => {
+                write!(f, "AllowedCurrencies: {:?}", denoms)
+            }
+        }
+    }
+}
+
 impl Plugin {
     // TODO
     // break this out into functions for each plugin type
@@ -181,7 +209,10 @@ impl Plugin {
         Ok(true)
     }
 
-    pub fn run_raw_transfer_plugin<T, U: CustomMsg>(&self, ctx: &mut PluginCtx<T, U>) -> StdResult<bool> {
+    pub fn run_raw_transfer_plugin<T, U: CustomMsg>(
+        &self,
+        ctx: &mut PluginCtx<T, U>,
+    ) -> StdResult<bool> {
         match self {
             Plugin::Royalty {
                 bps,
@@ -196,6 +227,20 @@ impl Plugin {
             _ => {}
         }
         Ok(true)
+    }
+
+    pub fn get_plugin_name(&self) -> &str {
+        match self {
+            Plugin::ExactPrice { .. } => "ExactPrice",
+            Plugin::MinimumPrice { .. } => "MinimumPrice",
+            Plugin::RequiresProof { .. } => "RequiresProof",
+            Plugin::NotBefore { .. } => "NotBefore",
+            Plugin::NotAfter { .. } => "NotAfter",
+            Plugin::TimeLock { .. } => "TimeLock",
+            Plugin::Royalty { .. } => "Royalty",
+            Plugin::AllowedMarketplaces { .. } => "AllowedMarketplaces",
+            Plugin::AllowedCurrencies { .. } => "AllowedCurrencies",
+        }
     }
 }
 
@@ -346,6 +391,22 @@ pub trait PluggableAsset<
         env: &Env,
         info: &MessageInfo,
     ) -> PluginCtx<'a, Context, TCustomResponseMsg>;
+
+    fn save_plugin(
+        &self,
+        deps: DepsMut,
+        env: &Env,
+        info: &MessageInfo,
+        plugins: &Vec<Plugin>,
+    ) -> StdResult<()>;
+
+    fn remove_plugin(
+        &self,
+        deps: DepsMut,
+        env: &Env,
+        info: &MessageInfo,
+        plugins: &Vec<String>,
+    ) -> StdResult<()>;
 }
 
 impl<TNftExtension, TNftExtensionMsg, TCollectionExtension, TCollectionExtensionMsg>
@@ -392,6 +453,7 @@ where
                 token_id,
                 recipient,
             } => self.on_buy_plugin(token_id, recipient, ctx),
+            _ => Ok(true),
         }
     }
 
@@ -406,16 +468,16 @@ where
         let config = AssetConfig::<TNftExtension>::default();
         let min_price_plugin = config
             .collection_plugins
-            .may_load(ctx.deps.storage, "MinimumPrice")?;
+            .may_load(ctx.deps.storage, Plugin::MinimumPrice { amount: coin(0, "") }.get_plugin_name())?;
         let not_before_plugin = config
             .collection_plugins
-            .may_load(ctx.deps.storage, "NotBefore")?;
+            .may_load(ctx.deps.storage, Plugin::NotBefore{ time: Expiration::Never {}}.get_plugin_name())?;
         let not_after_plugin = config
             .collection_plugins
-            .may_load(ctx.deps.storage, "NotAfter")?;
+            .may_load(ctx.deps.storage, Plugin::NotAfter{ time: Expiration::Never {}}.get_plugin_name())?;
         let allowed_currencies_plugin = config
             .collection_plugins
-            .may_load(ctx.deps.storage, "AllowedCurrencies")?;
+            .may_load(ctx.deps.storage, Plugin::AllowedCurrencies{denoms: [].into()}.get_plugin_name())?;
         ctx.data.token_id = token_id.to_string();
         ctx.data.ask_price = Some(price.clone());
         ctx.data.reservation = reservation.clone();
@@ -449,10 +511,10 @@ where
         let config = AssetConfig::<TNftExtension>::default();
         let allowed_marketplaces_plugin = config
             .collection_plugins
-            .may_load(ctx.deps.storage, "AllowedMarketplaces")?;
+            .may_load(ctx.deps.storage, Plugin::AllowedMarketplaces { marketplaces: [].into() }.get_plugin_name())?;
         let allowed_currencies_plugin = config
             .collection_plugins
-            .may_load(ctx.deps.storage, "AllowedCurrencies")?;
+            .may_load(ctx.deps.storage, Plugin::AllowedCurrencies { denoms: [].into() }.get_plugin_name())?;
         let royalty_plugin = config
             .collection_plugins
             .may_load(ctx.deps.storage, "Royalty")?;
@@ -496,10 +558,10 @@ where
         ctx.data.token_id = token_id.to_string();
         let allowed_marketplaces_plugin = config
             .collection_plugins
-            .may_load(ctx.deps.storage, "AllowedMarketplaces")?;
+            .may_load(ctx.deps.storage, Plugin::AllowedMarketplaces { marketplaces: [].into() }.get_plugin_name())?;
         let time_lock_plugin = config
             .collection_plugins
-            .may_load(ctx.deps.storage, "TimeLock")?;
+            .may_load(ctx.deps.storage, Plugin::TimeLock { time: Duration::from_secs(0) }.get_plugin_name())?;
         if let Some(plugin) = allowed_marketplaces_plugin {
             plugin.run_asset_plugin(ctx)?;
         }
@@ -522,6 +584,36 @@ where
             royalty: RoyaltyInfo::default(),
             data: DefaultXionAssetContext::default(),
         }
+    }
+
+    fn save_plugin(
+        &self,
+        deps: DepsMut,
+        _env: &Env,
+        _info: &MessageInfo,
+        plugins: &Vec<Plugin>,
+    ) -> StdResult<()> {
+        for plugin in plugins {
+            self.config
+                .collection_plugins
+                .save(deps.storage, plugin.get_plugin_name(), plugin)?;
+        }
+        Ok(())
+    }
+
+    fn remove_plugin(
+            &self,
+            deps: DepsMut,
+            _env: &Env,
+            _info: &MessageInfo,
+            plugins: &Vec<String>,
+        ) -> StdResult<()> {
+         for plugin in plugins {
+            self.config
+                .collection_plugins
+                .remove(deps.storage, plugin);
+        }
+        Ok(())
     }
 }
 
@@ -771,7 +863,9 @@ pub mod default_plugins {
     }
     /// This plugin checks that raw transfers are enabled. If royalty info is set,
     /// transfers are disabled and all transfers must go through the buy flow.
-    pub fn is_transfer_enabled_plugin<T, U: CustomMsg>(ctx: &mut PluginCtx<T, U>) -> StdResult<bool> {
+    pub fn is_transfer_enabled_plugin<T, U: CustomMsg>(
+        ctx: &mut PluginCtx<T, U>,
+    ) -> StdResult<bool> {
         if ctx.royalty.collection_royalty_bps.is_some()
             && ctx.royalty.collection_royalty_recipient.is_some()
         {
