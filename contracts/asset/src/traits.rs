@@ -3,15 +3,15 @@ use std::marker::PhantomData;
 use crate::{
     error::ContractError,
     execute::{buy, delist, list, reserve},
-    msg::AssetExtensionExecuteMsg,
+    msg::{AssetExtensionExecuteMsg, AssetExtensionQueryMsg},
+    plugin::PluggableAsset,
     state::{AssetConfig, Reserve},
 };
-use cosmwasm_std::{Coin, CustomMsg, DepsMut, Empty, Env, MessageInfo, Response};
-use cw721::{
-    traits::{
-        Cw721CustomMsg, Cw721Execute, Cw721State, FromAttributesState, StateFactory,
-        ToAttributesState,
-    },
+use cosmwasm_std::{Coin, CustomMsg, DepsMut, Empty, Env, MessageInfo, Response, to_json_binary};
+use cw_storage_plus::Bound;
+use cw721::traits::{
+    Contains, Cw721CustomMsg, Cw721Execute, Cw721Query, Cw721State, FromAttributesState,
+    StateFactory, ToAttributesState,
 };
 
 pub struct AssetContract<
@@ -262,6 +262,99 @@ where
                 token_id,
                 recipient,
             } => Ok(self.buy(deps, env, info, token_id, recipient)?),
+            AssetExtensionExecuteMsg::SetCollectionPlugin { plugins } => {
+                self.save_plugin(deps, env, info, &plugins)?;
+                Ok(Response::new().add_attribute(
+                    "action",
+                    format!("set_collection_plugin {:?}", plugins.clone()),
+                ))
+            }
+            AssetExtensionExecuteMsg::RemoveCollectionPlugin { plugins } => {
+                self.remove_plugin(deps, env, info, &plugins)?;
+                Ok(Response::new()
+                    .add_attribute("action", format!("remove_collection_plugin {:?}", plugins)))
+            }
+        }
+    }
+}
+
+impl<TNftExtension, TNftExtensionMsg, TCollectionExtension, TCollectionExtensionMsg>
+    Cw721Query<TNftExtension, TCollectionExtension, AssetExtensionQueryMsg>
+    for DefaultAssetContract<
+        '_,
+        TNftExtension,
+        TNftExtensionMsg,
+        TCollectionExtension,
+        TCollectionExtensionMsg,
+    >
+where
+    TNftExtension: Cw721State + Contains,
+    TCollectionExtension: Cw721State + FromAttributesState + ToAttributesState,
+{
+    fn query_extension(
+        &self,
+        deps: cosmwasm_std::Deps,
+        _env: &Env,
+        msg: AssetExtensionQueryMsg,
+    ) -> Result<cosmwasm_std::Binary, cw721::error::Cw721ContractError> {
+        match msg {
+            AssetExtensionQueryMsg::GetListing { token_id } => {
+                let listing = self
+                    .config
+                    .listings
+                    .may_load(deps.storage, &token_id)?
+                    .ok_or(ContractError::ListingNotFound {
+                        id: token_id.clone(),
+                    })?;
+                Ok(to_json_binary(&listing)?)
+            }
+            AssetExtensionQueryMsg::GetListingsBySeller {
+                seller,
+                start_after,
+                limit,
+            } => {
+                let seller_addr = deps.api.addr_validate(&seller)?;
+                let listings: Vec<_> = self
+                    .config
+                    .listings
+                    .idx
+                    .seller
+                    .prefix(seller_addr)
+                    .range(
+                        deps.storage,
+                        start_after.map(|s| Bound::ExclusiveRaw(s.into())),
+                        None,
+                        cosmwasm_std::Order::Ascending,
+                    )
+                    .take(limit.unwrap_or(10) as usize)
+                    .map(|item| item.map(|(_, listing)| listing))
+                    .collect::<Result<_, _>>()?;
+                Ok(to_json_binary(&listings)?)
+            }
+            AssetExtensionQueryMsg::GetCollectionPlugins {} => {
+                let plugins: Vec<_> = self
+                    .config
+                    .collection_plugins
+                    .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+                    .map(|item| item.map(|(_, plugin)| plugin))
+                    .collect::<Result<_, _>>()?;
+                Ok(to_json_binary(&plugins)?)
+            }
+            AssetExtensionQueryMsg::GetAllListings { start_after, limit } => {
+                let listings: Vec<_> = self
+                    .config
+                    .listings
+                    .range(
+                        deps.storage,
+                        start_after.map(|s| Bound::ExclusiveRaw(s.into())),
+                        None,
+                        cosmwasm_std::Order::Ascending,
+                    )
+                    .take(limit.unwrap_or(10) as usize)
+                    .map(|item| item.map(|(_, listing)| listing))
+                    .collect::<Result<_, _>>()?;
+                Ok(to_json_binary(&listings)?)
+            }
         }
     }
 }
