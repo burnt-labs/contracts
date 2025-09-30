@@ -2,11 +2,12 @@ use std::borrow::BorrowMut;
 
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
-use crate::auth::{jwt, passkey, AddAuthenticator, Authenticator};
+use crate::auth::{jwt, passkey, AddAuthenticator, Authenticator, zkemail};
 use crate::{
     error::{ContractError, ContractResult},
     state::AUTHENTICATORS,
 };
+
 
 pub fn init(
     deps: DepsMut,
@@ -69,6 +70,12 @@ pub fn before_tx(
             }
             Authenticator::Passkey { .. } => {
                 // todo: figure out if there are minimum checks for passkeys
+            }
+            Authenticator::ZKEmail { .. } => {
+                // todo: verify that this minimum is as high as possible
+                if sig_bytes.len() < 400 {
+                    return Err(ContractError::ShortSignature);
+                }
             }
         }
 
@@ -219,6 +226,29 @@ pub fn add_auth_method(
             // observers to see
             *(credential) = passkey;
             Ok(())
+        }
+        AddAuthenticator::ZKEmail {
+            id,
+            dkim_domain,
+            signature,
+        } => {
+            // extract email salt from signature
+            let email_salt = zkemail::extract_email_salt(signature)?;
+            let auth = Authenticator::ZKEmail {
+                email_salt: email_salt.clone(),
+                dkim_domain: dkim_domain.clone(),
+            };
+            if !auth.verify(
+                deps.as_ref(),
+                env,
+                &Binary::from(env.contract.address.as_bytes()),
+                signature,
+            )? {
+                Err(ContractError::InvalidSignature)
+            } else {
+                save_authenticator(deps, *id, &auth)?;
+                Ok(())
+            }
         }
     }?;
     Ok(
@@ -394,5 +424,47 @@ pub mod tests {
             query_response.unwrap().credential,
             Binary::from("true".as_bytes())
         );
+    }
+
+    #[test]
+    fn test_add_zkemail_authenticator_invalid_signature() {
+        use crate::auth::AddAuthenticator;
+        use crate::execute::add_auth_method;
+
+        let mut deps = OwnedDeps {
+            storage: MockStorage::default(),
+            api: MockApi::default().with_prefix("xion"),
+            querier: MockQuerier::<XionCustomQuery>::new(&[]),
+            custom_query_type: std::marker::PhantomData,
+        };
+        let env = mock_env();
+
+        // Create an invalid signature (insufficient public outputs)
+        let invalid_signature_json = r#"{
+            "proof": {
+                "pi_a": ["1", "2", "3"],
+                "pi_b": [["4", "5"], ["6", "7"], ["8", "9"]],
+                "pi_c": ["10", "11", "12"],
+                "protocol": "groth16"
+            },
+            "publicOutputs": ["1", "2", "3"]
+        }"#;
+
+        let signature_binary = Binary::from(invalid_signature_json.as_bytes());
+
+        let mut add_authenticator = AddAuthenticator::ZKEmail {
+            id: 1,
+            dkim_domain: "gmail.com".to_string(),
+            signature: signature_binary,
+        };
+
+        // Call add_auth_method - should fail due to insufficient public outputs
+        let result = add_auth_method(deps.as_mut(), &env, &mut add_authenticator);
+        
+        // Verify the result is an error
+        assert!(result.is_err());
+        
+        // Verify the authenticator was not saved
+        assert!(!AUTHENTICATORS.has(deps.as_ref().storage, 1));
     }
 }
