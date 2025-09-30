@@ -9,13 +9,16 @@ pub struct InstantiateMsg {
     pub type_urls: Vec<String>,
     pub grant_configs: Vec<GrantConfig>,
     pub fee_config: FeeConfig,
+    pub params: Params,
 }
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    UpdateAdmin {
+    ProposeAdmin {
         new_admin: Addr,
     },
+    AcceptAdmin {},
+    CancelProposedAdmin {},
     UpdateGrantConfig {
         msg_type_url: String,
         grant_config: GrantConfig,
@@ -39,6 +42,10 @@ pub enum ExecuteMsg {
     Withdraw {
         coins: Vec<Coin>,
     },
+    Migrate {
+        new_code_id: u64,
+        migrate_msg: Binary,
+    },
 }
 
 #[cw_serde]
@@ -58,5 +65,11 @@ pub enum QueryMsg {
     Admin {},
 
     #[returns(Binary)]
+    PendingAdmin {},
+
+    #[returns(Binary)]
     Params {},
 }
+
+#[cw_serde]
+pub struct MigrateMsg {}

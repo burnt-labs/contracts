@@ -22,3 +22,7 @@ Cargo.lock
 
 **/.editorconfig
 **/.circleci/
+
+.env
+wasm/
+/node_modules

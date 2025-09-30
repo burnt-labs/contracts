@@ -1,6 +1,6 @@
-use crate::error::ContractResult;
+use crate::error::{ContractError, ContractResult};
 use crate::execute::{revoke_allowance, update_fee_config, update_params, withdraw_coins};
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::{execute, query, CONTRACT_NAME, CONTRACT_VERSION};
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
@@ -14,13 +14,20 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    // Validate the admin address
+    let admin_addr = if let Some(addr) = msg.admin {
+        deps.api.addr_validate(addr.as_str())?
+    } else {
+        return Err(ContractError::Unauthorized);
+    };
     execute::init(
         deps,
         info,
-        msg.admin,
+        Some(admin_addr),
         msg.type_urls,
         msg.grant_configs,
         msg.fee_config,
+        msg.params,
     )
 }
 
@@ -36,7 +43,11 @@ pub fn execute(
             authz_granter,
             authz_grantee,
         } => execute::deploy_fee_grant(deps, env, authz_granter, authz_grantee),
-        ExecuteMsg::UpdateAdmin { new_admin } => execute::update_admin(deps, info, new_admin),
+        ExecuteMsg::ProposeAdmin { new_admin } => {
+            execute::propose_admin(deps, info, new_admin.into_string())
+        }
+        ExecuteMsg::AcceptAdmin {} => execute::accept_admin(deps, info),
+        ExecuteMsg::CancelProposedAdmin {} => execute::cancel_proposed_admin(deps, info),
         ExecuteMsg::UpdateGrantConfig {
             msg_type_url,
             grant_config,
@@ -48,6 +59,10 @@ pub fn execute(
         ExecuteMsg::RevokeAllowance { grantee } => revoke_allowance(deps, env, info, grantee),
         ExecuteMsg::UpdateParams { params } => update_params(deps, info, params),
         ExecuteMsg::Withdraw { coins } => withdraw_coins(deps, info, coins),
+        ExecuteMsg::Migrate {
+            new_code_id,
+            migrate_msg,
+        } => execute::migrate(deps, env, info, new_code_id, migrate_msg),
     }
 }
 
@@ -62,6 +77,13 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::FeeConfig {} => to_json_binary(&query::fee_config(deps.storage)?),
         QueryMsg::Admin {} => to_json_binary(&query::admin(deps.storage)?),
+        QueryMsg::PendingAdmin {} => to_json_binary(&query::pending_admin(deps.storage)?),
         QueryMsg::Params {} => to_json_binary(&query::params(deps.storage)?),
     }
+}
+
+#[entry_point]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    // No state migrations performed, just returned a Response
+    Ok(Response::default())
 }
