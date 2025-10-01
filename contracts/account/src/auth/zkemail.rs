@@ -2,8 +2,7 @@ use crate::error::ContractResult;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{from_json, Binary, Deps};
 use cosmos_sdk_proto::{
-    traits::MessageExt,
-    xion::v1::dkim::{QueryVerifyRequest, QueryVerifyResponse},
+    prost::Message, traits::MessageExt, xion::v1::dkim::{QueryVerifyRequest, QueryVerifyResponse}
 };
 
 #[cw_serde]
@@ -32,7 +31,6 @@ pub fn verify(
     email_salt: &str,
     dkim_domain: &str,
 ) -> ContractResult<bool> {
-
     let verification_request = QueryVerifyRequest {
         tx_bytes: tx_bytes.to_vec(),
         proof: sig_bytes.to_vec(),
@@ -45,7 +43,7 @@ pub fn verify(
         Binary::from(verification_request_byte),
     )?;
 
-    let res: QueryVerifyResponse = from_json(verification_response)?;
+    let res: QueryVerifyResponse = QueryVerifyResponse::decode(verification_response.as_slice())?;
 
     Ok(res.verified)
 }
