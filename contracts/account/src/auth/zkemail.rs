@@ -6,7 +6,6 @@ use cosmos_sdk_proto::{
     xion::v1::dkim::{QueryVerifyRequest, QueryVerifyResponse},
 };
 
-
 #[cw_serde]
 pub struct SnarkJsProof {
     #[serde(rename = "pi_a")]
