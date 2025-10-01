@@ -5,14 +5,13 @@ on:
     branches:
       - main
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
   pull_request:
 
 name: Basic
 
 jobs:
-
   test:
     name: Test Suite
     runs-on: ubuntu-latest
@@ -24,7 +23,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: 1.89.0
           target: wasm32-unknown-unknown
           override: true
 
@@ -34,7 +33,6 @@ jobs:
           command: test
         env:
           RUST_BACKTRACE: 1
-
 
   lints:
     name: Lints
@@ -47,7 +45,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: 1.89.0
           override: true
           components: rustfmt, clippy
 
