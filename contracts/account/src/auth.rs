@@ -1,6 +1,6 @@
 use crate::auth::secp256r1::verify;
 use crate::error::ContractError;
-use cosmwasm_std::{Binary, Deps, Env};
+use cosmwasm_std::{Addr, Binary, Deps, Env};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

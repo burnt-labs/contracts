@@ -73,7 +73,7 @@ pub fn before_tx(
             }
             Authenticator::ZKEmail { .. } => {
                 // todo: verify that this minimum is as high as possible
-                if sig_bytes.len() < 400 {
+                if sig_bytes.len() < 700 {
                     return Err(ContractError::ShortSignature);
                 }
             }
