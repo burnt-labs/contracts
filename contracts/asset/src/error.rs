@@ -22,11 +22,18 @@ pub enum ContractError {
     #[error("Invalid payment: {price} {denom}")]
     InvalidPayment { price: u128, denom: String },
 
+    #[error("Insufficient funds")]
+    InsufficientFunds {},
+
     #[error("No payment")]
     NoPayment {},
 
     #[error("Plugin error: {msg}")]
     PluginError { msg: String },
+
+    #[error("Invalid marketplace fee: {bps}, {recipient}")]
+    InvalidMarketplaceFee { bps: u16, recipient: String },
+
 }
 
 impl From<ContractError> for cw721::error::Cw721ContractError {

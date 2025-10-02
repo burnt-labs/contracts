@@ -16,6 +16,8 @@ pub struct ListingInfo<TNftExtension> {
     pub seller: Addr,
     pub reserved: Option<Reserve>,
     pub nft_info: NftInfo<TNftExtension>,
+    pub marketplace_fee_bps: Option<u16>,
+    pub marketplace_fee_recipient: Option<Addr>,
 }
 
 #[cw_serde]
