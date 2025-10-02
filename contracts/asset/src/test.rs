@@ -30,6 +30,7 @@ mod plugins_test {
             response: Response::default(),
             royalty: Default::default(),
             data: DefaultXionAssetContext::default(),
+            deductions: vec![],
         }
     }
 
@@ -306,6 +307,7 @@ mod asset_pluggable_tests {
             response: Response::default(),
             royalty: RoyaltyInfo::default(),
             data: DefaultXionAssetContext::default(),
+            deductions: vec![],
         }
     }
 
@@ -367,12 +369,13 @@ mod asset_pluggable_tests {
         let token_id = "token-1".to_string();
         let price = Coin::new(100u128, "uxion");
 
-        let result = contract.on_list_plugin(&token_id, &price, &None, &mut ctx);
+        let result = contract.on_list_plugin(&token_id, &price, &None, &Some(10), &mut ctx);
 
         assert!(result.unwrap());
         assert_eq!(ctx.data.token_id, token_id);
         assert_eq!(ctx.data.ask_price, Some(price));
         assert_eq!(ctx.data.min_price, Some(min_price));
+        assert_eq!(ctx.data.marketplace_fee_bps, Some(10));
         let allowed = ctx.data.allowed_currencies.expect("allowed currencies");
         assert!(allowed.iter().any(|coin| coin.denom == "uxion"));
     }
@@ -412,7 +415,7 @@ mod asset_pluggable_tests {
         let token_id = "token-1".to_string();
         let price = Coin::new(100u128, "uxion");
 
-        let result = contract.on_list_plugin(&token_id, &price, &None, &mut ctx);
+        let result = contract.on_list_plugin(&token_id, &price, &None, &None, &mut ctx);
 
         assert_eq!(
             result.expect_err("expected not after error").to_string(),
@@ -448,7 +451,7 @@ mod asset_pluggable_tests {
         let token_id = "token-1".to_string();
         let price = Coin::new(100u128, "uxion");
 
-        let result = contract.on_list_plugin(&token_id, &price, &None, &mut ctx);
+        let result = contract.on_list_plugin(&token_id, &price, &None, &None,&mut ctx);
 
         assert_eq!(
             result.expect_err("expected min price error").to_string(),
@@ -488,6 +491,8 @@ mod asset_pluggable_tests {
                         token_uri: None,
                         extension: Empty::default(),
                     },
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();
@@ -582,6 +587,8 @@ mod asset_pluggable_tests {
                         token_uri: None,
                         extension: Empty::default(),
                     },
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();
@@ -639,6 +646,8 @@ mod asset_pluggable_tests {
                         token_uri: None,
                         extension: Empty::default(),
                     },
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();
@@ -714,10 +723,7 @@ mod asset_pluggable_tests {
 
         assert!(result);
         assert_eq!(ctx.data.reservation.as_ref().unwrap().reserver, reserver);
-        assert_eq!(
-            ctx.data.time_lock,
-            Some(Duration::from_secs(2_000))
-        );
+        assert_eq!(ctx.data.time_lock, Some(Duration::from_secs(2_000)));
     }
 
     #[test]
@@ -800,12 +806,16 @@ mod asset_pluggable_tests {
         let result = contract.on_reserve_plugin(&"token-1".to_string(), &reservation, &mut ctx);
 
         assert_eq!(
-            result
-                .expect_err("expected time lock exceeded")
-                .to_string(),
+            result.expect_err("expected time lock exceeded").to_string(),
             cosmwasm_std::StdError::generic_err(format!(
                 "Reservation end time {} exceeds the collection time lock {}",
-                reservation.reserved_until, Expiration::AtTime(ctx.env.block.time.plus_seconds(ctx.data.time_lock.expect("time lock set").as_secs()))
+                reservation.reserved_until,
+                Expiration::AtTime(
+                    ctx.env
+                        .block
+                        .time
+                        .plus_seconds(ctx.data.time_lock.expect("time lock set").as_secs())
+                )
             ))
             .to_string()
         );
@@ -841,7 +851,12 @@ mod asset_pluggable_tests {
         let stored_plugins: Vec<Plugin> = contract
             .config
             .collection_plugins
-            .range(deps.as_ref().storage, None, None, cosmwasm_std::Order::Ascending)
+            .range(
+                deps.as_ref().storage,
+                None,
+                None,
+                cosmwasm_std::Order::Ascending,
+            )
             .map(|item| item.unwrap().1)
             .collect();
         assert_eq!(stored_plugins.len(), plugins.len());
@@ -853,7 +868,7 @@ mod asset_pluggable_tests {
     #[test]
     fn remove_plugin_removes_specified_plugin() {
         let mut deps = mock_dependencies();
-        let mut contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
+        let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
             Default::default();
 
         let plugins = vec![
@@ -884,7 +899,12 @@ mod asset_pluggable_tests {
         let stored_plugins: Vec<Plugin> = contract
             .config
             .collection_plugins
-            .range(deps.as_ref().storage, None, None, cosmwasm_std::Order::Ascending)
+            .range(
+                deps.as_ref().storage,
+                None,
+                None,
+                cosmwasm_std::Order::Ascending,
+            )
             .map(|item| item.unwrap().1)
             .collect();
         assert_eq!(stored_plugins.len(), plugins.len() - 1);
@@ -897,15 +917,12 @@ mod asset_pluggable_tests {
 #[cfg(test)]
 mod query_test {
     use crate::{
-        msg::AssetExtensionQueryMsg,
-        plugin::Plugin,
-        state::ListingInfo,
+        msg::AssetExtensionQueryMsg, plugin::Plugin, state::ListingInfo,
         traits::DefaultAssetContract,
     };
     use cosmwasm_std::{
-        from_json,
+        Coin, Empty, from_json,
         testing::{mock_dependencies, mock_env},
-        Coin, Empty,
     };
     use cw721::{state::NftInfo, traits::Cw721Query};
 
@@ -927,6 +944,8 @@ mod query_test {
                 token_uri: None,
                 extension: Empty::default(),
             },
+            marketplace_fee_bps: None,
+            marketplace_fee_recipient: None,
         };
 
         contract
@@ -975,6 +994,8 @@ mod query_test {
                     token_uri: None,
                     extension: Empty::default(),
                 },
+                marketplace_fee_bps: None,
+                marketplace_fee_recipient: None,
             };
             contract
                 .config
@@ -1044,6 +1065,8 @@ mod query_test {
                     token_uri: None,
                     extension: Empty::default(),
                 },
+                marketplace_fee_bps: None,
+                marketplace_fee_recipient: None,
             };
             contract
                 .config
@@ -1083,7 +1106,7 @@ mod query_test {
         assert_eq!(second_page[1].id, "token-3");
         assert_eq!(second_page[2].id, "token-4");
     }
-    
+
     #[test]
     fn get_collection_plugins_returns_all_plugins() {
         let mut deps = mock_dependencies();

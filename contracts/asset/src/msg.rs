@@ -11,6 +11,8 @@ pub enum AssetExtensionExecuteMsg {
         token_id: String,
         price: Coin,
         reservation: Option<Reserve>,
+        marketplace_fee_bps: Option<u16>,
+        marketplace_fee_recipient: Option<String>,
     },
     Reserve {
         token_id: String,

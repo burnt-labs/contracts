@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    BankMsg, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError
+    Addr, BankMsg, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdError
 };
 use cw721::{state::NftInfo, traits::Cw721State, Expiration};
 
@@ -15,6 +15,8 @@ pub fn list<TNftExtension, TCustomResponseMsg>(
     id: String,
     price: Coin,
     reservation: Option<Reserve>,
+    marketplace_fee_bps: Option<u16>,
+    marketplace_fee_recipient: Option<String>,
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
 where
     TNftExtension: Cw721State,
@@ -31,6 +33,25 @@ where
             price: price.amount.u128(),
         });
     }
+
+    // validate market place fee and recipient
+    if let Some(market_fee) = marketplace_fee_bps {
+        if market_fee > 10_000 {
+            return Err(ContractError::InvalidMarketplaceFee {
+                bps: market_fee,
+                recipient: marketplace_fee_recipient.clone().unwrap_or_default(),
+            });
+        }
+    }
+    let (marketplace_fee_bps_ref, marketplace_fee_recipient_ref) = (&marketplace_fee_bps, &marketplace_fee_recipient);
+    if marketplace_fee_bps_ref.is_some() && marketplace_fee_recipient_ref.is_none() {
+        return Err(ContractError::InvalidMarketplaceFee {
+            bps: marketplace_fee_bps_ref.unwrap(),
+            recipient: "".to_string(),
+        });
+    } else if marketplace_fee_bps_ref.is_some() && marketplace_fee_recipient_ref.is_some() {
+        deps.api.addr_validate(marketplace_fee_recipient_ref.as_ref().unwrap())?;
+    }
     // Ensure the listing does not already exist
     let old_listing = asset_config.listings.may_load(deps.storage, &id)?;
     if old_listing.is_some() {
@@ -43,6 +64,8 @@ where
         price: price.clone(),
         reserved: reservation.clone(),
         nft_info,
+        marketplace_fee_bps,
+        marketplace_fee_recipient: Some(deps.api.addr_validate(&marketplace_fee_recipient.unwrap())?),
     };
     asset_config.listings.save(deps.storage, &id, &listing)?;
     Ok(Response::default()
@@ -137,6 +160,7 @@ pub fn buy<TNftExtension, TCustomResponseMsg>(
     info: &MessageInfo,
     id: String,
     recipient: Option<String>,
+    deductions: Vec<(String, Coin, String)>,
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
 where
     TNftExtension: Cw721State,
@@ -152,17 +176,41 @@ where
     let price = listing.price.clone();
     let seller = listing.seller.clone();
 
-    let payment = info
+    let mut payment = info
         .funds
         .iter()
         .find(|coin| coin.denom == price.denom)
-        .ok_or_else(|| ContractError::NoPayment {})?;
+        .ok_or_else(|| ContractError::NoPayment {})?.clone();
 
     if payment.amount.lt(&price.amount) || payment.denom != price.denom {
         return Err(ContractError::InvalidPayment {
             price: payment.amount.u128(),
             denom: payment.denom.clone(),
         });
+    }
+
+    let mut response = Response::<TCustomResponseMsg>::default();
+
+    if let Some(market_fee) = listing.marketplace_fee_bps {
+        let fee_amount = payment.amount.checked_multiply_ratio(market_fee, 10_000 as u128).map_err(|_| ContractError::InsufficientFunds {})?;
+        payment.amount = payment.amount.checked_sub(fee_amount).map_err(|_| ContractError::InsufficientFunds {})?;
+        if let Some(recipient) = listing.marketplace_fee_recipient {
+            if !fee_amount.is_zero() {
+                response = response.add_attribute("marketplace_fee", fee_amount.to_string());
+                response = response.add_message(BankMsg::Send {
+                    to_address: recipient.to_string(),
+                    amount: vec![Coin {
+                        denom: payment.denom.clone(),
+                        amount: fee_amount,
+                    }],
+                });
+            }
+        }
+    }
+
+    // remove all other deductions e.g. royalties from payment
+    for (_, amount, _) in deductions {
+        payment.amount = payment.amount.checked_sub(amount.amount).map_err(|_| ContractError::InsufficientFunds {})?;
     }
 
     let buyer = match recipient {
@@ -187,17 +235,18 @@ where
 
     asset_config.listings.remove(deps.storage, &id)?;
 
-    Ok(Response::default()
+    response = response
         .add_message(BankMsg::Send {
             to_address: seller.to_string(),
-            amount: vec![payment.clone()], // we send the entire payment to the seller
+            amount: vec![payment.clone()], // we send the remaining payment after deductions to the seller
         })
         .add_attribute("action", "buy")
         .add_attribute("id", id)
         .add_attribute("price", price.amount.to_string())
         .add_attribute("denom", price.denom)
         .add_attribute("seller", seller.to_string())
-        .add_attribute("buyer", buyer.to_string()))
+        .add_attribute("buyer", buyer.to_string());
+        Ok(response)
 }
 
 /// returns true if the sender can list the token
@@ -275,6 +324,8 @@ fn test_list() {
             "token-1".to_string(),
             price.clone(),
             None,
+            None,
+            None
         )
         .unwrap();
 
@@ -312,6 +363,8 @@ fn test_list() {
             "token-1".to_string(),
             Coin::new(200 as u128, "uxion"),
             None,
+            None,
+            None
         )
         .unwrap_err();
         assert_eq!(
@@ -346,6 +399,8 @@ fn test_list() {
             "token-2".to_string(),
             Coin::new(100 as u128, "uxion"),
             None,
+            None,
+            None
         )
         .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
@@ -380,6 +435,8 @@ fn test_list() {
             "token-3".to_string(),
             price.clone(),
             None,
+            None,
+            None
         )
         .unwrap();
 
@@ -447,6 +504,8 @@ fn test_list() {
             "token-4".to_string(),
             price.clone(),
             None,
+            None,
+            None
         )
         .unwrap();
 
@@ -516,6 +575,8 @@ fn test_list() {
             "token-5".to_string(),
             Coin::new(100 as u128, "uxion"),
             None,
+            None,
+            None
         )
         .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
@@ -545,6 +606,8 @@ fn test_list() {
             "token-3".to_string(),
             Coin::new(0 as u128, "uxion"),
             None,
+            None,
+            None
         )
         .unwrap_err();
         assert_eq!(err, ContractError::InvalidListingPrice { price: 0 });
@@ -562,6 +625,8 @@ fn test_list() {
             "token-999".to_string(),
             Coin::new(100 as u128, "uxion"),
             None,
+            None,
+            None
         )
         .unwrap_err();
         match err {
@@ -605,6 +670,8 @@ fn test_buy() {
                     price: price.clone(),
                     reserved: None,
                     nft_info: nft_info.clone(),
+                    marketplace_fee_bps: Some(100),
+                    marketplace_fee_recipient: Some(seller_addr.clone()),
                 },
             )
             .unwrap();
@@ -615,6 +682,7 @@ fn test_buy() {
             &message_info(&buyer_addr, &[price.clone()]),
             "token-1".to_string(),
             None,
+            vec![(seller_addr.to_string(), coin(10 as u128, "uxion"), "marketplace_fee".to_string())],
         )
         .unwrap();
 
@@ -626,6 +694,7 @@ fn test_buy() {
         assert_eq!(
             attrs,
             vec![
+                ("marketplace_fee".to_string(), "100".to_string()),
                 ("action".to_string(), "buy".to_string()),
                 ("id".to_string(), "token-1".to_string()),
                 ("price".to_string(), price.amount.to_string()),
@@ -643,7 +712,10 @@ fn test_buy() {
             msgs,
             vec![CosmosMsg::Bank(BankMsg::Send {
                 to_address: seller_addr.to_string(),
-                amount: coins(100 as u128, "uxion"),
+                amount: coins(1 as u128, "uxion"),
+            }),CosmosMsg::Bank(BankMsg::Send {
+                to_address: seller_addr.to_string(),
+                amount: coins(99 as u128, "uxion"),
             })],
         );
 
@@ -691,6 +763,8 @@ fn test_buy() {
                     price: price.clone(),
                     reserved: None,
                     nft_info: nft_info.clone(),
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();
@@ -701,6 +775,7 @@ fn test_buy() {
             &message_info(&buyer_addr, &[coin(50 as u128, "uxion")]),
             "token-2".to_string(),
             None,
+            vec![],
         )
         .unwrap_err();
         assert_eq!(
@@ -722,6 +797,7 @@ fn test_buy() {
             &message_info(&buyer_addr, &[coin(100 as u128, "uxion")]),
             "token-3".to_string(),
             None,
+            vec![],
         )
         .unwrap_err();
         assert_eq!(
@@ -763,6 +839,8 @@ fn test_buy() {
                         reserved_until: Expiration::AtHeight(env.block.height + 100),
                     }),
                     nft_info: nft_info.clone(),
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();
@@ -780,6 +858,8 @@ fn test_buy() {
                         reserved_until: Expiration::AtHeight(env.block.height + 100),
                     }),
                     nft_info: nft_info.clone(),
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();
@@ -790,6 +870,7 @@ fn test_buy() {
             &message_info(&seller_addr, &[price.clone()]),
             "token-4".to_string(),
             None,
+            vec![],
         )
         .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
@@ -801,6 +882,7 @@ fn test_buy() {
             &message_info(&buyer_addr, &[price.clone()]),
             "token-4".to_string(),
             None,
+            vec![],
         )
         .unwrap();
         let attrs: Vec<(String, String)> = response
@@ -834,6 +916,8 @@ fn test_buy() {
                         reserved_until: Expiration::AtHeight(env.block.height + 100),
                     }),
                     nft_info: nft_info.clone(),
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();
@@ -844,6 +928,7 @@ fn test_buy() {
             &message_info(&seller_addr, &[price.clone()]),
             "token-4".to_string(),
             Some(buyer_addr.to_string()), // buyer is the reserver
+            vec![],
         )
         .unwrap();
         let attrs: Vec<(String, String)> = response
@@ -898,6 +983,8 @@ fn test_delist() {
                     price: price.clone(),
                     reserved: None,
                     nft_info: nft_info.clone(),
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();
@@ -963,6 +1050,8 @@ fn test_delist() {
                     price: price.clone(),
                     reserved: None,
                     nft_info: nft_info.clone(),
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();
@@ -1025,6 +1114,8 @@ fn test_delist() {
                         reserver: seller_addr.clone(),
                     }),
                     nft_info: nft_info.clone(),
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();
@@ -1100,6 +1191,8 @@ fn test_reserve() {
                     price: price.clone(),
                     reserved: None,
                     nft_info: nft_info.clone(),
+                    marketplace_fee_bps: None,
+                    marketplace_fee_recipient: None,
                 },
             )
             .unwrap();

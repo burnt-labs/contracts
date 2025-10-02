@@ -7,7 +7,7 @@ use crate::{
     plugin::PluggableAsset,
     state::{AssetConfig, Reserve},
 };
-use cosmwasm_std::{Coin, CustomMsg, DepsMut, Empty, Env, MessageInfo, Response, to_json_binary};
+use cosmwasm_std::{to_json_binary, Addr, Coin, CustomMsg, DepsMut, Empty, Env, MessageInfo, Response};
 use cw_storage_plus::Bound;
 use cw721::traits::{
     Contains, Cw721CustomMsg, Cw721Execute, Cw721Query, Cw721State, FromAttributesState,
@@ -135,8 +135,19 @@ pub trait SellableAsset<
         id: String,
         price: Coin,
         reservation: Option<Reserve>,
+        marketplace_fee_bps: Option<u16>,
+        marketplace_fee_recipient: Option<String>,
     ) -> Result<Response<TCustomResponseMsg>, ContractError> {
-        list::<TNftExtension, TCustomResponseMsg>(deps, env, info, id, price, reservation)
+        list::<TNftExtension, TCustomResponseMsg>(
+            deps,
+            env,
+            info,
+            id,
+            price,
+            reservation,
+            marketplace_fee_bps,
+            marketplace_fee_recipient,
+        )
     }
     fn delist(
         &self,
@@ -164,8 +175,9 @@ pub trait SellableAsset<
         info: &MessageInfo,
         id: String,
         recipient: Option<String>,
+        deductions: Vec<(String, Coin, String)>,
     ) -> Result<Response<TCustomResponseMsg>, ContractError> {
-        buy::<TNftExtension, TCustomResponseMsg>(deps, env, info, id, recipient)
+        buy::<TNftExtension, TCustomResponseMsg>(deps, env, info, id, recipient, deductions)
     }
 }
 
@@ -250,7 +262,9 @@ where
                 token_id,
                 price,
                 reservation,
-            } => Ok(self.list(deps, env, info, token_id, price, reservation)?),
+                marketplace_fee_bps,
+                marketplace_fee_recipient,
+            } => Ok(self.list(deps, env, info, token_id, price, reservation, marketplace_fee_bps, marketplace_fee_recipient)?),
             AssetExtensionExecuteMsg::Reserve {
                 token_id,
                 reservation,
@@ -261,7 +275,7 @@ where
             AssetExtensionExecuteMsg::Buy {
                 token_id,
                 recipient,
-            } => Ok(self.buy(deps, env, info, token_id, recipient)?),
+            } => Ok(self.buy(deps, env, info, token_id, recipient, [].into())?),
             AssetExtensionExecuteMsg::SetCollectionPlugin { plugins } => {
                 self.save_plugin(deps, env, info, &plugins)?;
                 Ok(Response::new().add_attribute(

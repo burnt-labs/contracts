@@ -2,7 +2,8 @@ use std::{default, fmt::Display, time::Duration};
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    coin, Addr, BankMsg, Binary, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult, SubMsg, Timestamp
+    Addr, BankMsg, Binary, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo,
+    Response, StdResult, SubMsg, Timestamp, coin,
 };
 use cw721::{
     Expiration,
@@ -36,6 +37,7 @@ where
 
     /// The response being built up by the plugins.
     pub response: Response<TCustomResponseMsg>,
+    pub deductions: Vec<(String, Coin, String)>, // (recipient, amount, reason)
 
     pub data: Context,
 }
@@ -73,6 +75,7 @@ pub struct DefaultXionAssetContext {
     pub time_lock: Option<Duration>,
 
     pub allowed_marketplaces: Option<Vec<Addr>>,
+    pub marketplace_fee_bps: Option<u16>,
     pub allowed_currencies: Option<Vec<Coin>>,
 }
 
@@ -88,6 +91,7 @@ impl Default for DefaultXionAssetContext {
             not_after: Expiration::Never {},
             reservation: None,
             allowed_marketplaces: None,
+            marketplace_fee_bps: None,
             allowed_currencies: None,
             time_lock: None,
         }
@@ -355,6 +359,7 @@ pub trait PluggableAsset<
         _token_id: &String,
         _price: &Coin,
         _reservation: &Option<Reserve>,
+        _marketplace_fee_bps: &Option<u16>,
         _ctx: &'a mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
         Ok(true)
@@ -443,7 +448,9 @@ where
                 token_id,
                 price,
                 reservation,
-            } => self.on_list_plugin(token_id, price, reservation, ctx),
+                marketplace_fee_bps,
+                ..
+            } => self.on_list_plugin(token_id, price, reservation, marketplace_fee_bps, ctx),
             AssetExtensionExecuteMsg::Reserve {
                 token_id,
                 reservation,
@@ -462,24 +469,39 @@ where
         token_id: &String,
         price: &Coin,
         reservation: &Option<Reserve>,
+        marketplace_fee_bps: &Option<u16>,
         ctx: &mut DefaultPluginCtx,
     ) -> StdResult<bool> {
         // for listings we run the minimum price, not before, not after plugins if set
         let config = AssetConfig::<TNftExtension>::default();
-        let min_price_plugin = config
-            .collection_plugins
-            .may_load(ctx.deps.storage, Plugin::MinimumPrice { amount: coin(0, "") }.get_plugin_name())?;
-        let not_before_plugin = config
-            .collection_plugins
-            .may_load(ctx.deps.storage, Plugin::NotBefore{ time: Expiration::Never {}}.get_plugin_name())?;
-        let not_after_plugin = config
-            .collection_plugins
-            .may_load(ctx.deps.storage, Plugin::NotAfter{ time: Expiration::Never {}}.get_plugin_name())?;
-        let allowed_currencies_plugin = config
-            .collection_plugins
-            .may_load(ctx.deps.storage, Plugin::AllowedCurrencies{denoms: [].into()}.get_plugin_name())?;
+        let min_price_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::MinimumPrice {
+                amount: coin(0, ""),
+            }
+            .get_plugin_name(),
+        )?;
+        let not_before_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::NotBefore {
+                time: Expiration::Never {},
+            }
+            .get_plugin_name(),
+        )?;
+        let not_after_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::NotAfter {
+                time: Expiration::Never {},
+            }
+            .get_plugin_name(),
+        )?;
+        let allowed_currencies_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::AllowedCurrencies { denoms: [].into() }.get_plugin_name(),
+        )?;
         ctx.data.token_id = token_id.to_string();
         ctx.data.ask_price = Some(price.clone());
+        ctx.data.marketplace_fee_bps = *marketplace_fee_bps;
         ctx.data.reservation = reservation.clone();
         ctx.data.seller = Some(ctx.info.sender.clone());
         if let Some(plugin) = min_price_plugin {
@@ -509,12 +531,17 @@ where
     ) -> StdResult<bool> {
         // for buys we run the exact price, then allowed marketplaces and royalty plugins if set
         let config = AssetConfig::<TNftExtension>::default();
-        let allowed_marketplaces_plugin = config
-            .collection_plugins
-            .may_load(ctx.deps.storage, Plugin::AllowedMarketplaces { marketplaces: [].into() }.get_plugin_name())?;
-        let allowed_currencies_plugin = config
-            .collection_plugins
-            .may_load(ctx.deps.storage, Plugin::AllowedCurrencies { denoms: [].into() }.get_plugin_name())?;
+        let allowed_marketplaces_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::AllowedMarketplaces {
+                marketplaces: [].into(),
+            }
+            .get_plugin_name(),
+        )?;
+        let allowed_currencies_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::AllowedCurrencies { denoms: [].into() }.get_plugin_name(),
+        )?;
         let royalty_plugin = config
             .collection_plugins
             .may_load(ctx.deps.storage, "Royalty")?;
@@ -556,12 +583,20 @@ where
         ctx.data.buyer = ctx.info.sender.clone().into();
         ctx.data.reservation = Some(reservation.clone());
         ctx.data.token_id = token_id.to_string();
-        let allowed_marketplaces_plugin = config
-            .collection_plugins
-            .may_load(ctx.deps.storage, Plugin::AllowedMarketplaces { marketplaces: [].into() }.get_plugin_name())?;
-        let time_lock_plugin = config
-            .collection_plugins
-            .may_load(ctx.deps.storage, Plugin::TimeLock { time: Duration::from_secs(0) }.get_plugin_name())?;
+        let allowed_marketplaces_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::AllowedMarketplaces {
+                marketplaces: [].into(),
+            }
+            .get_plugin_name(),
+        )?;
+        let time_lock_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::TimeLock {
+                time: Duration::from_secs(0),
+            }
+            .get_plugin_name(),
+        )?;
         if let Some(plugin) = allowed_marketplaces_plugin {
             plugin.run_asset_plugin(ctx)?;
         }
@@ -583,6 +618,7 @@ where
             response: Response::default(),
             royalty: RoyaltyInfo::default(),
             data: DefaultXionAssetContext::default(),
+            deductions: vec![],
         }
     }
 
@@ -602,16 +638,14 @@ where
     }
 
     fn remove_plugin(
-            &self,
-            deps: DepsMut,
-            _env: &Env,
-            _info: &MessageInfo,
-            plugins: &Vec<String>,
-        ) -> StdResult<()> {
-         for plugin in plugins {
-            self.config
-                .collection_plugins
-                .remove(deps.storage, plugin);
+        &self,
+        deps: DepsMut,
+        _env: &Env,
+        _info: &MessageInfo,
+        plugins: &Vec<String>,
+    ) -> StdResult<()> {
+        for plugin in plugins {
+            self.config.collection_plugins.remove(deps.storage, plugin);
         }
         Ok(())
     }
@@ -656,6 +690,30 @@ pub mod default_plugins {
     pub fn min_price_plugin(
         ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>,
     ) -> StdResult<bool> {
+        // remove royalty and marketplace fees from the ask price if set
+        if let Some(royalty) = &ctx.royalty.collection_royalty_bps {
+            ctx.data.ask_price = ctx.data.ask_price.as_mut().map(|p| {
+                let royalty_amount = p.amount.multiply_ratio(*royalty as u128, 10_000u128);
+                Coin {
+                    denom: p.denom.clone(),
+                    amount: p.amount.checked_sub(royalty_amount).unwrap_or_default(),
+                }
+            });
+        }
+        if let Some(marketplace_fee) = &ctx.data.marketplace_fee_bps {
+            ctx.data.ask_price = ctx.data.ask_price.as_mut().map(|p| {
+                let marketplace_fee_amount = p
+                    .amount
+                    .multiply_ratio(*marketplace_fee as u128, 10_000u128);
+                Coin {
+                    denom: p.denom.clone(),
+                    amount: p
+                        .amount
+                        .checked_sub(marketplace_fee_amount)
+                        .unwrap_or_default(),
+                }
+            });
+        }
         // check if the minimum price is met
         if let Some(min_price) = &ctx.data.min_price {
             if let Some(ask_price) = ctx.data.ask_price.clone() {
@@ -791,10 +849,12 @@ pub mod default_plugins {
 
         let msg = SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
             to_address: recipient.to_string(),
-            amount: vec![royalty_coin],
+            amount: vec![royalty_coin.clone()],
         }));
 
         ctx.response.messages.push(msg);
+        ctx.deductions
+            .push((recipient.to_string(), royalty_coin, "royalty".to_string()));
 
         Ok(true)
     }
