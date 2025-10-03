@@ -20,7 +20,7 @@ use crate::{
     msg::AssetExtensionExecuteMsg,
     plugin,
     state::{AssetConfig, Reserve},
-    traits::{AssetContract, DefaultAssetContract},
+    traits::{AssetContract, DefaultAssetContract, SellableAsset},
 };
 
 /// Shared context passed through the pipeline, mutated by plugins.
@@ -438,6 +438,62 @@ where
     TNftExtensionMsg: Cw721CustomMsg,
     TNftExtensionMsg: StateFactory<TNftExtension>,
 {
+    fn execute_pluggable(
+        &self,
+        deps: DepsMut,
+        env: &Env,
+        info: &MessageInfo,
+        msg: Cw721ExecuteMsg<TNftExtensionMsg, TCollectionExtensionMsg, AssetExtensionExecuteMsg>,
+    ) -> Result<Response<Empty>, Cw721ContractError> {
+        let plugin_response: Response<Empty>;
+        let plugin_ctx_deductions: Vec<(String, Coin, String)>;
+        {
+            let mut plugin_ctx = Self::get_plugin_ctx(deps.as_ref(), env, info);
+
+            match &msg {
+                Cw721ExecuteMsg::TransferNft {
+                    recipient,
+                    token_id,
+                } => self.on_transfer_plugin(&recipient, &token_id, &mut plugin_ctx)?,
+                Cw721ExecuteMsg::UpdateExtension { msg } => {
+                    self.on_update_extension_plugin(&msg, &mut plugin_ctx)?
+                }
+                _ => true,
+            };
+            plugin_response = plugin_ctx.response;
+            plugin_ctx_deductions = plugin_ctx.deductions.clone();
+        };
+        let mut response = match &msg {
+            Cw721ExecuteMsg::UpdateExtension { msg: extension_msg } => {
+                match extension_msg {
+                    AssetExtensionExecuteMsg::Buy { token_id, recipient } => {
+                        self.buy(deps, env, info, (*token_id).clone(), (*recipient).clone(), plugin_ctx_deductions)?
+                    },
+                    _ => self.execute(deps, env, info, msg)?,
+                }
+            },
+             _ => self.execute(deps, env, info, msg)?,
+        };
+
+        response.messages.extend(plugin_response.messages);
+        response.events.extend(plugin_response.events);
+        response.attributes.extend(plugin_response.attributes);
+
+        if let Some(plugin_data) = plugin_response.data {
+            match &mut response.data {
+                Some(existing) => {
+                    let mut combined = Vec::with_capacity(existing.len() + plugin_data.len());
+                    combined.extend_from_slice(existing.as_slice());
+                    combined.extend_from_slice(plugin_data.as_slice());
+                    *existing = Binary::from(combined);
+                }
+                None => response.data = Some(plugin_data),
+            }
+        }
+
+        Ok(response)
+    }
+
     fn on_update_extension_plugin<'a>(
         &self,
         msg: &AssetExtensionExecuteMsg,

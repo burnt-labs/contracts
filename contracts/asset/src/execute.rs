@@ -641,12 +641,13 @@ fn test_buy() {
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
     use cosmwasm_std::{Empty, coin, coins};
 
-    // successful buy transfers ownership, pays seller, removes listing, and emits attributes
+    // successful buy transfers ownership, pays seller, pays royalties, removes listing, and emits attributes
     {
         let mut deps = mock_dependencies();
         let env = mock_env();
         let seller_addr = deps.api.addr_make("seller");
         let buyer_addr = deps.api.addr_make("buyer");
+        let owner_addr = deps.api.addr_make("owner");
         let nft_info = NftInfo {
             owner: seller_addr.clone(),
             approvals: vec![],
@@ -682,7 +683,7 @@ fn test_buy() {
             &message_info(&buyer_addr, &[price.clone()]),
             "token-1".to_string(),
             None,
-            vec![(seller_addr.to_string(), coin(10 as u128, "uxion"), "marketplace_fee".to_string())],
+            vec![(owner_addr.to_string(), coin(10 as u128, "uxion"), "royalties".to_string())],
         )
         .unwrap();
 
@@ -694,7 +695,7 @@ fn test_buy() {
         assert_eq!(
             attrs,
             vec![
-                ("marketplace_fee".to_string(), "100".to_string()),
+                ("marketplace_fee".to_string(), "1".to_string()),
                 ("action".to_string(), "buy".to_string()),
                 ("id".to_string(), "token-1".to_string()),
                 ("price".to_string(), price.amount.to_string()),
@@ -715,7 +716,7 @@ fn test_buy() {
                 amount: coins(1 as u128, "uxion"),
             }),CosmosMsg::Bank(BankMsg::Send {
                 to_address: seller_addr.to_string(),
-                amount: coins(99 as u128, "uxion"),
+                amount: coins(89 as u128, "uxion"),
             })],
         );
 
