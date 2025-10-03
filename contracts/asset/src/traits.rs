@@ -188,7 +188,6 @@ impl<
     TCollectionExtension,
     TCollectionExtensionMsg,
     TExtentionMsg,
-    TCustomResponseMsg,
 >
     SellableAsset<
         'a,
@@ -197,7 +196,7 @@ impl<
         TCollectionExtension,
         TCollectionExtensionMsg,
         TExtentionMsg,
-        TCustomResponseMsg,
+        Empty,
     >
     for AssetContract<
         'a,
@@ -214,7 +213,6 @@ where
     TCollectionExtension: FromAttributesState + ToAttributesState,
     TCollectionExtensionMsg: StateFactory<TCollectionExtension> + Cw721CustomMsg,
     TCollectionExtensionMsg: Default,
-    TCustomResponseMsg: CustomMsg,
 {
 }
 
@@ -224,7 +222,6 @@ impl<
     TNftExtensionMsg,
     TCollectionExtension,
     TCollectionExtensionMsg,
-    TCustomResponseMsg,
 >
     Cw721Execute<
         TNftExtension,
@@ -232,7 +229,7 @@ impl<
         TCollectionExtension,
         TCollectionExtensionMsg,
         AssetExtensionExecuteMsg,
-        TCustomResponseMsg,
+        Empty,
     >
     for DefaultAssetContract<
         'a,
@@ -244,7 +241,6 @@ impl<
 where
     TNftExtension: Cw721State,
     TNftExtensionMsg: StateFactory<TNftExtension> + Cw721CustomMsg,
-    TCustomResponseMsg: CustomMsg,
     TCollectionExtensionMsg: StateFactory<TCollectionExtension> + Cw721CustomMsg,
     TCollectionExtension: Cw721State,
     TCollectionExtension: FromAttributesState + ToAttributesState,
@@ -256,7 +252,7 @@ where
         env: &Env,
         info: &MessageInfo,
         msg: AssetExtensionExecuteMsg,
-    ) -> Result<Response<TCustomResponseMsg>, cw721::error::Cw721ContractError> {
+    ) -> Result<Response<Empty>, cw721::error::Cw721ContractError> {
         match msg {
             AssetExtensionExecuteMsg::List {
                 token_id,
