@@ -82,6 +82,7 @@ dependencies = [
 [[package]]
 name = "appattest-rs"
 version = "0.1.0"
+source = "git+https://github.com/mvid/appattest-rs.git?rev=5079835ed8c27862ce344aab974e8e446930586a#5079835ed8c27862ce344aab974e8e446930586a"
 dependencies = [
  "base64 0.22.1",
  "byteorder",
@@ -990,7 +991,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.1",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2122,7 +2123,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.1",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2462,7 +2463,7 @@ dependencies = [
  "getrandom 0.3.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.1",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

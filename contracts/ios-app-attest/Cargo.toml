@@ -17,8 +17,7 @@ cw-storage-plus    = { workspace = true }
 thiserror          = { workspace = true }
 serde              = { workspace = true }
 serde_json         = { workspace = true }
-#appattest-rs = {git = "https://github.com/mvid/appattest-rs.git", rev = "86ff67e0fabb9465790b9111e80d1f9d86622553"}
-appattest-rs = {path = "../../../../reliq/appattest-rs"}
+appattest-rs = {git = "https://github.com/mvid/appattest-rs.git", rev = "5079835ed8c27862ce344aab974e8e446930586a"}
 ciborium = "0.2.2"
 
 [dev-dependencies]
