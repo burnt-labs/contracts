@@ -1,3 +1,5 @@
+#[cfg(feature = "asset_base")]
+use crate::msg::AssetExtensionQueryMsg;
 // Default implementation of the xion asset standard showing how to set up a contract
 // to use the default trait XionAssetExecuteExtension
 use crate::plugin::PluggableAsset;
@@ -58,13 +60,19 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 #[cfg(feature = "asset_base")]
 pub fn query(
-    _deps: Deps,
-    _env: Env,
-    _msg: cw721::msg::Cw721QueryMsg<
+    deps: Deps,
+    env: Env,
+    msg: cw721::msg::Cw721QueryMsg<
         DefaultOptionalNftExtension,
         DefaultOptionalCollectionExtension,
-        cosmwasm_std::Empty,
+        AssetExtensionQueryMsg,
     >,
 ) -> StdResult<Binary> {
-    unimplemented!("asset query entry point is not implemented yet")
+    use cw721::traits::Cw721Query;
+
+    use crate::error::ContractError;
+
+     let contract: AssetBaseContract<'static> = AssetContract::default();
+
+    contract.query(deps, &env, msg).map_err(|err| ContractError::from(err).into())
 }

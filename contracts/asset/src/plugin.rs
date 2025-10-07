@@ -1,9 +1,9 @@
-use std::{default, fmt::Display, time::Duration};
+use std::{fmt::Display, time::Duration};
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     Addr, BankMsg, Binary, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo,
-    Response, StdResult, SubMsg, Timestamp, coin,
+    Response, StdResult, SubMsg, coin,
 };
 use cw721::{
     Expiration,
@@ -18,9 +18,8 @@ use cw721::{
 use crate::{
     error::ContractError,
     msg::AssetExtensionExecuteMsg,
-    plugin,
     state::{AssetConfig, Reserve},
-    traits::{AssetContract, DefaultAssetContract, SellableAsset},
+    traits::{DefaultAssetContract, SellableAsset},
 };
 
 /// Shared context passed through the pipeline, mutated by plugins.
@@ -464,15 +463,21 @@ where
             plugin_ctx_deductions = plugin_ctx.deductions.clone();
         };
         let mut response = match &msg {
-            Cw721ExecuteMsg::UpdateExtension { msg: extension_msg } => {
-                match extension_msg {
-                    AssetExtensionExecuteMsg::Buy { token_id, recipient } => {
-                        self.buy(deps, env, info, (*token_id).clone(), (*recipient).clone(), plugin_ctx_deductions)?
-                    },
-                    _ => self.execute(deps, env, info, msg)?,
-                }
+            Cw721ExecuteMsg::UpdateExtension { msg: extension_msg } => match extension_msg {
+                AssetExtensionExecuteMsg::Buy {
+                    token_id,
+                    recipient,
+                } => self.buy(
+                    deps,
+                    env,
+                    info,
+                    (*token_id).clone(),
+                    (*recipient).clone(),
+                    plugin_ctx_deductions,
+                )?,
+                _ => self.execute(deps, env, info, msg)?,
             },
-             _ => self.execute(deps, env, info, msg)?,
+            _ => self.execute(deps, env, info, msg)?,
         };
 
         response.messages.extend(plugin_response.messages);

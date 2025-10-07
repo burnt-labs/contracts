@@ -1,10 +1,10 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Coin, from_json, to_json_binary};
+use cosmwasm_std::{Addr, Coin};
 use cw_storage_plus::{IndexList, IndexedMap, Item, Map, MultiIndex};
 use cw721::{
     Expiration,
     state::{Cw721Config, NftInfo},
-    traits::{Cw721State, FromAttributesState, ToAttributesState},
+    traits::{Cw721State},
 };
 
 use crate::plugin::Plugin;
