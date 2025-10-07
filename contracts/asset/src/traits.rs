@@ -7,7 +7,7 @@ use crate::{
     plugin::PluggableAsset,
     state::{AssetConfig, Reserve},
 };
-use cosmwasm_std::{to_json_binary, Addr, Coin, CustomMsg, DepsMut, Empty, Env, MessageInfo, Response};
+use cosmwasm_std::{to_json_binary, Coin, CustomMsg, DepsMut, Empty, Env, MessageInfo, Response};
 use cw_storage_plus::Bound;
 use cw721::traits::{
     Contains, Cw721CustomMsg, Cw721Execute, Cw721Query, Cw721State, FromAttributesState,

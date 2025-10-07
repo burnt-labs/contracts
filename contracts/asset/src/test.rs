@@ -1174,7 +1174,7 @@ mod asset_pluggable_sellable_test {
     #[test]
     fn buy_deducts_marketplace_and_royalty_fees() {
         let mut deps = mock_dependencies();
-        let mut contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
+        let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
             Default::default();
 
         let seller = deps.api.addr_make("seller");

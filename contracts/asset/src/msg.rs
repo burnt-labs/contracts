@@ -1,6 +1,6 @@
 use crate::{plugin::Plugin, state::Reserve};
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Coin, CustomQuery};
+use cosmwasm_std::{Coin};
 use cw721::traits::Cw721CustomMsg;
 
 pub type InstantiateMsg<CollectionExtension> = cw721::msg::Cw721InstantiateMsg<CollectionExtension>;
