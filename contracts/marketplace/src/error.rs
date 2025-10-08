@@ -37,6 +37,9 @@ pub enum ContractError {
     #[error("Invalid payment: {expected} != {actual}")]
     InvalidPayment { expected: Coin, actual: Coin },
 
+    #[error("Invalid seller")]
+    InvalidSeller {},
+
     #[error("{0}")]
     PaymentError(#[from] PaymentError),
 }

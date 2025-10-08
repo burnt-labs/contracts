@@ -6,7 +6,6 @@ use blake2::{Blake2s256, Digest};
 use cosmwasm_std::{ensure, ensure_eq, Coin};
 use cosmwasm_std::{Addr, Empty, MessageInfo, QuerierWrapper};
 use cw721::msg::OwnerOfResponse;
-use cw721::{DefaultOptionalCollectionExtension, DefaultOptionalNftExtension};
 use cw721_base::msg::QueryMsg;
 use cw_utils::one_coin;
 

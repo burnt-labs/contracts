@@ -56,7 +56,14 @@ pub fn execute(
             collection,
             price,
             token_id,
-        } => execute_create_offer(deps, info, api.addr_validate(&collection)?, price, token_id),
+        } => execute_create_offer(
+            deps,
+            env,
+            info,
+            api.addr_validate(&collection)?,
+            price,
+            token_id,
+        ),
         ExecuteMsg::AcceptOffer {
             id,
             collection,
@@ -72,7 +79,7 @@ pub fn execute(
         ),
         ExecuteMsg::CancelOffer { id } => execute_cancel_offer(deps, info, id),
         ExecuteMsg::CreateCollectionOffer { collection, price } => {
-            execute_create_collection_offer(deps, info, api.addr_validate(&collection)?, price)
+            execute_create_collection_offer(deps, env, info, api.addr_validate(&collection)?, price)
         }
         ExecuteMsg::AcceptCollectionOffer {
             id,
