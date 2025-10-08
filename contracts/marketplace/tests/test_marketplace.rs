@@ -1,10 +1,15 @@
+use anyhow::Error;
 use cosmwasm_std::{coin, Addr, Empty};
+use cw_multi_test::AppResponse;
 use cw_multi_test::{Contract, ContractWrapper};
 use serde_json::json;
 use xion_nft_marketplace::helpers::generate_id;
 use xion_nft_marketplace::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use xion_nft_marketplace::state::{Listing, ListingStatus};
 
+pub fn assert_error(result: Result<AppResponse, Error>, expected: String) {
+    assert_eq!(result.unwrap_err().source().unwrap().to_string(), expected);
+}
 fn asset_contract() -> Box<dyn Contract<Empty>> {
     Box::new(ContractWrapper::new_with_empty(
         asset::contracts::asset_base::execute,
@@ -27,6 +32,7 @@ mod tests {
     use asset::msg::InstantiateMsg as AssetInstantiateMsg;
     use cw721::DefaultOptionalCollectionExtensionMsg;
     use cw721_base::msg::ExecuteMsg as Cw721ExecuteMsg;
+
     use cw_multi_test::{App, Executor};
     use xion_nft_marketplace::helpers::query_listing;
 
@@ -176,6 +182,345 @@ mod tests {
             assert_eq!(listing.price, price);
             assert_eq!(listing.seller, seller);
             assert_eq!(listing.status, ListingStatus::Active);
+        }
+        #[test]
+        fn test_create_listing_unauthorized() {
+            let mut app = setup_app();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let unauthorized_user = app.api().addr_make("unauthorized");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Try to create listing with unauthorized user
+            let price = coin(100, "uxion");
+            let list_msg = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price,
+                token_id: "token1".to_string(),
+            };
+
+            let result = app.execute_contract(
+                unauthorized_user.clone(),
+                marketplace_contract.clone(),
+                &list_msg,
+                &[],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::Unauthorized {
+                    message: "sender is not owner".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_create_listing_invalid_denom() {
+            let mut app = setup_app();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Try to create listing with invalid denom
+            let price = coin(100, "fakexion"); // Wrong denom
+            let list_msg = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price,
+                token_id: "token1".to_string(),
+            };
+
+            let result =
+                app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::InvalidListingDenom {
+                    expected: "uxion".to_string(),
+                    actual: "fakexion".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_create_listing_already_listed() {
+            let mut app = setup_app();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Approve marketplace contract to manage the NFT
+            let approve_msg = Cw721ExecuteMsg::Approve {
+                spender: marketplace_contract.to_string(),
+                token_id: "token1".to_string(),
+                expires: None,
+            };
+            app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+                .unwrap();
+
+            // Create listing
+            let price = coin(100, "uxion");
+            let list_msg = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price: price.clone(),
+                token_id: "token1".to_string(),
+            };
+
+            let result =
+                app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+            assert!(result.is_ok());
+            // Try to create second listing for same token
+            let list_msg2 = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price,
+                token_id: "token1".to_string(),
+            };
+
+            let result2 = app.execute_contract(
+                seller.clone(),
+                marketplace_contract.clone(),
+                &list_msg2,
+                &[],
+            );
+
+            assert!(result2.is_err());
+            assert_error(
+                result2,
+                xion_nft_marketplace::error::ContractError::AlreadyListed {}.to_string(),
+            );
+        }
+
+        #[test]
+        fn test_create_listing_nonexistent_token() {
+            let mut app = setup_app();
+            let seller = app.api().addr_make("seller");
+            let manager = app.api().addr_make("manager");
+            let minter = app.api().addr_make("minter");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Try to create listing for non-existent token
+            let price = coin(100, "uxion");
+            let list_msg = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price,
+                token_id: "nonexistent".to_string(),
+            };
+
+            let result =
+                app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::Unauthorized {
+                    message: "sender is not owner".to_string(),
+                }
+                .to_string(),
+            );
+        }
+    }
+
+    mod cancel_listing_tests {
+        use super::*;
+
+        fn create_listing(
+            app: &mut App,
+            marketplace_contract: &Addr,
+            asset_contract: &Addr,
+            seller: &Addr,
+            token_id: &str,
+            price: cosmwasm_std::Coin,
+        ) -> String {
+            // Approve marketplace contract to manage the NFT
+            let approve_msg = Cw721ExecuteMsg::Approve {
+                spender: marketplace_contract.to_string(),
+                token_id: token_id.to_string(),
+                expires: None,
+            };
+            app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+                .unwrap();
+
+            let list_msg = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price,
+                token_id: token_id.to_string(),
+            };
+
+            let result =
+                app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+            assert!(result.is_ok());
+
+            // Extract listing ID from events
+            let events = result.unwrap().events;
+            let list_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/list-item")
+                .unwrap();
+            // Find the id attribute by key
+            let id_attr = list_event
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap();
+            id_attr.value.clone()
+        }
+        #[test]
+        fn test_cancel_listing_success() {
+            let mut app = setup_app();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Create listing
+            let price = coin(100, "uxion");
+            let listing_id = create_listing(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price,
+            );
+
+            // Cancel listing
+            let cancel_msg = ExecuteMsg::CancelListing {
+                listing_id: listing_id.clone(),
+            };
+
+            let result = app.execute_contract(
+                seller.clone(),
+                marketplace_contract.clone(),
+                &cancel_msg,
+                &[],
+            );
+
+            assert!(result.is_ok());
+
+            // Verify the listing was cancelled by checking events
+            let events = result.unwrap().events;
+            let cancel_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/cancel-listing");
+            assert!(cancel_event.is_some());
+
+            // listing should not be found on the asset contract
+            let listing_resp = query_listing(&app.wrap(), &asset_contract, "token1");
+            assert!(listing_resp.is_err());
+
+            // listing should not be found on the marketplace contract
+            let listing_resp = app.wrap().query_wasm_smart::<Listing>(
+                marketplace_contract.clone(),
+                &QueryMsg::Listing {
+                    listing_id: listing_id.clone(),
+                },
+            );
+            assert!(listing_resp.is_err());
+        }
+
+        #[test]
+        fn test_cancel_listing_unauthorized() {
+            let mut app = setup_app();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let unauthorized_user = app.api().addr_make("unauthorized");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Create listing
+            let price = coin(100, "uxion");
+            let listing_id = create_listing(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price,
+            );
+
+            // Try to cancel listing with unauthorized user
+            let cancel_msg = ExecuteMsg::CancelListing { listing_id };
+
+            let result = app.execute_contract(
+                unauthorized_user.clone(),
+                marketplace_contract.clone(),
+                &cancel_msg,
+                &[],
+            );
+
+            assert!(result.is_err());
+
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::Unauthorized {
+                    message: "sender is not the seller".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_cancel_listing_nonexistent() {
+            let mut app = setup_app();
+            let seller = app.api().addr_make("seller");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Try to cancel non-existent listing
+            let cancel_msg = ExecuteMsg::CancelListing {
+                listing_id: "nonexistent".to_string(),
+            };
+
+            let result = app.execute_contract(
+                seller.clone(),
+                marketplace_contract.clone(),
+                &cancel_msg,
+                &[],
+            );
+
+            assert!(result.is_err());
+            result.unwrap_err().to_string().contains("not found");
         }
     }
 }

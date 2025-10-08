@@ -11,6 +11,8 @@ crate-type = ["cdylib", "rlib"]
 library = []
 
 [dependencies]
+anyhow.workspace = true
+
 asset           = { path = "../asset", features = ["library", "asset_base"] }
 blake2          = "0.10.6"
 cosmwasm-schema = { workspace = true }
@@ -26,4 +28,5 @@ serde_json      = { workspace = true }
 thiserror       = { workspace = true }
 
 [dev-dependencies]
+anyhow        = { workspace = true }
 cw-multi-test = { version = "2", features = ["staking", "stargate", "cosmwasm_2_2"] }

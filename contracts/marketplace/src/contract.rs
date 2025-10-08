@@ -220,6 +220,7 @@ pub fn execute_cancel_listing(
         });
     }
 
+    listings().remove(deps.storage, listing_id.clone())?;
     // query if there is a listing in the asset contract (in case is out of sync)
     let asset_listing = query_listing(&deps.querier, &listing.collection, &listing.token_id);
 
