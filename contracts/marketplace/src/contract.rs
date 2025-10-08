@@ -12,8 +12,8 @@ use crate::state::{listings, Listing, ListingStatus};
 use crate::state::{Config, CONFIG};
 use asset::msg::AssetExtensionExecuteMsg as AssetExecuteMsg;
 use cosmwasm_std::{
-    ensure, ensure_eq, entry_point, has_coins, to_json_binary, Addr, Coin, DepsMut, Empty, Env,
-    MessageInfo, Response, WasmMsg,
+    ensure_eq, entry_point, to_json_binary, Addr, Coin, DepsMut, Env, MessageInfo, Response,
+    WasmMsg,
 };
 use cw2::set_contract_version;
 

@@ -1,7 +1,5 @@
 use cosmwasm_std::{Addr, Coin, Event};
 
-const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
-
 pub fn create_listing_event(
     id: String,
     owner: Addr,
