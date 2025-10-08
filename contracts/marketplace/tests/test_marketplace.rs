@@ -40,6 +40,48 @@ mod tests {
         App::default()
     }
 
+    fn setup_app_with_balances() -> App {
+        use cosmwasm_std::coin;
+        use cw_multi_test::{App, BankSudo, SudoMsg};
+
+        let mut app = App::default();
+
+        // Create proper addresses using app.api().addr_make
+        let buyer = app.api().addr_make("buyer");
+        let seller = app.api().addr_make("seller");
+        let minter = app.api().addr_make("minter");
+        let manager = app.api().addr_make("manager");
+
+        // Mint tokens to test accounts using sudo
+        let funds = vec![coin(10000, "uxion")];
+
+        app.sudo(SudoMsg::Bank(BankSudo::Mint {
+            to_address: buyer.to_string(),
+            amount: funds.clone(),
+        }))
+        .unwrap();
+
+        app.sudo(SudoMsg::Bank(BankSudo::Mint {
+            to_address: seller.to_string(),
+            amount: funds.clone(),
+        }))
+        .unwrap();
+
+        app.sudo(SudoMsg::Bank(BankSudo::Mint {
+            to_address: minter.to_string(),
+            amount: funds.clone(),
+        }))
+        .unwrap();
+
+        app.sudo(SudoMsg::Bank(BankSudo::Mint {
+            to_address: manager.to_string(),
+            amount: funds.clone(),
+        }))
+        .unwrap();
+
+        app
+    }
+
     fn setup_asset_contract(app: &mut App, minter: &Addr) -> Addr {
         let asset_code_id = app.store_code(asset_contract());
 
@@ -521,6 +563,514 @@ mod tests {
 
             assert!(result.is_err());
             result.unwrap_err().to_string().contains("not found");
+        }
+    }
+
+    mod buy_item_tests {
+        use super::*;
+
+        fn extract_listing_id_from_events(events: &[cosmwasm_std::Event]) -> String {
+            let list_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/list-item")
+                .unwrap();
+            list_event
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap()
+                .value
+                .clone()
+        }
+
+        fn create_listing_for_buy_test(
+            app: &mut App,
+            marketplace_contract: &Addr,
+            asset_contract: &Addr,
+            seller: &Addr,
+            token_id: &str,
+            price: cosmwasm_std::Coin,
+        ) -> String {
+            // Approve marketplace contract to manage the NFT
+            let approve_msg = Cw721ExecuteMsg::Approve {
+                spender: marketplace_contract.to_string(),
+                token_id: token_id.to_string(),
+                expires: None,
+            };
+            app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+                .unwrap();
+
+            let list_msg = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price,
+                token_id: token_id.to_string(),
+            };
+
+            let result =
+                app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+            assert!(result.is_ok());
+
+            // Extract listing ID from events
+            let events = result.unwrap().events;
+            let list_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/list-item")
+                .unwrap();
+            let id_attr = list_event
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap();
+            id_attr.value.clone()
+        }
+
+        #[test]
+        fn test_buy_item_success() {
+            // This test follows the exact same pattern as test_create_listing_success
+            // but adds the buy functionality
+            let mut app = setup_app();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Approve marketplace contract to manage the NFT
+            let approve_msg = Cw721ExecuteMsg::Approve {
+                spender: marketplace_contract.to_string(),
+                token_id: "token1".to_string(),
+                expires: None,
+            };
+            app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+                .unwrap();
+
+            // Create listing (same as test_create_listing_success)
+            let price = coin(100, "uxion");
+            let list_msg = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price: price.clone(),
+                token_id: "token1".to_string(),
+            };
+
+            let result =
+                app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+            assert!(result.is_ok());
+
+            // Extract listing ID from events
+            let events = result.unwrap().events;
+            let listing_id = extract_listing_id_from_events(&events);
+
+            // Verify listing was created (same as test_create_listing_success)
+            let listing_resp = query_listing(&app.wrap(), &asset_contract, "token1");
+            assert!(listing_resp.is_ok());
+            let listing = listing_resp.unwrap();
+            assert_eq!(listing.price, price);
+
+            // Add funds for the buyer
+            use cosmwasm_std::coin;
+            use cw_multi_test::{BankSudo, SudoMsg};
+            let funds = vec![coin(10000, "uxion")];
+            app.sudo(SudoMsg::Bank(BankSudo::Mint {
+                to_address: buyer.to_string(),
+                amount: funds,
+            }))
+            .unwrap();
+
+            // Buy item using listing_id
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price.clone()],
+            );
+
+            match result {
+                Ok(response) => {
+                    // Verify the item was sold by checking events
+                    let events = response.events;
+                    let sell_event = events
+                        .iter()
+                        .find(|e| e.ty == "wasm-xion-nft-marketplace/item-sold");
+                    assert!(sell_event.is_some());
+
+                    // Verify NFT ownership changed
+                    let owner_query = cw721_base::msg::QueryMsg::OwnerOf {
+                        token_id: "token1".to_string(),
+                        include_expired: Some(false),
+                    };
+                    let owner_resp: cw721::msg::OwnerOfResponse = app
+                        .wrap()
+                        .query_wasm_smart(asset_contract.clone(), &owner_query)
+                        .unwrap();
+                    assert_eq!(owner_resp.owner, buyer.to_string());
+
+                    // Verify listing is no longer active
+                    let listing_resp = query_listing(&app.wrap(), &asset_contract, "token1");
+                    assert!(listing_resp.is_err());
+                }
+                Err(error) => {
+                    println!("Error: {:?}", error);
+                    panic!("Buy item failed: {:?}", error);
+                }
+            }
+        }
+
+        #[test]
+        fn test_buy_item_insufficient_funds() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Create listing
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_for_buy_test(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Try to buy item with insufficient funds
+            let insufficient_price = coin(50, "uxion");
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[insufficient_price],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::InvalidPayment {
+                    expected: price,
+                    actual: coin(50, "uxion"),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_buy_item_wrong_price() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Create listing
+            let listing_price = coin(100, "uxion");
+            let listing_id = create_listing_for_buy_test(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                listing_price.clone(),
+            );
+
+            // Try to buy item with wrong price
+            let wrong_price = coin(150, "uxion");
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: wrong_price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[wrong_price],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::InvalidPrice {
+                    expected: listing_price,
+                    actual: coin(150, "uxion"),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_buy_item_wrong_denomination() {
+            let mut app = setup_app();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Approve marketplace contract to manage the NFT
+            let approve_msg = Cw721ExecuteMsg::Approve {
+                spender: marketplace_contract.to_string(),
+                token_id: "token1".to_string(),
+                expires: None,
+            };
+            app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+                .unwrap();
+
+            // Create listing
+            let price = coin(100, "uxion");
+            let list_msg = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price: price.clone(),
+                token_id: "token1".to_string(),
+            };
+
+            let result =
+                app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+            assert!(result.is_ok());
+
+            // Extract listing ID from events
+            let events = result.unwrap().events;
+            let listing_id = extract_listing_id_from_events(&events);
+
+            // Add funds for the buyer
+            use cosmwasm_std::coin;
+            use cw_multi_test::{BankSudo, SudoMsg};
+            let funds = vec![coin(10000, "fakexion")]; // Give buyer fakexion instead of uxion
+            app.sudo(SudoMsg::Bank(BankSudo::Mint {
+                to_address: buyer.to_string(),
+                amount: funds,
+            }))
+            .unwrap();
+
+            // Try to buy item with wrong denomination
+            let wrong_denom_price = coin(100, "fakexion");
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: wrong_denom_price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[wrong_denom_price],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::InvalidPrice {
+                    expected: coin(100, "uxion"),
+                    actual: coin(100, "fakexion"),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_buy_item_nonexistent_listing() {
+            let mut app = setup_app_with_balances();
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+            let minter = app.api().addr_make("minter");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Try to buy item that's not listed
+            let price = coin(100, "uxion");
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: "nonexistent-listing-id".to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price],
+            );
+
+            assert!(result.is_err());
+            // Should fail because the listing doesn't exist
+            let error_msg = result.unwrap_err().to_string();
+            // The error is wrapped by the test framework, so we check for the generic error
+            assert!(error_msg.contains("Error executing") || error_msg.contains("WasmMsg"));
+        }
+
+        #[test]
+        fn test_buy_item_self_purchase() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Create listing
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_for_buy_test(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Try to buy own item (this should succeed - sellers can buy their own items)
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                seller.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price],
+            );
+
+            // This should succeed - sellers can buy their own items
+            assert!(result.is_ok());
+
+            // Verify the item was sold by checking events
+            let events = result.unwrap().events;
+            let sell_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/item-sold");
+            assert!(sell_event.is_some());
+        }
+
+        #[test]
+        fn test_buy_item_multiple_coins() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Create listing
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_for_buy_test(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Try to buy item with multiple coins
+            let extra_coin = coin(50, "fakexion");
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price, extra_coin],
+            );
+
+            assert!(result.is_err());
+            // Should fail because only one coin is expected
+            let error_msg = result.unwrap_err().to_string();
+            // The error is wrapped by the test framework, so we check for the generic error
+            assert!(error_msg.contains("Error executing") || error_msg.contains("WasmMsg"));
+        }
+
+        #[test]
+        fn test_buy_item_no_coins() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Create listing
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_for_buy_test(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Try to buy item without sending any coins
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            let result =
+                app.execute_contract(buyer.clone(), marketplace_contract.clone(), &buy_msg, &[]);
+
+            assert!(result.is_err());
+            // Should fail because no coins were sent
+            let error_msg = result.unwrap_err().to_string();
+            // The error is wrapped by the test framework, so we check for the generic error
+            assert!(error_msg.contains("Error executing") || error_msg.contains("WasmMsg"));
         }
     }
 }

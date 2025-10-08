@@ -18,8 +18,7 @@ pub enum ExecuteMsg {
         listing_id: String,
     },
     BuyItem {
-        collection: String,
-        token_id: String,
+        listing_id: String,
         price: Coin,
     },
     CreateOffer {

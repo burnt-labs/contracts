@@ -49,11 +49,9 @@ pub fn execute(
             token_id,
         } => execute_create_listing(deps, info, api.addr_validate(&collection)?, price, token_id),
         ExecuteMsg::CancelListing { listing_id } => execute_cancel_listing(deps, info, listing_id),
-        ExecuteMsg::BuyItem {
-            collection,
-            token_id,
-            price,
-        } => execute_buy_item(deps, info, api.addr_validate(&collection)?, token_id, price),
+        ExecuteMsg::BuyItem { listing_id, price } => {
+            execute_buy_item(deps, info, listing_id, price)
+        }
         ExecuteMsg::CreateOffer {
             collection,
             price,
@@ -215,17 +213,10 @@ pub fn execute_cancel_listing(
 pub fn execute_buy_item(
     deps: DepsMut,
     info: MessageInfo,
-    collection: Addr,
-    token_id: String,
+    listing_id: String,
     price: Coin,
 ) -> Result<Response, ContractError> {
-    let listing: asset::state::ListingInfo<Empty> = deps.querier.query_wasm_smart(
-        collection.clone().to_string(),
-        &asset::msg::AssetExtensionQueryMsg::GetListing {
-            token_id: token_id.clone(),
-        },
-    )?;
-
+    let listing = listings().load(deps.storage, listing_id.clone())?;
     // prevent price mismatch due to possible frontrunning
     if listing.price != price {
         return Err(ContractError::InvalidPrice {
@@ -243,7 +234,7 @@ pub fn execute_buy_item(
         asset::msg::AssetExtensionExecuteMsg,
     >::UpdateExtension {
         msg: asset::msg::AssetExtensionExecuteMsg::Buy {
-            token_id: token_id.clone(),
+            token_id: listing.token_id.clone(),
             recipient: Some(info.sender.to_string()),
         },
     };
@@ -251,14 +242,14 @@ pub fn execute_buy_item(
     Ok(Response::new()
         .add_event(item_sold_event(
             listing.id,
-            collection.clone(),
+            listing.collection.clone(),
             listing.seller,
             info.sender,
-            token_id.clone(),
+            listing.token_id.clone(),
             price,
         ))
         .add_message(WasmMsg::Execute {
-            contract_addr: collection.clone().to_string(),
+            contract_addr: listing.collection.clone().to_string(),
             msg: to_json_binary(&purchase_item)?,
             // send the payment to the asset contract
             funds: info.funds,
