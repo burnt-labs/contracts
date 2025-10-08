@@ -9,16 +9,15 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    CreateListing {
+    ListItem {
         price: Coin,
         collection: String,
         token_id: String,
     },
     CancelListing {
-        collection: String,
-        token_id: String,
+        listing_id: String,
     },
-    PurchaseItem {
+    BuyItem {
         collection: String,
         token_id: String,
         price: Coin,

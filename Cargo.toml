@@ -22,6 +22,7 @@ cw-storage-plus = "2.0.0"
 cw-utils = "2.0.0"
 cw2 = "2.0.0"
 cw721 = "0.20.0"
+cw721-base = "0.20.0"
 getrandom = { version = "0.2.10", features = ["custom"] }
 hex = "0.4"
 p256 = { version = "0.13.2", features = ["ecdsa-core", "arithmetic", "serde"] }

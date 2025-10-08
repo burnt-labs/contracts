@@ -65,7 +65,8 @@ where
         reserved: reservation.clone(),
         nft_info,
         marketplace_fee_bps,
-        marketplace_fee_recipient: Some(deps.api.addr_validate(&marketplace_fee_recipient.unwrap())?),
+        marketplace_fee_recipient: marketplace_fee_recipient
+        .map(|recipient| deps.api.addr_validate(&recipient).unwrap()),
     };
     asset_config.listings.save(deps.storage, &id, &listing)?;
     Ok(Response::default()

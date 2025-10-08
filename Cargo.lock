@@ -717,6 +717,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw721-base"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f3671b8e76ab8c22113e8d5b6e4bffbfb5df69a44cae99657a361941b95b6ca"
+dependencies = [
+ "cosmwasm-schema 2.2.2",
+ "cosmwasm-std 2.2.2",
+ "cw-ownable",
+ "cw2 2.0.0",
+ "cw721 0.20.0",
+ "serde",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1184,24 +1198,6 @@ name = "litemap"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
-
-[[package]]
-name = "marketplace"
-version = "0.1.0"
-dependencies = [
- "asset",
- "blake2",
- "cosmwasm-schema 2.2.2",
- "cosmwasm-std 2.2.2",
- "cw-address-like",
- "cw-multi-test",
- "cw-storage-plus 2.0.0",
- "cw2 2.0.0",
- "cw721 0.20.0",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
 
 [[package]]
 name = "memchr"
@@ -2040,6 +2036,26 @@ dependencies = [
  "prost 0.13.5",
  "serde",
  "tendermint-proto",
+]
+
+[[package]]
+name = "xion-nft-marketplace"
+version = "0.1.0"
+dependencies = [
+ "asset",
+ "blake2",
+ "cosmwasm-schema 2.2.2",
+ "cosmwasm-std 2.2.2",
+ "cw-address-like",
+ "cw-multi-test",
+ "cw-storage-plus 2.0.0",
+ "cw-utils 2.0.0",
+ "cw2 2.0.0",
+ "cw721 0.20.0",
+ "cw721-base",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -1,17 +1,19 @@
 use std::env;
 
 use crate::error::ContractError;
+use crate::helpers::{not_listed, only_owner, query_listing};
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::state::Offer;
 use crate::state::{init_auto_increment, next_auto_increment};
+use crate::state::{listings, Listing, ListingStatus, Offer};
 use crate::state::{offers, Config, CONFIG};
+use asset::msg::AssetExtensionExecuteMsg as AssetExecuteMsg;
 use blake2::{Blake2s256, Digest};
 use cosmwasm_std::{
-    ensure, entry_point, has_coins, to_json_binary, Addr, Binary, Coin, Deps, DepsMut, Empty, Env,
-    MessageInfo, Response, StdResult, WasmMsg,
+    ensure, ensure_eq, entry_point, has_coins, to_json_binary, Addr, Binary, Coin, Deps, DepsMut,
+    Empty, Env, MessageInfo, Response, StdResult, WasmMsg,
 };
 use cw2::set_contract_version;
-use cw721::Expiration;
+use cw_utils::one_coin;
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[entry_point]
@@ -28,6 +30,7 @@ pub fn instantiate(
     Ok(Response::new().add_attribute("method", "instantiate"))
 }
 
+use crate::events::{cancel_listing_event, create_listing_event};
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
@@ -37,20 +40,17 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     let api = deps.api;
     match msg {
-        ExecuteMsg::CreateListing {
+        ExecuteMsg::ListItem {
             collection,
             price,
             token_id,
-        } => execute_create_listing(env, collection, price, token_id),
-        ExecuteMsg::CancelListing {
-            collection,
-            token_id,
-        } => execute_cancel_listing(collection, token_id),
-        ExecuteMsg::PurchaseItem {
+        } => execute_create_listing(deps, info, api.addr_validate(&collection)?, price, token_id),
+        ExecuteMsg::CancelListing { listing_id } => execute_cancel_listing(deps, info, listing_id),
+        ExecuteMsg::BuyItem {
             collection,
             token_id,
             price,
-        } => execute_purchase_item(deps, info, collection, token_id, price),
+        } => execute_buy_item(deps, info, collection, token_id, price),
         ExecuteMsg::CreateOffer {
             collection,
             price,
@@ -76,7 +76,40 @@ pub fn generate_id(parts: Vec<&[u8]>) -> String {
     }
     format!("{:x}", hasher.finalize())
 }
-
+pub fn valid_payment(
+    info: &MessageInfo,
+    price: Coin,
+    valid_denom: String,
+) -> Result<(), ContractError> {
+    let payment = one_coin(&info)?;
+    // check if the payment is the valid denom
+    ensure_eq!(
+        payment.denom,
+        valid_denom,
+        ContractError::InvalidListingDenom {
+            expected: valid_denom,
+            actual: payment.denom,
+        }
+    );
+    // check if the payment is the same as the offer price
+    ensure_eq!(
+        payment.denom,
+        price.denom,
+        ContractError::InvalidListingDenom {
+            expected: price.denom,
+            actual: payment.denom,
+        }
+    );
+    // check if the payment is the same as the offer price
+    ensure!(
+        payment.amount == price.amount,
+        ContractError::InvalidPayment {
+            expected: price,
+            actual: payment,
+        }
+    );
+    Ok(())
+}
 pub fn execute_create_offer(
     deps: DepsMut,
     info: MessageInfo,
@@ -84,6 +117,8 @@ pub fn execute_create_offer(
     price: Coin,
     token_id: String,
 ) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+    valid_payment(&info, price.clone(), config.listing_denom)?;
     let auto_increment = next_auto_increment(deps.storage)?;
     let id = generate_id(vec![
         &collection.as_bytes(),
@@ -98,51 +133,131 @@ pub fn execute_create_offer(
         token_id,
         price,
     };
+    // reject offer for potential collision
     offers().update(deps.storage, id.to_string(), |prev| match prev {
         Some(_) => Err(ContractError::OfferAlreadyExists { id: id.to_string() }),
         None => Ok(offer),
     })?;
-
     Ok(Response::new().add_attribute("method", "create_offer"))
 }
+
 pub fn execute_create_listing(
-    env: Env,
-    collection: String,
+    deps: DepsMut,
+    info: MessageInfo,
+    collection: Addr,
     price: Coin,
     token_id: String,
 ) -> Result<Response, ContractError> {
-    let list = asset::msg::AssetExtensionExecuteMsg::List {
-        token_id,
-        price,
-        reservation: Some(asset::state::Reserve {
-            reserver: env.contract.address,
-            reserved_until: Expiration::AtTime(env.block.time.plus_seconds(3600)),
-        }),
+    only_owner(&deps.querier, &info, &collection, &token_id)?;
+    not_listed(&deps.querier, &collection, &token_id)?;
+    let config = CONFIG.load(deps.storage)?;
+    ensure_eq!(
+        price.denom,
+        CONFIG.load(deps.storage)?.listing_denom,
+        ContractError::InvalidListingDenom {
+            expected: config.listing_denom,
+            actual: price.denom,
+        }
+    );
+
+    // generate consistent id even across relisting helps single lookup
+    let id = generate_id(vec![&collection.as_bytes(), &token_id.as_bytes()]);
+    let listing = Listing {
+        id: id.clone(),
+        seller: info.sender.clone(),
+        collection: collection.clone(),
+        token_id: token_id.clone(),
+        price: price.clone(),
+        status: ListingStatus::Active,
+    };
+    // reject if listing already exists
+    listings().update(deps.storage, id.clone(), |prev| match prev {
+        Some(_) => Err(ContractError::AlreadyListed {}),
+        None => Ok(listing),
+    })?;
+    let list_msg = asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        AssetExecuteMsg,
+    >::UpdateExtension {
+        msg: AssetExecuteMsg::List {
+            token_id: token_id.clone(),
+            price: price.clone(),
+            reservation: None,
+            marketplace_fee_bps: None,
+            marketplace_fee_recipient: None,
+        },
     };
     Ok(Response::new()
-        .add_attribute("method", "create_listing")
+        .add_event(create_listing_event(
+            id,
+            info.sender,
+            collection.clone(),
+            token_id,
+            price,
+        ))
         .add_message(WasmMsg::Execute {
-            contract_addr: collection,
-            msg: to_json_binary(&list)?,
+            contract_addr: collection.to_string(),
+            msg: to_json_binary(&list_msg)?,
             funds: vec![],
         }))
 }
 
 pub fn execute_cancel_listing(
-    collection: String,
-    token_id: String,
+    deps: DepsMut,
+    info: MessageInfo,
+    listing_id: String,
 ) -> Result<Response, ContractError> {
-    let cancel_listing = asset::msg::AssetExtensionExecuteMsg::Delist { token_id };
-    Ok(Response::new()
-        .add_attribute("method", "cancel_listing")
-        .add_message(WasmMsg::Execute {
-            contract_addr: collection,
+    let listing = listings().load(deps.storage, listing_id.clone())?;
+    ensure_eq!(
+        listing.seller,
+        info.sender,
+        ContractError::Unauthorized {
+            message: "sender is not the seller".to_string(),
+        }
+    );
+    // can't cancel a list that is pending approval if sale approvals are enabled
+    // listings that are in pending status have already been placed a matching buy order
+    // but it's not yet been accepted by the manager
+    if CONFIG.load(deps.storage)?.sale_approvals && listing.status != ListingStatus::Active {
+        return Err(ContractError::InvalidListingStatus {
+            expected: ListingStatus::Active.to_string(),
+            actual: listing.status.to_string(),
+        });
+    }
+
+    // query if there is a listing in the asset contract (in case is out of sync)
+    let asset_listing = query_listing(&deps.querier, &listing.collection, &listing.token_id);
+
+    let mut sub_msgs = vec![];
+
+    if let Ok(_) = asset_listing {
+        let cancel_listing = asset::msg::ExecuteMsg::<
+            cw721::DefaultOptionalNftExtensionMsg,
+            cw721::DefaultOptionalCollectionExtensionMsg,
+            asset::msg::AssetExtensionExecuteMsg,
+        >::UpdateExtension {
+            msg: asset::msg::AssetExtensionExecuteMsg::Delist {
+                token_id: listing.token_id.clone(),
+            },
+        };
+        sub_msgs.push(WasmMsg::Execute {
+            contract_addr: listing.collection.to_string(),
             msg: to_json_binary(&cancel_listing)?,
             funds: vec![],
-        }))
+        });
+    }
+    Ok(Response::new()
+        .add_event(cancel_listing_event(
+            listing_id,
+            listing.collection.clone(),
+            listing.seller,
+            listing.token_id,
+        ))
+        .add_messages(sub_msgs))
 }
 
-pub fn execute_purchase_item(
+pub fn execute_buy_item(
     deps: DepsMut,
     info: MessageInfo,
     collection: String,
@@ -170,9 +285,15 @@ pub fn execute_purchase_item(
             actual: price,
         }
     );
-    let purchase_item = asset::msg::AssetExtensionExecuteMsg::Buy {
-        token_id,
-        recipient: Some(info.sender.to_string()),
+    let purchase_item = asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        asset::msg::AssetExtensionExecuteMsg,
+    >::UpdateExtension {
+        msg: asset::msg::AssetExtensionExecuteMsg::Buy {
+            token_id,
+            recipient: Some(info.sender.to_string()),
+        },
     };
     Ok(Response::new()
         .add_attribute("method", "purchase_item")
