@@ -1,4 +1,4 @@
-use crate::state::Config;
+use crate::state::{CollectionOffer, Config, Listing, Offer};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin};
 
@@ -44,6 +44,12 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     #[returns(Config<Addr>)]
     Config {},
+    #[returns(Listing)]
+    Listing { listing_id: String },
+    #[returns(Offer)]
+    Offer { offer_id: String },
+    #[returns(CollectionOffer)]
+    CollectionOffer { collection_offer_id: String },
 }
 
 #[cw_serde]

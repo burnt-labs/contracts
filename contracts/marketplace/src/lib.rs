@@ -2,8 +2,9 @@ extern crate core;
 
 #[cfg(not(feature = "library"))]
 pub mod contract;
-mod error;
-mod events;
-mod helpers;
+pub mod error;
+pub mod events;
+pub mod helpers;
 pub mod msg;
-mod state;
+pub mod query;
+pub mod state;

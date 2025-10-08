@@ -1,8 +1,8 @@
-use cosmwasm_std::{Addr, Empty, MessageInfo, QuerierWrapper};
-
 use asset::msg::AssetExtensionQueryMsg;
 use asset::msg::QueryMsg as AssetQueryMsg;
 use asset::state::ListingInfo;
+use blake2::{Blake2s256, Digest};
+use cosmwasm_std::{Addr, Empty, MessageInfo, QuerierWrapper};
 use cw721::msg::OwnerOfResponse;
 use cw721_base::msg::QueryMsg;
 
@@ -41,15 +41,17 @@ pub fn query_listing(
     querier: &QuerierWrapper,
     collection: &Addr,
     token_id: &str,
-) -> Result<ListingInfo<Empty>, ContractError> {
-    if let Ok(listing) = querier.query_wasm_smart::<ListingInfo<Empty>>(
-        collection.clone(),
-        &AssetQueryMsg::<Empty, Empty, AssetExtensionQueryMsg>::Extension {
-            msg: AssetExtensionQueryMsg::GetListing {
-                token_id: token_id.to_string(),
+) -> Result<ListingInfo<cw721::DefaultOptionalNftExtension>, ContractError> {
+    if let Ok(listing) = querier
+        .query_wasm_smart::<ListingInfo<cw721::DefaultOptionalNftExtension>>(
+            collection.clone(),
+            &AssetQueryMsg::<Empty, Empty, AssetExtensionQueryMsg>::Extension {
+                msg: AssetExtensionQueryMsg::GetListing {
+                    token_id: token_id.to_string(),
+                },
             },
-        },
-    ) {
+        )
+    {
         Ok(listing)
     } else {
         Err(ContractError::NotListed {})
@@ -65,4 +67,12 @@ pub fn not_listed(
         Ok(_) => Err(ContractError::AlreadyListed {}),
         Err(_) => Ok(()),
     }
+}
+
+pub fn generate_id(parts: Vec<&[u8]>) -> String {
+    let mut hasher = Blake2s256::new();
+    for part in parts {
+        hasher.update(part);
+    }
+    format!("{:x}", hasher.finalize())
 }

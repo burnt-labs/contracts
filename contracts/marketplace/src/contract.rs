@@ -1,16 +1,16 @@
 use std::env;
 
 use crate::error::ContractError;
-use crate::helpers::{not_listed, only_owner, query_listing};
-use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use crate::helpers::{generate_id, not_listed, only_owner, query_listing};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{init_auto_increment, next_auto_increment};
 use crate::state::{listings, Listing, ListingStatus, Offer};
 use crate::state::{offers, Config, CONFIG};
 use asset::msg::AssetExtensionExecuteMsg as AssetExecuteMsg;
-use blake2::{Blake2s256, Digest};
+
 use cosmwasm_std::{
-    ensure, ensure_eq, entry_point, has_coins, to_json_binary, Addr, Binary, Coin, Deps, DepsMut,
-    Empty, Env, MessageInfo, Response, StdResult, WasmMsg,
+    ensure, ensure_eq, entry_point, has_coins, to_json_binary, Addr, Coin, DepsMut, Empty, Env,
+    MessageInfo, Response, WasmMsg,
 };
 use cw2::set_contract_version;
 use cw_utils::one_coin;
@@ -69,13 +69,6 @@ pub fn execute(
     }
 }
 
-pub fn generate_id(parts: Vec<&[u8]>) -> String {
-    let mut hasher = Blake2s256::new();
-    for part in parts {
-        hasher.update(part);
-    }
-    format!("{:x}", hasher.finalize())
-}
 pub fn valid_payment(
     info: &MessageInfo,
     price: Coin,
@@ -188,6 +181,7 @@ pub fn execute_create_listing(
             marketplace_fee_recipient: None,
         },
     };
+
     Ok(Response::new()
         .add_event(create_listing_event(
             id,
@@ -302,16 +296,6 @@ pub fn execute_buy_item(
             msg: to_json_binary(&purchase_item)?,
             funds: info.funds,
         }))
-}
-#[entry_point]
-pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    match msg {
-        QueryMsg::Config {} => to_json_binary(&query_config(_deps)?),
-    }
-}
-
-pub fn query_config(deps: Deps) -> StdResult<Config<Addr>> {
-    Ok(CONFIG.load(deps.storage)?)
 }
 
 #[entry_point]
