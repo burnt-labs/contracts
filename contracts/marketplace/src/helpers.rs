@@ -1,12 +1,13 @@
+use crate::error::ContractError;
 use asset::msg::AssetExtensionQueryMsg;
 use asset::msg::QueryMsg as AssetQueryMsg;
 use asset::state::ListingInfo;
 use blake2::{Blake2s256, Digest};
+use cosmwasm_std::{ensure, ensure_eq, Coin};
 use cosmwasm_std::{Addr, Empty, MessageInfo, QuerierWrapper};
 use cw721::msg::OwnerOfResponse;
 use cw721_base::msg::QueryMsg;
-
-use crate::error::ContractError;
+use cw_utils::one_coin;
 
 pub fn only_owner(
     querier: &QuerierWrapper,
@@ -75,4 +76,39 @@ pub fn generate_id(parts: Vec<&[u8]>) -> String {
         hasher.update(part);
     }
     format!("{:x}", hasher.finalize())
+}
+
+pub fn valid_payment(
+    info: &MessageInfo,
+    price: Coin,
+    valid_denom: String,
+) -> Result<(), ContractError> {
+    let payment = one_coin(&info)?;
+    // check if the payment is the valid denom
+    ensure_eq!(
+        payment.denom,
+        valid_denom,
+        ContractError::InvalidListingDenom {
+            expected: valid_denom,
+            actual: payment.denom,
+        }
+    );
+    // check if the payment is the same as the offer price
+    ensure_eq!(
+        payment.denom,
+        price.denom,
+        ContractError::InvalidListingDenom {
+            expected: price.denom,
+            actual: payment.denom,
+        }
+    );
+    // check if the payment is the same as the offer price
+    ensure!(
+        payment.amount == price.amount,
+        ContractError::InvalidPayment {
+            expected: price,
+            actual: payment,
+        }
+    );
+    Ok(())
 }

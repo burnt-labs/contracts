@@ -29,12 +29,24 @@ pub enum ExecuteMsg {
     },
     AcceptOffer {
         id: String,
+        collection: String,
+        token_id: String,
+        price: Coin,
     },
     CreateCollectionOffer {
         collection: String,
         price: Coin,
     },
     AcceptCollectionOffer {
+        id: String,
+        collection: String,
+        token_id: String,
+        price: Coin,
+    },
+    CancelOffer {
+        id: String,
+    },
+    CancelCollectionOffer {
         id: String,
     },
 }

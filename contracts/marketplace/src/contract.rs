@@ -1,19 +1,22 @@
 use std::env;
 
 use crate::error::ContractError;
-use crate::helpers::{generate_id, not_listed, only_owner, query_listing};
+use crate::helpers::{generate_id, not_listed, only_owner, query_listing, valid_payment};
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
-use crate::state::{init_auto_increment, next_auto_increment};
-use crate::state::{listings, Listing, ListingStatus, Offer};
-use crate::state::{offers, Config, CONFIG};
+use crate::offers::{
+    execute_accept_collection_offer, execute_accept_offer, execute_cancel_collection_offer,
+    execute_cancel_offer, execute_create_collection_offer, execute_create_offer,
+};
+use crate::state::init_auto_increment;
+use crate::state::{listings, Listing, ListingStatus};
+use crate::state::{Config, CONFIG};
 use asset::msg::AssetExtensionExecuteMsg as AssetExecuteMsg;
-
 use cosmwasm_std::{
     ensure, ensure_eq, entry_point, has_coins, to_json_binary, Addr, Coin, DepsMut, Empty, Env,
     MessageInfo, Response, WasmMsg,
 };
 use cw2::set_contract_version;
-use cw_utils::one_coin;
+
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[entry_point]
@@ -56,82 +59,39 @@ pub fn execute(
             price,
             token_id,
         } => execute_create_offer(deps, info, api.addr_validate(&collection)?, price, token_id),
-        ExecuteMsg::AcceptOffer { .. } => {
-            Ok(Response::new().add_attribute("method", "accept_collection_offer"))
+        ExecuteMsg::AcceptOffer {
+            id,
+            collection,
+            token_id,
+            price,
+        } => execute_accept_offer(
+            deps,
+            info,
+            id,
+            api.addr_validate(&collection)?,
+            token_id,
+            price,
+        ),
+        ExecuteMsg::CancelOffer { id } => execute_cancel_offer(deps, info, id),
+        ExecuteMsg::CreateCollectionOffer { collection, price } => {
+            execute_create_collection_offer(deps, info, api.addr_validate(&collection)?, price)
         }
+        ExecuteMsg::AcceptCollectionOffer {
+            id,
+            collection,
+            token_id,
+            price,
+        } => execute_accept_collection_offer(
+            deps,
+            info,
+            id,
+            api.addr_validate(&collection)?,
+            token_id,
+            price,
+        ),
 
-        ExecuteMsg::CreateCollectionOffer { .. } => {
-            Ok(Response::new().add_attribute("method", "create_collection_offer"))
-        }
-        ExecuteMsg::AcceptCollectionOffer { .. } => {
-            Ok(Response::new().add_attribute("method", "accept_collection_offer"))
-        }
+        ExecuteMsg::CancelCollectionOffer { id } => execute_cancel_collection_offer(deps, info, id),
     }
-}
-
-pub fn valid_payment(
-    info: &MessageInfo,
-    price: Coin,
-    valid_denom: String,
-) -> Result<(), ContractError> {
-    let payment = one_coin(&info)?;
-    // check if the payment is the valid denom
-    ensure_eq!(
-        payment.denom,
-        valid_denom,
-        ContractError::InvalidListingDenom {
-            expected: valid_denom,
-            actual: payment.denom,
-        }
-    );
-    // check if the payment is the same as the offer price
-    ensure_eq!(
-        payment.denom,
-        price.denom,
-        ContractError::InvalidListingDenom {
-            expected: price.denom,
-            actual: payment.denom,
-        }
-    );
-    // check if the payment is the same as the offer price
-    ensure!(
-        payment.amount == price.amount,
-        ContractError::InvalidPayment {
-            expected: price,
-            actual: payment,
-        }
-    );
-    Ok(())
-}
-pub fn execute_create_offer(
-    deps: DepsMut,
-    info: MessageInfo,
-    collection: Addr,
-    price: Coin,
-    token_id: String,
-) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
-    valid_payment(&info, price.clone(), config.listing_denom)?;
-    let auto_increment = next_auto_increment(deps.storage)?;
-    let id = generate_id(vec![
-        &collection.as_bytes(),
-        &token_id.as_bytes(),
-        &info.sender.as_bytes(),
-        &auto_increment.to_string().as_bytes(),
-    ]);
-    let offer = Offer {
-        id: id.to_string(),
-        buyer: info.sender,
-        collection,
-        token_id,
-        price,
-    };
-    // reject offer for potential collision
-    offers().update(deps.storage, id.to_string(), |prev| match prev {
-        Some(_) => Err(ContractError::OfferAlreadyExists { id: id.to_string() }),
-        None => Ok(offer),
-    })?;
-    Ok(Response::new().add_attribute("method", "create_offer"))
 }
 
 pub fn execute_create_listing(
