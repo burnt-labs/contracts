@@ -1,4 +1,5 @@
 use crate::error::ContractError;
+use asset::msg::AssetExtensionExecuteMsg as AssetExecuteMsg;
 use asset::msg::AssetExtensionQueryMsg;
 use asset::msg::QueryMsg as AssetQueryMsg;
 use asset::state::ListingInfo;
@@ -111,4 +112,47 @@ pub fn valid_payment(
         }
     );
     Ok(())
+}
+
+pub fn asset_list_msg(
+    token_id: String,
+    price: Coin,
+) -> asset::msg::ExecuteMsg<
+    cw721::DefaultOptionalNftExtensionMsg,
+    cw721::DefaultOptionalCollectionExtensionMsg,
+    AssetExecuteMsg,
+> {
+    asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        AssetExecuteMsg,
+    >::UpdateExtension {
+        msg: AssetExecuteMsg::List {
+            token_id: token_id.clone(),
+            price: price.clone(),
+            reservation: None,
+            marketplace_fee_bps: None,
+            marketplace_fee_recipient: None,
+        },
+    }
+}
+
+pub fn asset_buy_msg(
+    recipient: Addr,
+    token_id: String,
+) -> asset::msg::ExecuteMsg<
+    cw721::DefaultOptionalNftExtensionMsg,
+    cw721::DefaultOptionalCollectionExtensionMsg,
+    AssetExecuteMsg,
+> {
+    asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        AssetExecuteMsg,
+    >::UpdateExtension {
+        msg: AssetExecuteMsg::Buy {
+            token_id: token_id.clone(),
+            recipient: Some(recipient.to_string()),
+        },
+    }
 }

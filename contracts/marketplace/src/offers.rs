@@ -1,8 +1,10 @@
 use crate::error::ContractError;
-use crate::helpers::{generate_id, only_owner, valid_payment};
+use crate::events::item_sold_event;
+use crate::helpers::{asset_buy_msg, asset_list_msg, generate_id, only_owner, valid_payment};
 use crate::state::{collection_offers, CollectionOffer, Offer, CONFIG};
-
-use cosmwasm_std::{ensure_eq, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{
+    ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, WasmMsg,
+};
 
 use crate::events::{
     cancel_collection_offer_event, cancel_offer_event, create_collection_offer_event,
@@ -58,7 +60,62 @@ pub fn execute_accept_offer(
     token_id: String,
     price: Coin,
 ) -> Result<Response, ContractError> {
-    Ok(Response::new().add_attribute("method", "accept_offer"))
+    only_owner(&deps.querier, &info, &collection, &token_id)?;
+    let offer = offers().load(deps.storage, offer_id.clone())?;
+    ensure_eq!(
+        offer.collection,
+        collection,
+        ContractError::InvalidCollection {
+            expected: collection.clone().to_string(),
+            actual: offer.collection.clone().to_string()
+        }
+    );
+    ensure_eq!(
+        token_id,
+        offer.token_id,
+        ContractError::InvalidTokenId {
+            expected: offer.token_id.clone(),
+            actual: token_id.clone()
+        }
+    );
+
+    if offer.price != price {
+        return Err(ContractError::InvalidPrice {
+            expected: offer.price,
+            actual: price,
+        });
+    }
+    if offer.buyer == info.sender {
+        return Err(ContractError::InvalidSeller {});
+    }
+    // list the item on the asset contract for the specific price
+    let list_msg = asset_list_msg(token_id.clone(), offer.price.clone());
+    // do a buy on the asset contract for the specific price and buyer
+    let buy_msg = asset_buy_msg(info.sender.clone(), token_id.clone());
+
+    offers().remove(deps.storage, offer_id.clone())?;
+
+    Ok(Response::new()
+        .add_event(item_sold_event(
+            "listing_id".to_string(),
+            offer.collection.clone(),
+            info.sender.clone(),
+            offer.buyer,
+            token_id.clone(),
+            offer.price.clone(),
+            Some(offer.id),
+            None,
+        ))
+        .add_message(WasmMsg::Execute {
+            contract_addr: offer.collection.clone().to_string(),
+            msg: to_json_binary(&list_msg)?,
+            funds: vec![],
+        })
+        .add_message(WasmMsg::Execute {
+            contract_addr: offer.collection.clone().to_string(),
+            msg: to_json_binary(&buy_msg)?,
+            funds: vec![price],
+        }))
 }
 
 pub fn execute_cancel_offer(
@@ -133,20 +190,54 @@ pub fn execute_accept_collection_offer(
     token_id: String,
     price: Coin,
 ) -> Result<Response, ContractError> {
-    // only owner of the nft can accept the offer
     only_owner(&deps.querier, &info, &collection, &token_id)?;
-    let offer = offers().load(deps.storage, offer_id)?;
-    ensure_eq!(offer.buyer, info.sender, ContractError::InvalidSeller {});
+    let offer = collection_offers().load(deps.storage, offer_id.clone())?;
     ensure_eq!(
-        offer.price,
-        price,
-        ContractError::InvalidPrice {
-            expected: offer.price,
-            actual: price
+        offer.collection,
+        collection,
+        ContractError::InvalidCollection {
+            expected: collection.clone().to_string(),
+            actual: offer.collection.clone().to_string()
         }
     );
 
-    Ok(Response::new().add_attribute("method", "accept_collection_offer"))
+    if offer.price != price {
+        return Err(ContractError::InvalidPrice {
+            expected: offer.price,
+            actual: price,
+        });
+    }
+    if offer.buyer == info.sender {
+        return Err(ContractError::InvalidSeller {});
+    }
+    // list the item on the asset contract for the specific price
+    let list_msg = asset_list_msg(token_id.clone(), offer.price.clone());
+    // do a buy on the asset contract for the specific price and buyer
+    let buy_msg = asset_buy_msg(info.sender.clone(), token_id.clone());
+
+    collection_offers().remove(deps.storage, offer_id.clone())?;
+
+    Ok(Response::new()
+        .add_event(item_sold_event(
+            "listing_id".to_string(),
+            offer.collection.clone(),
+            info.sender.clone(),
+            offer.buyer,
+            token_id.clone(),
+            offer.price.clone(),
+            Some(offer.id),
+            None,
+        ))
+        .add_message(WasmMsg::Execute {
+            contract_addr: offer.collection.clone().to_string(),
+            msg: to_json_binary(&list_msg)?,
+            funds: vec![],
+        })
+        .add_message(WasmMsg::Execute {
+            contract_addr: offer.collection.clone().to_string(),
+            msg: to_json_binary(&buy_msg)?,
+            funds: vec![price],
+        }))
 }
 
 pub fn execute_cancel_collection_offer(

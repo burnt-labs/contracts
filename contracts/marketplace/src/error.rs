@@ -40,6 +40,12 @@ pub enum ContractError {
     #[error("Invalid seller")]
     InvalidSeller {},
 
+    #[error("Invalid token: expected {expected}, got {actual}")]
+    InvalidTokenId { expected: String, actual: String },
+
+    #[error("Invalid collection: expected {expected}, got {actual}")]
+    InvalidCollection { expected: String, actual: String },
+
     #[error("{0}")]
     PaymentError(#[from] PaymentError),
 }

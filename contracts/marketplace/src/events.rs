@@ -30,14 +30,23 @@ pub fn item_sold_event(
     buyer: Addr,
     token_id: String,
     price: Coin,
+    offer_id: Option<String>,
+    collection_offer_id: Option<String>,
 ) -> Event {
-    Event::new(format!("{}/item-sold", env!("CARGO_PKG_NAME")))
+    let mut sold_event = Event::new(format!("{}/item-sold", env!("CARGO_PKG_NAME")))
         .add_attribute("id", id)
         .add_attribute("seller", seller.to_string())
         .add_attribute("buyer", buyer.to_string())
         .add_attribute("collection", collection.to_string())
         .add_attribute("token_id", token_id)
-        .add_attribute("price", price.to_string())
+        .add_attribute("price", price.to_string());
+    if let Some(id) = offer_id {
+        sold_event = sold_event.add_attribute("offer_id", id);
+    }
+    if let Some(id) = collection_offer_id {
+        sold_event = sold_event.add_attribute("collection_offer_id", id);
+    }
+    sold_event
 }
 
 pub fn cancel_offer_event(id: String, collection: Addr, owner: Addr, token_id: String) -> Event {

@@ -1,7 +1,10 @@
 use std::env;
 
 use crate::error::ContractError;
-use crate::helpers::{generate_id, not_listed, only_owner, query_listing, valid_payment};
+use crate::helpers::{
+    asset_buy_msg, asset_list_msg, generate_id, not_listed, only_owner, query_listing,
+    valid_payment,
+};
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::offers::{
     execute_accept_collection_offer, execute_accept_offer, execute_cancel_collection_offer,
@@ -133,20 +136,7 @@ pub fn execute_create_listing(
         Some(_) => Err(ContractError::AlreadyListed {}),
         None => Ok(listing),
     })?;
-    let list_msg = asset::msg::ExecuteMsg::<
-        cw721::DefaultOptionalNftExtensionMsg,
-        cw721::DefaultOptionalCollectionExtensionMsg,
-        AssetExecuteMsg,
-    >::UpdateExtension {
-        msg: AssetExecuteMsg::List {
-            token_id: token_id.clone(),
-            price: price.clone(),
-            reservation: None,
-            marketplace_fee_bps: None,
-            marketplace_fee_recipient: None,
-        },
-    };
-
+    let list_msg = asset_list_msg(token_id.clone(), price.clone());
     Ok(Response::new()
         .add_event(create_listing_event(
             id,
@@ -235,16 +225,7 @@ pub fn execute_buy_item(
     // check payment and funds are valid
     valid_payment(&info, price.clone(), listing.price.denom)?;
 
-    let purchase_item = asset::msg::ExecuteMsg::<
-        cw721::DefaultOptionalNftExtensionMsg,
-        cw721::DefaultOptionalCollectionExtensionMsg,
-        asset::msg::AssetExtensionExecuteMsg,
-    >::UpdateExtension {
-        msg: asset::msg::AssetExtensionExecuteMsg::Buy {
-            token_id: listing.token_id.clone(),
-            recipient: Some(info.sender.to_string()),
-        },
-    };
+    let buy_msg = asset_buy_msg(info.sender.clone(), listing.token_id.clone());
 
     Ok(Response::new()
         .add_event(item_sold_event(
@@ -254,10 +235,12 @@ pub fn execute_buy_item(
             info.sender,
             listing.token_id.clone(),
             price,
+            None,
+            None,
         ))
         .add_message(WasmMsg::Execute {
             contract_addr: listing.collection.clone().to_string(),
-            msg: to_json_binary(&purchase_item)?,
+            msg: to_json_binary(&buy_msg)?,
             // send the payment to the asset contract
             funds: info.funds,
         }))
