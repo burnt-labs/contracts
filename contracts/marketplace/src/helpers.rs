@@ -93,7 +93,7 @@ pub fn valid_payment(
             actual: payment.denom,
         }
     );
-    // check if the payment is the same as the offer price
+    // check if the payment  and listing have the same denom
     ensure_eq!(
         payment.denom,
         price.denom,
@@ -102,7 +102,7 @@ pub fn valid_payment(
             actual: payment.denom,
         }
     );
-    // check if the payment is the same as the offer price
+    // check if the payment is the same amount as the price
     ensure!(
         payment.amount == price.amount,
         ContractError::InvalidPayment {

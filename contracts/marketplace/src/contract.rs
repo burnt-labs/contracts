@@ -33,7 +33,7 @@ pub fn instantiate(
     Ok(Response::new().add_attribute("method", "instantiate"))
 }
 
-use crate::events::{cancel_listing_event, create_listing_event};
+use crate::events::{cancel_listing_event, create_listing_event, item_sold_event};
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
@@ -53,7 +53,7 @@ pub fn execute(
             collection,
             token_id,
             price,
-        } => execute_buy_item(deps, info, collection, token_id, price),
+        } => execute_buy_item(deps, info, api.addr_validate(&collection)?, token_id, price),
         ExecuteMsg::CreateOffer {
             collection,
             price,
@@ -215,17 +215,18 @@ pub fn execute_cancel_listing(
 pub fn execute_buy_item(
     deps: DepsMut,
     info: MessageInfo,
-    collection: String,
+    collection: Addr,
     token_id: String,
     price: Coin,
 ) -> Result<Response, ContractError> {
     let listing: asset::state::ListingInfo<Empty> = deps.querier.query_wasm_smart(
-        collection.clone(),
+        collection.clone().to_string(),
         &asset::msg::AssetExtensionQueryMsg::GetListing {
             token_id: token_id.clone(),
         },
     )?;
 
+    // prevent price mismatch due to possible frontrunning
     if listing.price != price {
         return Err(ContractError::InvalidPrice {
             expected: listing.price,
@@ -233,28 +234,33 @@ pub fn execute_buy_item(
         });
     }
 
-    ensure!(
-        has_coins(&info.funds, &price),
-        ContractError::InvalidPrice {
-            expected: listing.price,
-            actual: price,
-        }
-    );
+    // check payment and funds are valid
+    valid_payment(&info, price.clone(), listing.price.denom)?;
+
     let purchase_item = asset::msg::ExecuteMsg::<
         cw721::DefaultOptionalNftExtensionMsg,
         cw721::DefaultOptionalCollectionExtensionMsg,
         asset::msg::AssetExtensionExecuteMsg,
     >::UpdateExtension {
         msg: asset::msg::AssetExtensionExecuteMsg::Buy {
-            token_id,
+            token_id: token_id.clone(),
             recipient: Some(info.sender.to_string()),
         },
     };
+
     Ok(Response::new()
-        .add_attribute("method", "purchase_item")
+        .add_event(item_sold_event(
+            listing.id,
+            collection.clone(),
+            listing.seller,
+            info.sender,
+            token_id.clone(),
+            price,
+        ))
         .add_message(WasmMsg::Execute {
-            contract_addr: collection.clone(),
+            contract_addr: collection.clone().to_string(),
             msg: to_json_binary(&purchase_item)?,
+            // send the payment to the asset contract
             funds: info.funds,
         }))
 }
