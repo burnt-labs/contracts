@@ -4,7 +4,10 @@ use crate::state::{collection_offers, CollectionOffer, Offer, CONFIG};
 
 use cosmwasm_std::{ensure_eq, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response};
 
-use crate::events::{cancel_collection_offer_event, cancel_offer_event};
+use crate::events::{
+    cancel_collection_offer_event, cancel_offer_event, create_collection_offer_event,
+    create_offer_event,
+};
 use crate::state::{next_auto_increment, offers};
 
 pub fn execute_create_offer(
@@ -28,10 +31,10 @@ pub fn execute_create_offer(
     ]);
     let offer = Offer {
         id: id.clone().to_string(),
-        buyer: info.sender,
-        collection,
-        token_id,
-        price,
+        buyer: info.sender.clone(),
+        collection: collection.clone(),
+        token_id: token_id.clone(),
+        price: price.clone(),
     };
     // reject offer for potential collision
     offers().update(deps.storage, id.clone().to_string(), |prev| match prev {
@@ -39,7 +42,13 @@ pub fn execute_create_offer(
         None => Ok(offer),
     })?;
 
-    Ok(Response::new().add_attribute("method", "create_offer"))
+    Ok(Response::new().add_event(create_offer_event(
+        id,
+        collection,
+        info.sender,
+        token_id,
+        price,
+    )))
 }
 pub fn execute_accept_offer(
     deps: DepsMut,
@@ -58,7 +67,13 @@ pub fn execute_cancel_offer(
     offer_id: String,
 ) -> Result<Response, ContractError> {
     let offer = offers().load(deps.storage, offer_id.clone())?;
-    assert_eq!(offer.buyer, info.sender);
+    ensure_eq!(
+        offer.buyer,
+        info.sender,
+        ContractError::Unauthorized {
+            message: "sender is not the buyer".to_string()
+        }
+    );
     offers().remove(deps.storage, offer_id)?;
     let refund_msg = BankMsg::Send {
         to_address: offer.buyer.to_string(),
@@ -93,16 +108,21 @@ pub fn execute_create_collection_offer(
     ]);
     let collection_offer = CollectionOffer {
         id: id.to_string(),
-        buyer: info.sender,
-        collection,
-        price,
+        buyer: info.sender.clone(),
+        collection: collection.clone(),
+        price: price.clone(),
     };
     // reject offer for potential collision
     collection_offers().update(deps.storage, id.to_string(), |prev| match prev {
         Some(_) => Err(ContractError::OfferAlreadyExists { id: id.to_string() }),
         None => Ok(collection_offer),
     })?;
-    Ok(Response::new())
+    Ok(Response::new().add_event(create_collection_offer_event(
+        id,
+        collection,
+        info.sender,
+        price,
+    )))
 }
 
 pub fn execute_accept_collection_offer(
@@ -135,7 +155,13 @@ pub fn execute_cancel_collection_offer(
     offer_id: String,
 ) -> Result<Response, ContractError> {
     let collection_offer = collection_offers().load(deps.storage, offer_id.clone())?;
-    assert_eq!(collection_offer.buyer, info.sender);
+    ensure_eq!(
+        collection_offer.buyer,
+        info.sender,
+        ContractError::Unauthorized {
+            message: "sender is not the buyer".to_string()
+        }
+    );
     collection_offers().remove(deps.storage, offer_id)?;
 
     let refund_msg = BankMsg::Send {

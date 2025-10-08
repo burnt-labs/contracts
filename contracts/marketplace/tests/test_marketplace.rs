@@ -1073,4 +1073,678 @@ mod tests {
             assert!(error_msg.contains("Error executing") || error_msg.contains("WasmMsg"));
         }
     }
+
+    mod create_offer_tests {
+        use super::*;
+
+        #[test]
+        fn test_create_offer_success() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Create offer
+            let price = coin(100, "uxion");
+            let offer_msg = ExecuteMsg::CreateOffer {
+                collection: asset_contract.to_string(),
+                token_id: "token1".to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[price.clone()],
+            );
+
+            assert!(result.is_ok());
+
+            // Verify the offer was created by checking event
+            let response = result.unwrap();
+            let events = response.events;
+            let offer_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/create-offer");
+            assert!(offer_event.is_some());
+
+            // Verify event has ID attribute
+            let id_attr = offer_event
+                .unwrap()
+                .attributes
+                .iter()
+                .find(|a| a.key == "id");
+            assert!(id_attr.is_some());
+        }
+
+        #[test]
+        fn test_create_offer_without_funds() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Try to create offer without sending funds
+            let price = coin(100, "uxion");
+            let offer_msg = ExecuteMsg::CreateOffer {
+                collection: asset_contract.to_string(),
+                token_id: "token1".to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[], // No funds sent
+            );
+
+            assert!(result.is_err());
+            // Should fail because no funds were sent for escrow
+        }
+
+        #[test]
+        fn test_create_offer_wrong_denom() {
+            let mut app = setup_app();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Mint wrong denom to buyer
+            use cw_multi_test::{BankSudo, SudoMsg};
+            let funds = vec![coin(10000, "fakexion")];
+            app.sudo(SudoMsg::Bank(BankSudo::Mint {
+                to_address: buyer.to_string(),
+                amount: funds,
+            }))
+            .unwrap();
+
+            // Try to create offer with wrong denom
+            let price = coin(100, "fakexion");
+            let offer_msg = ExecuteMsg::CreateOffer {
+                collection: asset_contract.to_string(),
+                token_id: "token1".to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[price.clone()],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::InvalidListingDenom {
+                    expected: "uxion".to_string(),
+                    actual: "fakexion".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_create_offer_insufficient_funds() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Try to create offer with insufficient funds
+            let price = coin(100, "uxion");
+            let insufficient = coin(50, "uxion");
+            let offer_msg = ExecuteMsg::CreateOffer {
+                collection: asset_contract.to_string(),
+                token_id: "token1".to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[insufficient.clone()],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::InvalidPayment {
+                    expected: price,
+                    actual: insufficient,
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_create_offer_nonexistent_token() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Create offer for nonexistent token (should still succeed as offers don't validate existence)
+            let price = coin(100, "uxion");
+            let offer_msg = ExecuteMsg::CreateOffer {
+                collection: asset_contract.to_string(),
+                token_id: "nonexistent".to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[price.clone()],
+            );
+
+            // Offers can be created for nonexistent tokens
+            assert!(result.is_ok());
+        }
+    }
+
+    mod cancel_offer_tests {
+        use super::*;
+
+        fn create_offer_helper(
+            app: &mut App,
+            marketplace_contract: &Addr,
+            asset_contract: &Addr,
+            buyer: &Addr,
+            token_id: &str,
+            price: cosmwasm_std::Coin,
+        ) -> String {
+            let offer_msg = ExecuteMsg::CreateOffer {
+                collection: asset_contract.to_string(),
+                token_id: token_id.to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[price],
+            );
+            assert!(result.is_ok());
+
+            // Extract offer ID from events
+            let events = result.unwrap().events;
+            let offer_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/create-offer")
+                .unwrap();
+            offer_event
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap()
+                .value
+                .clone()
+        }
+
+        #[test]
+        fn test_cancel_offer_success() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Check buyer balance before
+            let buyer_balance_before = app.wrap().query_balance(buyer.clone(), "uxion").unwrap();
+
+            // Create offer and get ID from event
+            let price = coin(100, "uxion");
+            let offer_id = create_offer_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &buyer,
+                "token1",
+                price.clone(),
+            );
+
+            // Cancel offer
+            let cancel_msg = ExecuteMsg::CancelOffer { id: offer_id };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &cancel_msg,
+                &[],
+            );
+
+            assert!(result.is_ok());
+
+            // Verify refund was sent
+            let buyer_balance_after = app.wrap().query_balance(buyer.clone(), "uxion").unwrap();
+            assert_eq!(buyer_balance_before, buyer_balance_after);
+
+            // Verify event was emitted
+            let events = result.unwrap().events;
+            let cancel_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/cancel-offer");
+            assert!(cancel_event.is_some());
+        }
+
+        #[test]
+        fn test_cancel_offer_unauthorized() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let unauthorized = app.api().addr_make("unauthorized");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Create offer and get ID from event
+            let price = coin(100, "uxion");
+            let offer_id = create_offer_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &buyer,
+                "token1",
+                price.clone(),
+            );
+
+            // Try to cancel offer with unauthorized user
+            let cancel_msg = ExecuteMsg::CancelOffer { id: offer_id };
+
+            let result = app.execute_contract(
+                unauthorized.clone(),
+                marketplace_contract.clone(),
+                &cancel_msg,
+                &[],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::Unauthorized {
+                    message: "sender is not the buyer".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_cancel_offer_nonexistent() {
+            let mut app = setup_app_with_balances();
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+            let minter = app.api().addr_make("minter");
+
+            // Setup contracts
+            let _asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Try to cancel nonexistent offer
+            let cancel_msg = ExecuteMsg::CancelOffer {
+                id: "nonexistent-offer-id".to_string(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &cancel_msg,
+                &[],
+            );
+
+            assert!(result.is_err());
+            // Should fail because offer doesn't exist
+        }
+    }
+
+    mod create_collection_offer_tests {
+        use super::*;
+
+        #[test]
+        fn test_create_collection_offer_success() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Create collection offer
+            let price = coin(100, "uxion");
+            let offer_msg = ExecuteMsg::CreateCollectionOffer {
+                collection: asset_contract.to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[price.clone()],
+            );
+
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_create_collection_offer_without_funds() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Try to create collection offer without funds
+            let price = coin(100, "uxion");
+            let offer_msg = ExecuteMsg::CreateCollectionOffer {
+                collection: asset_contract.to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[], // No funds
+            );
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_create_collection_offer_wrong_denom() {
+            let mut app = setup_app();
+            let minter = app.api().addr_make("minter");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Mint wrong denom to buyer
+            use cw_multi_test::{BankSudo, SudoMsg};
+            let funds = vec![coin(10000, "fakexion")];
+            app.sudo(SudoMsg::Bank(BankSudo::Mint {
+                to_address: buyer.to_string(),
+                amount: funds,
+            }))
+            .unwrap();
+
+            // Try to create collection offer with wrong denom
+            let price = coin(100, "fakexion");
+            let offer_msg = ExecuteMsg::CreateCollectionOffer {
+                collection: asset_contract.to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[price.clone()],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::InvalidListingDenom {
+                    expected: "uxion".to_string(),
+                    actual: "fakexion".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_create_collection_offer_insufficient_funds() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Try to create collection offer with insufficient funds
+            let price = coin(100, "uxion");
+            let insufficient = coin(50, "uxion");
+            let offer_msg = ExecuteMsg::CreateCollectionOffer {
+                collection: asset_contract.to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[insufficient.clone()],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::InvalidPayment {
+                    expected: price,
+                    actual: insufficient,
+                }
+                .to_string(),
+            );
+        }
+    }
+
+    mod cancel_collection_offer_tests {
+        use super::*;
+
+        fn create_collection_offer_helper(
+            app: &mut App,
+            marketplace_contract: &Addr,
+            asset_contract: &Addr,
+            buyer: &Addr,
+            price: cosmwasm_std::Coin,
+        ) -> String {
+            let offer_msg = ExecuteMsg::CreateCollectionOffer {
+                collection: asset_contract.to_string(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &offer_msg,
+                &[price],
+            );
+            assert!(result.is_ok());
+
+            // Extract collection offer ID from events
+            let events = result.unwrap().events;
+            let offer_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/create-collection-offer")
+                .unwrap();
+            offer_event
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap()
+                .value
+                .clone()
+        }
+
+        #[test]
+        fn test_cancel_collection_offer_success() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Check buyer balance before
+            let buyer_balance_before = app.wrap().query_balance(buyer.clone(), "uxion").unwrap();
+
+            // Create collection offer and get ID from event
+            let price = coin(100, "uxion");
+            let offer_id = create_collection_offer_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &buyer,
+                price.clone(),
+            );
+
+            // Cancel collection offer
+            let cancel_msg = ExecuteMsg::CancelCollectionOffer { id: offer_id };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &cancel_msg,
+                &[],
+            );
+
+            assert!(result.is_ok());
+
+            // Verify refund was sent
+            let buyer_balance_after = app.wrap().query_balance(buyer.clone(), "uxion").unwrap();
+            assert_eq!(buyer_balance_before, buyer_balance_after);
+
+            // Verify event was emitted
+            let events = result.unwrap().events;
+            let cancel_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/cancel-collection-offer");
+            assert!(cancel_event.is_some());
+        }
+
+        #[test]
+        fn test_cancel_collection_offer_unauthorized() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let buyer = app.api().addr_make("buyer");
+            let unauthorized = app.api().addr_make("unauthorized");
+            let manager = app.api().addr_make("manager");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Create collection offer and get ID from event
+            let price = coin(100, "uxion");
+            let offer_id = create_collection_offer_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &buyer,
+                price.clone(),
+            );
+
+            // Try to cancel with unauthorized user
+            let cancel_msg = ExecuteMsg::CancelCollectionOffer { id: offer_id };
+
+            let result = app.execute_contract(
+                unauthorized.clone(),
+                marketplace_contract.clone(),
+                &cancel_msg,
+                &[],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::Unauthorized {
+                    message: "sender is not the buyer".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_cancel_collection_offer_nonexistent() {
+            let mut app = setup_app_with_balances();
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+            let minter = app.api().addr_make("minter");
+
+            // Setup contracts
+            let _asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Try to cancel nonexistent collection offer
+            let cancel_msg = ExecuteMsg::CancelCollectionOffer {
+                id: "nonexistent-collection-offer".to_string(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &cancel_msg,
+                &[],
+            );
+
+            assert!(result.is_err());
+        }
+    }
 }
