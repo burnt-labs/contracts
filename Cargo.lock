@@ -1187,7 +1187,6 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 name = "opacity-hash-map"
 version = "0.1.0"
 dependencies = [
- "base64ct",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
@@ -1201,7 +1200,6 @@ dependencies = [
 name = "opacity_verifier"
 version = "0.1.0"
 dependencies = [
- "base64ct",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-orch",
@@ -1827,7 +1825,6 @@ dependencies = [
 name = "treasury"
 version = "0.1.0"
 dependencies = [
- "base64ct",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",

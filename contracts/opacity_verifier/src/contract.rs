@@ -12,12 +12,13 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    ADMIN.save(deps.storage, &msg.admin)?;
+    let admin = deps.api.addr_validate(&msg.admin)?;
+    ADMIN.save(deps.storage, &admin)?;
     for key in msg.allow_list {
         VERIFICATION_KEY_ALLOW_LIST.save(deps.storage, key, &Empty{})?;
     }
     Ok(Response::new().add_event(Event::new("create_opacity_verifier").add_attributes( vec![
-        ("admin", msg.admin.into_string()),
+        ("admin", admin.to_string()),
     ])))
 }
 
@@ -35,7 +36,8 @@ pub fn execute(
     }
     match msg {
         ExecuteMsg::UpdateAdmin { admin } => {
-            ADMIN.save(deps.storage, &admin)?;
+            let new_admin = deps.api.addr_validate(&admin)?;
+            ADMIN.save(deps.storage, &new_admin)?;
         }
         ExecuteMsg::UpdateAllowList { keys  } => {
             VERIFICATION_KEY_ALLOW_LIST.clear(deps.storage);
@@ -81,6 +83,7 @@ mod tests {
 
     #[test]
     fn test_verify_proof() {
+        // response from https://verifier.opacity.network/api/public-keys
         let allowlist_keys_raw = ["322df8c3146a9891c8d63deec562db5f325f7a28","3ac1e280b6b5d8e15cf428229eccb20d9b824a53","5a29af4859ebc29ac0819c178bd293ba7f7bdfcf","9b776cbbd434d7d8f32b8cb369c37442760457b5","90cbfa246fb5bd65192aeaaa41483e311a13f109","ae16d88cd1f4ba016da8909ebc7c9c4a4fb112b8","8a4ca92581fb9b569ef8152c70a031569ee971b5","bdd5b7410abf138da1008906191188f4b5543be7","5d92cf96045bb80d869ee7bfa5d894be4782cfab","7775b5ffbcd55e7fce07672895145c5961ff828f","cf203ffb676fad5c8924ceebe91ebe3e617f01af"];
         let allowlist_keys: Vec<String> = allowlist_keys_raw.iter().map(|x| x.to_string()).collect();
 
@@ -92,7 +95,8 @@ mod tests {
         opacity_verifier.upload().unwrap();
 
         let verifier_init_msg = InstantiateMsg {
-            admin: sender,
+            // Use a valid bech32 address for admin; this matches the mock sender prefix
+            admin: "cosmwasm1pgm8hyk0pvphmlvfjc8wsvk4daluz5tgrw6pu5mfpemk74uxnx9qlm3aqg".to_string(),
             allow_list: allowlist_keys,
         };
 

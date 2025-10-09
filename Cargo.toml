@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "contracts/*",
+    "examples/*",
 ]
 resolver = "2"
 
@@ -29,4 +30,3 @@ getrandom = { version = "0.2.10", features = ["custom"] }
 p256 = {version = "0.13.2", features = ["ecdsa-core", "arithmetic", "serde"]}
 cosmos-sdk-proto = {package = "xion-cosmos-sdk-proto", version = "0.26.1", default-features = false, features = ["std", "cosmwasm", "xion", "serde"]}
 url = "2.5.2"
-base64ct = "=1.7.2" # can't upgrade until after version 2024

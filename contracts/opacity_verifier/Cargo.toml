@@ -20,7 +20,6 @@ thiserror          = { workspace = true }
 cw2                = { workspace = true }
 getrandom          = { workspace = true }
 tiny-keccak        = { workspace = true }
-base64ct = { workspace = true }
 
 [dev-dependencies]
 cw-orch = "0.28.0"

@@ -3,13 +3,13 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub admin: Addr,
+    pub admin: String,
     pub allow_list: Vec<String>,
 }
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    UpdateAdmin { admin: Addr },
+    UpdateAdmin { admin: String },
     UpdateAllowList { keys: Vec<String> },
 }
 
