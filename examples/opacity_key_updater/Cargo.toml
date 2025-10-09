@@ -1,0 +1,19 @@
+[package]
+name = "opacity_key_updater"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+thiserror = { workspace = true }
+hex = { workspace = true }
+url = { workspace = true }
+sha2 = { workspace = true }
+# Use the contract crate for message types
+opacity_verifier = { path = "../../contracts/opacity_verifier" }
+# On-chain submission dependencies (always compiled; enable via DRY_RUN=false at runtime)
+cw-orch = { version = "0.28.0", features = ["daemon"] }
+cosmwasm-std = { workspace = true }
