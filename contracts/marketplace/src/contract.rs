@@ -99,6 +99,8 @@ pub fn execute(
         ),
 
         ExecuteMsg::CancelCollectionOffer { id } => execute_cancel_collection_offer(deps, info, id),
+        ExecuteMsg::ApproveSale { id } => execute_approve_sale(deps, info, id),
+        ExecuteMsg::RejectSale { id } => execute_reject_sale(deps, info, id),
     }
 }
 
@@ -244,6 +246,24 @@ pub fn execute_buy_item(
             // send the payment to the asset contract
             funds: info.funds,
         }))
+}
+
+pub fn execute_approve_sale(
+    _deps: DepsMut,
+    _info: MessageInfo,
+    _id: String,
+) -> Result<Response, ContractError> {
+    // TODO: Implement approve sale functionality
+    Ok(Response::default())
+}
+
+pub fn execute_reject_sale(
+    _deps: DepsMut,
+    _info: MessageInfo,
+    _id: String,
+) -> Result<Response, ContractError> {
+    // TODO: Implement reject sale functionality
+    Ok(Response::default())
 }
 
 #[entry_point]

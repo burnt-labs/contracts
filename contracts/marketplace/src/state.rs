@@ -181,3 +181,53 @@ pub fn init_auto_increment(storage: &mut dyn Storage) -> Result<(), ContractErro
     AUTO_INCREMENT.save(storage, &0)?;
     Ok(())
 }
+
+#[cw_serde]
+pub enum SaleType {
+    BuyNow,
+    TokenOffer,
+    CollectionOffer,
+}
+
+type PendingSaleId = String;
+#[cw_serde]
+pub struct PendingSale {
+    pub id: String,
+    pub collection: Addr,
+    pub token_id: String,
+    pub price: Coin,
+    pub seller: Addr,
+    pub buyer: Addr,
+    pub sale_type: SaleType,
+    pub time: u64,
+    pub expiration: u64,
+}
+
+#[index_list(PendingSale)]
+pub struct PendingSaleIndices<'a> {
+    pub by_seller: MultiIndex<'a, Addr, PendingSale, PendingSaleId>,
+    pub by_buyer: MultiIndex<'a, Addr, PendingSale, PendingSaleId>,
+    pub by_expiration: MultiIndex<'a, u64, PendingSale, PendingSaleId>,
+}
+
+const PENDING_SALES_NAMESPACE: &str = "ps";
+pub fn pending_sales<'a>() -> IndexedMap<PendingSaleId, PendingSale, PendingSaleIndices<'a>> {
+    let pending_sale_indices = PendingSaleIndices {
+        by_seller: MultiIndex::new(
+            |_id, pending_sale: &PendingSale| pending_sale.seller.clone(),
+            PENDING_SALES_NAMESPACE,
+            "pss", // pending sale seller index namespace
+        ),
+        by_buyer: MultiIndex::new(
+            |_id, pending_sale: &PendingSale| pending_sale.buyer.clone(),
+            PENDING_SALES_NAMESPACE,
+            "psb", // pending sale buyer index namespace
+        ),
+        by_expiration: MultiIndex::new(
+            |_id, pending_sale: &PendingSale| pending_sale.expiration,
+            PENDING_SALES_NAMESPACE,
+            "pse", // pending sale expiration index namespace
+        ),
+    };
+    IndexedMap::new("ps", pending_sale_indices)
+}

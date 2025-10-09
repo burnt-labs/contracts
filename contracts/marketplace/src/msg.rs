@@ -1,4 +1,4 @@
-use crate::state::{CollectionOffer, Config, Listing, Offer};
+use crate::state::{CollectionOffer, Config, Listing, Offer, PendingSale};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin};
 
@@ -48,6 +48,12 @@ pub enum ExecuteMsg {
     CancelCollectionOffer {
         id: String,
     },
+    ApproveSale {
+        id: String,
+    },
+    RejectSale {
+        id: String,
+    },
 }
 
 #[cw_serde]
@@ -61,6 +67,18 @@ pub enum QueryMsg {
     Offer { offer_id: String },
     #[returns(CollectionOffer)]
     CollectionOffer { collection_offer_id: String },
+    #[returns(PendingSale)]
+    PendingSale { id: String },
+    #[returns(Vec<PendingSale>)]
+    PendingSales {
+        limit: Option<u32>,
+        start_after: Option<u64>,
+    },
+    #[returns(Vec<PendingSale>)]
+    PendingSalesByExpiry {
+        start_after: Option<u64>,
+        limit: Option<u32>,
+    },
 }
 
 #[cw_serde]
