@@ -4,6 +4,17 @@ use crate::msg::{QueryMsg, ExecuteMsg, InstantiateMsg};
 use crate::{query, CONTRACT_NAME, CONTRACT_VERSION};
 use crate::state::{ADMIN, VERIFICATION_KEY_ALLOW_LIST};
 
+fn normalize_addr_hex(s: &str) -> Result<String, crate::error::ContractError> {
+    let s = s.trim_start_matches("0x").to_ascii_lowercase();
+    if s.len() != 40 {
+        return Err(crate::error::ContractError::Std(cosmwasm_std::StdError::generic_err(
+            "address hex must be 40 chars",
+        )));
+    }
+    let _ = hex::decode(&s)?; // ensure valid hex
+    Ok(s)
+}
+
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -15,7 +26,8 @@ pub fn instantiate(
     let admin = deps.api.addr_validate(&msg.admin)?;
     ADMIN.save(deps.storage, &admin)?;
     for key in msg.allow_list {
-        VERIFICATION_KEY_ALLOW_LIST.save(deps.storage, key, &Empty{})?;
+        let k = normalize_addr_hex(&key)?;
+        VERIFICATION_KEY_ALLOW_LIST.save(deps.storage, k, &Empty{})?;
     }
     Ok(Response::new().add_event(Event::new("create_opacity_verifier").add_attributes( vec![
         ("admin", admin.to_string()),
@@ -42,7 +54,8 @@ pub fn execute(
         ExecuteMsg::UpdateAllowList { keys  } => {
             VERIFICATION_KEY_ALLOW_LIST.clear(deps.storage);
             for key in keys {
-                VERIFICATION_KEY_ALLOW_LIST.save(deps.storage, key, &Empty{})?;
+                let k = normalize_addr_hex(&key)?;
+                VERIFICATION_KEY_ALLOW_LIST.save(deps.storage, k, &Empty{})?;
             }
         }
     }
