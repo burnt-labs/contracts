@@ -41,7 +41,7 @@ pub fn execute(
             let query_msg = ios_app_attest::msg::QueryMsg::VerifyAttestation(attestation.clone());
 
             // query the verification contract, fails if verification fails
-            deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+            deps.querier.query::<()>(&QueryRequest::Wasm(WasmQuery::Smart {
                 contract_addr: verification_addr.to_string(),
                 msg: to_json_binary(&query_msg)?,
             }))?;

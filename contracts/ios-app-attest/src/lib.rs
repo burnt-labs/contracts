@@ -1,17 +1,33 @@
 #[cfg(not(feature = "library"))]
-mod contract;
+pub mod contract;
 mod error;
 pub mod msg;
 mod query;
+
+// the random function must be disabled in cosmwasm
+#[cfg(not(feature = "library"))]
+use core::num::NonZeroU32;
+#[cfg(not(feature = "library"))]
+use getrandom::Error;
+#[cfg(not(feature = "library"))]
+pub fn always_fail(_buf: &mut [u8]) -> Result<(), Error> {
+    let code = NonZeroU32::new(Error::CUSTOM_START).unwrap();
+    Err(Error::from(code))
+}
+#[cfg(not(feature = "library"))]
+use getrandom::register_custom_getrandom;
+#[cfg(not(feature = "library"))]
+register_custom_getrandom!(always_fail);
 
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::{Binary, BlockInfo, Response, Timestamp};
     use cw_orch::core::CwEnvError;
     use super::*;
-    use cw_orch::interface;
+    use cw_orch::{interface};
     use cw_orch::prelude::*;
     use crate::msg::{InstantiateMsg, QueryMsg, VerifyAttestation};
+    use crate::contract;
     use base64::prelude::*;
 
     #[interface(InstantiateMsg, Empty, QueryMsg, Empty)]
