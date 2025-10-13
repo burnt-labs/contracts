@@ -16,7 +16,7 @@ cosmwasm-std       = { workspace = true }
 thiserror          = { workspace = true }
 serde              = { workspace = true }
 serde_json         = { workspace = true }
-appattest-rs = {git = "https://github.com/mvid/appattest-rs.git", rev = "23ac80deeba0f84061b3354a10731a71deb85634"}
+appattest-rs = {git = "https://github.com/mvid/appattest-rs.git", rev = "3bbcd1c959d7f6eeb5c1ffa15fae32d6612b250f"}
 ciborium = "0.2.2"
 getrandom          = { workspace = true }
 

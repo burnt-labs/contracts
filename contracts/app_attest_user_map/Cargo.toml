@@ -17,5 +17,9 @@ cw-storage-plus    = { workspace = true }
 thiserror          = { workspace = true }
 serde              = { workspace = true }
 serde_json         = { workspace = true }
-ios-app-attest = {path = "../ios-app-attest", features = ["library"]}
+ios-app-attest = {path = "../../libraries/ios-app-attest", features = ["library"]}
 getrandom          = { workspace = true }
+
+[dev-dependencies]
+cw-orch = "0.28.0"
+base64 = "0.22.1"

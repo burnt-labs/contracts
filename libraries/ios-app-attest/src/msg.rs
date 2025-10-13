@@ -15,10 +15,3 @@ pub struct VerifyAttestation {
     pub cbor_data: Binary,
     pub dev_env: Option<bool>,
 }
-
-#[cw_serde]
-#[derive(QueryResponses)]
-pub enum QueryMsg {
-    #[returns(bool)]
-    VerifyAttestation(VerifyAttestation)
-}

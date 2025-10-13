@@ -2,7 +2,7 @@ use crate::error::ContractError;
 use crate::error::ContractResult;
 use crate::msg::InstantiateMsg;
 use crate::msg::{ExecuteMsg, QueryMsg};
-use crate::state::{UserStatus, APP_ATTEST_VERIFICATION_ADDR, APP_ID, USER_MAP};
+use crate::state::{APP_ID, USER_MAP};
 use cosmwasm_std::{entry_point, from_json, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, QueryRequest, Response, StdResult, WasmQuery};
 use crate::error::ContractError::InvalidAppId;
 
@@ -13,17 +13,17 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    APP_ATTEST_VERIFICATION_ADDR.save(deps.storage, &msg.verification_addr)?;
+    // APP_ATTEST_VERIFICATION_ADDR.save(deps.storage, &msg.verification_addr)?;
     APP_ID.save(deps.storage, &msg.app_id)?;
     Ok(Response::new()
         .add_attribute("method", "instantiate")
-        .add_attribute("owner", info.sender)
-        .add_attribute("verification_addr", msg.verification_addr.to_string()))
+        .add_attribute("owner", info.sender))
 }
+
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
-    _: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> ContractResult<Response> {
@@ -35,22 +35,13 @@ pub fn execute(
             }
 
             // get the verification contract address
-            let verification_addr = APP_ATTEST_VERIFICATION_ADDR.load(deps.storage)?;
+            // let verification_addr = APP_ATTEST_VERIFICATION_ADDR.load(deps.storage)?;
 
             // create the verification message
-            let query_msg = ios_app_attest::msg::QueryMsg::VerifyAttestation(attestation.clone());
-
-            // query the verification contract, fails if verification fails
-            deps.querier.query::<()>(&QueryRequest::Wasm(WasmQuery::Smart {
-                contract_addr: verification_addr.to_string(),
-                msg: to_json_binary(&query_msg)?,
-            }))?;
-
-            // deserialize the challenge into the expected type
-            let user_status: UserStatus = from_json(&attestation.challenge)?;
+            ios_app_attest::verify_attestation(attestation.app_id, attestation.key_id, attestation.challenge.clone(), attestation.cbor_data, env.block.time.seconds() as i64, attestation.dev_env)?;
 
             // save the data to the user's record
-            USER_MAP.save(deps.storage, info.sender, &user_status)?;
+            USER_MAP.save(deps.storage, info.sender, &attestation.challenge)?;
 
             Ok(Response::default())
         }
@@ -72,7 +63,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_json_binary(&addrs)
         }
         QueryMsg::GetMap {} => {
-            let mut response: Vec<(Addr, UserStatus)> = Vec::new();
+            let mut response: Vec<(Addr, Binary)> = Vec::new();
             for item in USER_MAP.range(deps.storage, None, None, Order::Ascending) {
                 let (key, value) = item?;
                 response.push((key, value))

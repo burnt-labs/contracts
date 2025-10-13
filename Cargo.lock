@@ -70,8 +70,10 @@ checksum = "b0674a1ddeecb70197781e945de4b3b8ffb61fa939a5597bcf48503737663100"
 name = "app_attest_user_map"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw-orch",
  "cw-storage-plus",
  "getrandom 0.2.16",
  "ios-app-attest",
@@ -83,7 +85,7 @@ dependencies = [
 [[package]]
 name = "appattest-rs"
 version = "0.1.0"
-source = "git+https://github.com/mvid/appattest-rs.git?rev=23ac80deeba0f84061b3354a10731a71deb85634#23ac80deeba0f84061b3354a10731a71deb85634"
+source = "git+https://github.com/mvid/appattest-rs.git?rev=3bbcd1c959d7f6eeb5c1ffa15fae32d6612b250f#3bbcd1c959d7f6eeb5c1ffa15fae32d6612b250f"
 dependencies = [
  "base64 0.22.1",
  "byteorder",

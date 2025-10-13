@@ -4,7 +4,6 @@ use ios_app_attest::msg::VerifyAttestation;
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub verification_addr: Addr,
     pub app_id: String,
 }
 
@@ -18,9 +17,9 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     #[returns(Vec<Addr>)]
     GetUsers {},
-    #[returns(UserStatus)]
+    #[returns(String)]
     GetValueByUser { address: Addr },
-    #[returns(Vec<(Addr, UserStatus)>)]
+    #[returns(Vec<(Addr, String)>)]
     GetMap {},
 }
 
