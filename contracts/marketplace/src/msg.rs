@@ -54,6 +54,9 @@ pub enum ExecuteMsg {
     RejectSale {
         id: String,
     },
+    UpdateConfig {
+        config: Config<String>,
+    },
 }
 
 #[cw_serde]

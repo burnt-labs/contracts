@@ -110,6 +110,7 @@ mod tests {
 
         let config_json = json!({
             "manager": manager.to_string(),
+            "fee_recipient": manager.to_string(),
             "sale_approvals": false,
             "fee_bps": 250,
             "listing_denom": "uxion"

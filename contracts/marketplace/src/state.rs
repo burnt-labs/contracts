@@ -8,6 +8,7 @@ use cw_storage_plus::{index_list, IndexedMap, Item, MultiIndex};
 #[cw_serde]
 pub struct Config<T: AddressLike> {
     pub manager: T,
+    pub fee_recipient: T,
     pub sale_approvals: bool,
     pub fee_bps: u64,
     pub listing_denom: String,
@@ -28,9 +29,25 @@ impl Config<Addr> {
 }
 
 impl Config<String> {
+    pub fn validate(&self) -> Result<(), ContractError> {
+        ensure!(
+            self.fee_bps <= MAX_FEE_BPS,
+            ContractError::InvalidFeeRate {}
+        );
+
+        ensure!(
+            !self.listing_denom.is_empty(),
+            ContractError::InvalidListingDenom {
+                expected: "non-empty".to_string(),
+                actual: self.listing_denom.clone(),
+            }
+        );
+        Ok(())
+    }
     pub fn to_addr(&self, api: &dyn Api) -> Result<Config<Addr>, ContractError> {
         Ok(Config {
             manager: api.addr_validate(&self.manager)?,
+            fee_recipient: api.addr_validate(&self.fee_recipient)?,
             fee_bps: self.fee_bps,
             sale_approvals: self.sale_approvals,
             listing_denom: self.listing_denom.clone(),
@@ -41,6 +58,7 @@ impl Config<Addr> {
     pub fn from_str(config: Config<String>, api: &dyn Api) -> Result<Self, ContractError> {
         Ok(Config {
             manager: api.addr_validate(&config.manager)?,
+            fee_recipient: api.addr_validate(&config.fee_recipient)?,
             fee_bps: config.fee_bps,
             sale_approvals: config.sale_approvals,
             listing_denom: config.listing_denom,
@@ -52,6 +70,7 @@ impl From<Config<Addr>> for Config<String> {
         Config {
             manager: config.manager.to_string(),
             fee_bps: config.fee_bps,
+            fee_recipient: config.fee_recipient.to_string(),
             sale_approvals: config.sale_approvals,
             listing_denom: config.listing_denom,
         }

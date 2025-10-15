@@ -1,5 +1,7 @@
 use cosmwasm_std::{Addr, Coin, Event};
 
+use crate::state::Config;
+
 pub fn create_listing_event(
     id: String,
     owner: Addr,
@@ -15,6 +17,13 @@ pub fn create_listing_event(
         .add_attribute("price", price.to_string())
 }
 
+pub fn update_config_event(config: Config<String>) -> Event {
+    Event::new(format!("{}/update-config", env!("CARGO_PKG_NAME")))
+        .add_attribute("manager", config.manager.to_string())
+        .add_attribute("fee_recipient", config.fee_recipient.to_string())
+        .add_attribute("fee_bps", config.fee_bps.to_string())
+        .add_attribute("listing_denom", config.listing_denom.to_string())
+}
 pub fn cancel_listing_event(id: String, collection: Addr, owner: Addr, token_id: String) -> Event {
     Event::new(format!("{}/cancel-listing", env!("CARGO_PKG_NAME")))
         .add_attribute("id", id)

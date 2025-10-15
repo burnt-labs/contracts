@@ -2,8 +2,8 @@ use std::env;
 
 use crate::error::ContractError;
 use crate::helpers::{
-    asset_buy_msg, asset_list_msg, generate_id, not_listed, only_owner, query_listing,
-    valid_payment,
+    asset_buy_msg, asset_list_msg, generate_id, not_listed, only_manager, only_owner,
+    query_listing, valid_payment,
 };
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::offers::{
@@ -13,7 +13,6 @@ use crate::offers::{
 use crate::state::init_auto_increment;
 use crate::state::{listings, Listing, ListingStatus};
 use crate::state::{Config, CONFIG};
-use asset::msg::AssetExtensionExecuteMsg as AssetExecuteMsg;
 use cosmwasm_std::{
     ensure_eq, entry_point, to_json_binary, Addr, Coin, DepsMut, Env, MessageInfo, Response,
     WasmMsg,
@@ -36,7 +35,9 @@ pub fn instantiate(
     Ok(Response::new().add_attribute("method", "instantiate"))
 }
 
-use crate::events::{cancel_listing_event, create_listing_event, item_sold_event};
+use crate::events::{
+    cancel_listing_event, create_listing_event, item_sold_event, update_config_event,
+};
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
@@ -101,7 +102,20 @@ pub fn execute(
         ExecuteMsg::CancelCollectionOffer { id } => execute_cancel_collection_offer(deps, info, id),
         ExecuteMsg::ApproveSale { id } => execute_approve_sale(deps, info, id),
         ExecuteMsg::RejectSale { id } => execute_reject_sale(deps, info, id),
+        ExecuteMsg::UpdateConfig { config } => execute_update_config(deps, info, config),
     }
+}
+
+pub fn execute_update_config(
+    deps: DepsMut,
+    info: MessageInfo,
+    config: Config<String>,
+) -> Result<Response, ContractError> {
+    only_manager(&info, &deps)?;
+    config.validate()?;
+    let addr_config = config.to_addr(deps.api)?;
+    CONFIG.save(deps.storage, &addr_config)?;
+    Ok(Response::new().add_event(update_config_event(config)))
 }
 
 pub fn execute_create_listing(
@@ -138,7 +152,12 @@ pub fn execute_create_listing(
         Some(_) => Err(ContractError::AlreadyListed {}),
         None => Ok(listing),
     })?;
-    let list_msg = asset_list_msg(token_id.clone(), price.clone());
+    let list_msg = asset_list_msg(
+        token_id.clone(),
+        price.clone(),
+        Some(config.fee_bps as u16),
+        Some(config.fee_recipient.to_string()),
+    );
     Ok(Response::new()
         .add_event(create_listing_event(
             id,
@@ -226,6 +245,9 @@ pub fn execute_buy_item(
 
     // check payment and funds are valid
     valid_payment(&info, price.clone(), listing.price.denom)?;
+
+    // remove the listing from state
+    listings().remove(deps.storage, listing_id.clone())?;
 
     let buy_msg = asset_buy_msg(info.sender.clone(), listing.token_id.clone());
 

@@ -1,11 +1,12 @@
 use crate::error::ContractError;
+use crate::state::CONFIG;
 use asset::msg::AssetExtensionExecuteMsg as AssetExecuteMsg;
 use asset::msg::AssetExtensionQueryMsg;
 use asset::msg::QueryMsg as AssetQueryMsg;
 use asset::state::ListingInfo;
 use blake2::{Blake2s256, Digest};
 use cosmwasm_std::{ensure, ensure_eq, Coin};
-use cosmwasm_std::{Addr, Empty, MessageInfo, QuerierWrapper};
+use cosmwasm_std::{Addr, DepsMut, Empty, MessageInfo, QuerierWrapper};
 use cw721::msg::OwnerOfResponse;
 use cw721_base::msg::QueryMsg;
 use cw_utils::one_coin;
@@ -39,6 +40,19 @@ pub fn only_owner(
         }
     }
 }
+
+pub fn only_manager(info: &MessageInfo, deps: &DepsMut) -> Result<(), ContractError> {
+    let manager = CONFIG.load(deps.storage)?.manager;
+    ensure_eq!(
+        info.sender,
+        manager,
+        ContractError::Unauthorized {
+            message: "sender is not manager".to_string()
+        }
+    );
+    Ok(())
+}
+
 pub fn query_listing(
     querier: &QuerierWrapper,
     collection: &Addr,
@@ -117,6 +131,8 @@ pub fn valid_payment(
 pub fn asset_list_msg(
     token_id: String,
     price: Coin,
+    marketplace_fee_bps: Option<u16>,
+    marketplace_fee_recipient: Option<String>,
 ) -> asset::msg::ExecuteMsg<
     cw721::DefaultOptionalNftExtensionMsg,
     cw721::DefaultOptionalCollectionExtensionMsg,
