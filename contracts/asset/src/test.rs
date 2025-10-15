@@ -474,6 +474,12 @@ mod asset_pluggable_tests {
         let seller = deps.api.addr_make("seller");
 
         let price = Coin::new(100u128, "uxion");
+        let nft_info = NftInfo {
+            owner: seller.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty::default(),
+        };
         contract
             .config
             .listings
@@ -485,16 +491,16 @@ mod asset_pluggable_tests {
                     price: price.clone(),
                     seller: seller.clone(),
                     reserved: None,
-                    nft_info: NftInfo {
-                        owner: seller,
-                        approvals: vec![],
-                        token_uri: None,
-                        extension: Empty::default(),
-                    },
                     marketplace_fee_bps: None,
                     marketplace_fee_recipient: None,
                 },
             )
+            .unwrap();
+        contract
+            .config
+            .cw721_config
+            .nft_info
+            .save(deps.as_mut().storage, "token-1", &nft_info)
             .unwrap();
 
         contract
@@ -570,6 +576,12 @@ mod asset_pluggable_tests {
         let seller = deps.api.addr_make("seller");
 
         let price = Coin::new(100u128, "uxion");
+        let nft_info = NftInfo {
+            owner: Addr::unchecked("nft-owner"),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty::default(),
+        };
         contract
             .config
             .listings
@@ -579,18 +591,18 @@ mod asset_pluggable_tests {
                 &ListingInfo {
                     id: "token-1".to_string(),
                     price: price.clone(),
-                    seller,
+                    seller: seller.clone(),
                     reserved: None,
-                    nft_info: NftInfo {
-                        owner: Addr::unchecked("nft-owner"),
-                        approvals: vec![],
-                        token_uri: None,
-                        extension: Empty::default(),
-                    },
                     marketplace_fee_bps: None,
                     marketplace_fee_recipient: None,
                 },
             )
+            .unwrap();
+        contract
+            .config
+            .cw721_config
+            .nft_info
+            .save(deps.as_mut().storage, "token-1", &nft_info)
             .unwrap();
 
         contract
@@ -629,6 +641,12 @@ mod asset_pluggable_tests {
         let seller = deps.api.addr_make("seller");
 
         let price = Coin::new(100u128, "uxion");
+        let nft_info = NftInfo {
+            owner: Addr::unchecked("nft-owner"),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty::default(),
+        };
         contract
             .config
             .listings
@@ -638,18 +656,18 @@ mod asset_pluggable_tests {
                 &ListingInfo {
                     id: "token-1".to_string(),
                     price: price.clone(),
-                    seller,
+                    seller: seller.clone(),
                     reserved: None,
-                    nft_info: NftInfo {
-                        owner: Addr::unchecked("nft-owner"),
-                        approvals: vec![],
-                        token_uri: None,
-                        extension: Empty::default(),
-                    },
                     marketplace_fee_bps: None,
                     marketplace_fee_recipient: None,
                 },
             )
+            .unwrap();
+        contract
+            .config
+            .cw721_config
+            .nft_info
+            .save(deps.as_mut().storage, "token-1", &nft_info)
             .unwrap();
 
         contract
@@ -933,17 +951,17 @@ mod query_test {
             Default::default();
 
         let seller = deps.api.addr_make("seller");
+        let nft_info = NftInfo {
+            owner: seller.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty::default(),
+        };
         let listing = ListingInfo {
             id: "token-1".to_string(),
             price: Coin::new(100u128, "uxion"),
             seller: seller.clone(),
             reserved: None,
-            nft_info: NftInfo {
-                owner: seller,
-                approvals: vec![],
-                token_uri: None,
-                extension: Empty::default(),
-            },
             marketplace_fee_bps: None,
             marketplace_fee_recipient: None,
         };
@@ -952,6 +970,12 @@ mod query_test {
             .config
             .listings
             .save(deps.as_mut().storage, "token-1", &listing)
+            .unwrap();
+        contract
+            .config
+            .cw721_config
+            .nft_info
+            .save(deps.as_mut().storage, "token-1", &nft_info)
             .unwrap();
 
         let binary = contract
@@ -964,7 +988,7 @@ mod query_test {
             )
             .unwrap();
 
-        let fetched: ListingInfo<Empty> = from_json(binary).unwrap();
+        let fetched: ListingInfo = from_json(binary).unwrap();
         assert_eq!(fetched, listing);
     }
 
@@ -983,17 +1007,17 @@ mod query_test {
             ("token-3", seller.clone()),
             ("token-4", other.clone()),
         ] {
+            let nft_info = NftInfo {
+                owner: owner.clone(),
+                approvals: vec![],
+                token_uri: None,
+                extension: Empty::default(),
+            };
             let listing = ListingInfo {
                 id: id.to_string(),
                 price: Coin::new(50u128, "uxion"),
                 seller: owner.clone(),
                 reserved: None,
-                nft_info: NftInfo {
-                    owner,
-                    approvals: vec![],
-                    token_uri: None,
-                    extension: Empty::default(),
-                },
                 marketplace_fee_bps: None,
                 marketplace_fee_recipient: None,
             };
@@ -1001,6 +1025,12 @@ mod query_test {
                 .config
                 .listings
                 .save(deps.as_mut().storage, id, &listing)
+                .unwrap();
+            contract
+                .config
+                .cw721_config
+                .nft_info
+                .save(deps.as_mut().storage, id, &nft_info)
                 .unwrap();
         }
 
@@ -1015,7 +1045,7 @@ mod query_test {
                 },
             )
             .unwrap();
-        let first_page: Vec<ListingInfo<Empty>> = from_json(first_page).unwrap();
+        let first_page: Vec<ListingInfo> = from_json(first_page).unwrap();
         assert_eq!(first_page.len(), 2);
         assert_eq!(first_page[0].id, "token-1");
         assert_eq!(first_page[1].id, "token-2");
@@ -1032,7 +1062,7 @@ mod query_test {
                 },
             )
             .unwrap();
-        let second_page: Vec<ListingInfo<Empty>> = from_json(second_page).unwrap();
+        let second_page: Vec<ListingInfo> = from_json(second_page).unwrap();
         assert_eq!(second_page.len(), 2);
         assert_eq!(second_page[0].id, "token-2");
         assert_eq!(second_page[1].id, "token-3");
@@ -1054,17 +1084,17 @@ mod query_test {
             ("token-3", seller.clone()),
             ("token-4", other.clone()),
         ] {
+            let nft_info = NftInfo {
+                owner: owner.clone(),
+                approvals: vec![],
+                token_uri: None,
+                extension: Empty::default(),
+            };
             let listing = ListingInfo {
                 id: id.to_string(),
                 price: Coin::new(50u128, "uxion"),
                 seller: owner.clone(),
                 reserved: None,
-                nft_info: NftInfo {
-                    owner,
-                    approvals: vec![],
-                    token_uri: None,
-                    extension: Empty::default(),
-                },
                 marketplace_fee_bps: None,
                 marketplace_fee_recipient: None,
             };
@@ -1072,6 +1102,12 @@ mod query_test {
                 .config
                 .listings
                 .save(deps.as_mut().storage, id, &listing)
+                .unwrap();
+            contract
+                .config
+                .cw721_config
+                .nft_info
+                .save(deps.as_mut().storage, id, &nft_info)
                 .unwrap();
         }
 
@@ -1085,7 +1121,7 @@ mod query_test {
                 },
             )
             .unwrap();
-        let first_page: Vec<ListingInfo<Empty>> = from_json(first_page).unwrap();
+        let first_page: Vec<ListingInfo> = from_json(first_page).unwrap();
         assert_eq!(first_page.len(), 2);
         assert_eq!(first_page[0].id, "token-1");
         assert_eq!(first_page[1].id, "token-2");
@@ -1100,7 +1136,7 @@ mod query_test {
                 },
             )
             .unwrap();
-        let second_page: Vec<ListingInfo<Empty>> = from_json(second_page).unwrap();
+        let second_page: Vec<ListingInfo> = from_json(second_page).unwrap();
         assert_eq!(second_page.len(), 3);
         assert_eq!(second_page[0].id, "token-2");
         assert_eq!(second_page[1].id, "token-3");
@@ -1184,17 +1220,17 @@ mod asset_pluggable_sellable_test {
 
         let price = Coin::new(1_000u128, "uxion");
 
+        let nft_info = NftInfo {
+            owner: seller.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty::default(),
+        };
         let listing = ListingInfo {
             id: "token-1".to_string(),
             price: price.clone(),
             seller: seller.clone(),
             reserved: None,
-            nft_info: NftInfo {
-                owner: seller.clone(),
-                approvals: vec![],
-                token_uri: None,
-                extension: Empty::default(),
-            },
             marketplace_fee_bps: Some(1_000),
             marketplace_fee_recipient: Some(marketplace.clone()),
         };
@@ -1208,7 +1244,7 @@ mod asset_pluggable_sellable_test {
             .config
             .cw721_config
             .nft_info
-            .save(deps.as_mut().storage, "token-1", &listing.nft_info)
+            .save(deps.as_mut().storage, "token-1", &nft_info)
             .unwrap();
         contract
             .config
