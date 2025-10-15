@@ -60,7 +60,7 @@ where
     // Save the listing
     let listing = ListingInfo {
         id: id.clone(),
-        seller: info.sender.clone(),
+        seller: nft_info.owner.clone(),
         price: price.clone(),
         reserved: reservation.clone(),
         marketplace_fee_bps: validated_marketplace_fee_bps,
@@ -73,7 +73,7 @@ where
         .add_attribute("collection", env.contract.address.clone())
         .add_attribute("price", price.amount.to_string())
         .add_attribute("denom", price.denom.to_string())
-        .add_attribute("seller", info.sender.clone().to_string())
+        .add_attribute("seller", nft_info.owner.clone().to_string())
         .add_attribute(
             "reserved_until",
             reservation.map_or("none".to_string(), |r| r.reserved_until.to_string()),
@@ -490,7 +490,7 @@ fn test_list() {
                 ("collection".to_string(), env.contract.address.to_string()),
                 ("price".to_string(), price.amount.to_string()),
                 ("denom".to_string(), "uxion".to_string()),
-                ("seller".to_string(), approver_addr.to_string()),
+                ("seller".to_string(), owner_addr.to_string()),
                 ("reserved_until".to_string(), "none".to_string()),
             ],
         );
@@ -501,7 +501,7 @@ fn test_list() {
                 .load(deps.as_ref().storage, "token-3"),
         );
         assert_eq!(stored.price, price);
-        assert_eq!(stored.seller, approver_addr);
+        assert_eq!(stored.seller, owner_addr);
         assert!(stored.reserved.is_none());
     }
 
@@ -554,7 +554,7 @@ fn test_list() {
                 ("collection".to_string(), env.contract.address.to_string()),
                 ("price".to_string(), price.amount.to_string()),
                 ("denom".to_string(), "uxion".to_string()),
-                ("seller".to_string(), operator_addr.to_string()),
+                ("seller".to_string(), owner_addr.to_string()),
                 ("reserved_until".to_string(), "none".to_string()),
             ],
         );
@@ -565,7 +565,7 @@ fn test_list() {
                 .load(deps.as_ref().storage, "token-4"),
         );
         assert_eq!(stored.price, price);
-        assert_eq!(stored.seller, operator_addr);
+        assert_eq!(stored.seller, owner_addr);
         assert!(stored.reserved.is_none());
     }
 
