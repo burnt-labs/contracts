@@ -34,8 +34,9 @@ logic without rewriting the core token implementation.
   route. These are automatically dispatched through `SellableAsset` when `DefaultAssetContract`
   handles `execute_extension`.
 - `Reserve` captures an optional reservation window (`Expiration`) and address, used to gate buys.
-- `ListingInfo` stores price, seller, reserve data, and a snapshot of the NFT metadata so listings
-  remain consistent even if the token attributes change later.
+- `ListingInfo` stores price, seller, reservation data, and marketplace fee settings. The contract
+  fetches NFT metadata directly from the `cw721` state when needed instead of duplicating it in the
+  listing storage.
 - `AssetConfig` centralizes the contract's storage maps and exposes helper constructors so you can
   use custom storage keys when embedding the contract inside another crate.
 

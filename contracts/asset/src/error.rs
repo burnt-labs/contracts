@@ -33,7 +33,6 @@ pub enum ContractError {
 
     #[error("Invalid marketplace fee: {bps}, {recipient}")]
     InvalidMarketplaceFee { bps: u16, recipient: String },
-
 }
 
 impl From<ContractError> for cw721::error::Cw721ContractError {

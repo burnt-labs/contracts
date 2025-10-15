@@ -1,21 +1,16 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin};
 use cw_storage_plus::{IndexList, IndexedMap, Item, Map, MultiIndex};
-use cw721::{
-    Expiration,
-    state::{Cw721Config, NftInfo},
-    traits::{Cw721State},
-};
+use cw721::{Expiration, state::Cw721Config, traits::Cw721State};
 
 use crate::plugin::Plugin;
 
 #[cw_serde]
-pub struct ListingInfo<TNftExtension> {
+pub struct ListingInfo {
     pub id: String,
     pub price: Coin,
     pub seller: Addr,
     pub reserved: Option<Reserve>,
-    pub nft_info: NftInfo<TNftExtension>,
     pub marketplace_fee_bps: Option<u16>,
     pub marketplace_fee_recipient: Option<Addr>,
 }
@@ -30,8 +25,7 @@ pub struct AssetConfig<'a, TNftExtension>
 where
     TNftExtension: Cw721State,
 {
-    pub listings:
-        IndexedMap<&'a str, ListingInfo<TNftExtension>, ListingIndexes<'a, TNftExtension>>,
+    pub listings: IndexedMap<&'a str, ListingInfo, ListingIndexes<'a>>,
     pub collection_plugins: Map<&'a str, Plugin>,
     /// We create a reference to the cw721 states
     pub cw721_config: Cw721Config<'a, TNftExtension>,
@@ -70,23 +64,19 @@ where
     }
 }
 
-pub fn seller_index<TNftExtension>(_pk: &[u8], d: &ListingInfo<TNftExtension>) -> Addr {
+pub fn seller_index(_pk: &[u8], d: &ListingInfo) -> Addr {
     d.seller.clone()
 }
 
-pub struct ListingIndexes<'a, TNftExtension> {
-    pub seller: MultiIndex<'a, Addr, ListingInfo<TNftExtension>, String>,
+pub struct ListingIndexes<'a> {
+    pub seller: MultiIndex<'a, Addr, ListingInfo, String>,
 }
 
-impl<'a, TNftExtension> IndexList<ListingInfo<TNftExtension>> for ListingIndexes<'a, TNftExtension>
-where
-    TNftExtension: Cw721State,
-{
+impl<'a> IndexList<ListingInfo> for ListingIndexes<'a> {
     fn get_indexes(
         &'_ self,
-    ) -> Box<dyn Iterator<Item = &'_ dyn cw_storage_plus::Index<ListingInfo<TNftExtension>>> + '_>
-    {
-        let v: Vec<&dyn cw_storage_plus::Index<ListingInfo<TNftExtension>>> = vec![&self.seller];
+    ) -> Box<dyn Iterator<Item = &'_ dyn cw_storage_plus::Index<ListingInfo>> + '_> {
+        let v: Vec<&dyn cw_storage_plus::Index<ListingInfo>> = vec![&self.seller];
         Box::new(v.into_iter())
     }
 }
