@@ -198,8 +198,7 @@ mod tests {
             assert!(listing_resp.is_ok());
             let listing = listing_resp.unwrap();
             assert_eq!(listing.price, price);
-            // TODO: seller should not be the marketplace contract
-            // assert_eq!(listing.seller, seller);
+            assert_eq!(listing.seller, seller);
 
             // verify event is emitted
             let events = result.unwrap().events;
