@@ -19,7 +19,7 @@ serde           = { workspace = true }
 thiserror       = { workspace = true }
 
 [features]
-default = []
-library = []
 asset_base = []
-crossmint = []
+crossmint  = []
+default    = []
+library    = []
