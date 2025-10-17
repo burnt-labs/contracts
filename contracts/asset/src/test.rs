@@ -129,11 +129,11 @@ mod plugins_test {
         let deps = mock_dependencies();
         let env = env_at(1_000);
         let info = message_info(&deps.api.addr_make("marketplace"), &[]);
-        let mut ctx = build_ctx(deps.as_ref(), env, info);
+        let mut ctx = build_ctx(deps.as_ref(), env.clone(), info);
         ctx.data.time_lock = Some(Duration::from_secs(2_000));
         ctx.data.reservation = Some(Reserve {
             reserver: Addr::unchecked("reserver"),
-            reserved_until: Expiration::AtTime(Timestamp::from_seconds(1_500)),
+            reserved_until: env.block.time.plus_seconds(600),
         });
 
         assert!(default_plugins::time_lock_plugin(&mut ctx).is_ok());
@@ -144,11 +144,13 @@ mod plugins_test {
         let deps = mock_dependencies();
         let env = env_at(1_000);
         let info = message_info(&deps.api.addr_make("marketplace"), &[]);
-        let mut ctx = build_ctx(deps.as_ref(), env, info);
-        ctx.data.time_lock = Some(Duration::from_secs(2_000));
+        let mut ctx = build_ctx(deps.as_ref(), env.clone(), info);
+        ctx.data.time_lock = Some(Duration::from_secs(
+            env.block.time.plus_seconds(2_000).seconds(),
+        ));
         ctx.data.reservation = Some(Reserve {
             reserver: Addr::unchecked("reserver"),
-            reserved_until: Expiration::AtTime(Timestamp::from_seconds(3_500)),
+            reserved_until: env.block.time.plus_seconds(6000),
         });
 
         assert!(default_plugins::time_lock_plugin(&mut ctx).is_err());
@@ -728,10 +730,10 @@ mod asset_pluggable_tests {
 
         let env = env_at(1_000);
         let info = message_info(&reserver, &[]);
-        let mut ctx = build_ctx(deps.as_ref(), env, info);
+        let mut ctx = build_ctx(deps.as_ref(), env.clone(), info);
         let reservation = Reserve {
             reserver: reserver.clone(),
-            reserved_until: Expiration::AtTime(Timestamp::from_seconds(1_500)),
+            reserved_until: env.block.time.plus_seconds(1_500),
         };
 
         let result = contract
@@ -765,10 +767,10 @@ mod asset_pluggable_tests {
 
         let env = env_at(1_000);
         let info = message_info(&reserver, &[]);
-        let mut ctx = build_ctx(deps.as_ref(), env, info);
+        let mut ctx = build_ctx(deps.as_ref(), env.clone(), info);
         let reservation = Reserve {
             reserver: reserver.clone(),
-            reserved_until: Expiration::AtTime(Timestamp::from_seconds(1_200)),
+            reserved_until: env.block.time.plus_seconds(1_200),
         };
 
         let result = contract.on_reserve_plugin(&"token-1".to_string(), &reservation, &mut ctx);
@@ -814,10 +816,10 @@ mod asset_pluggable_tests {
 
         let env = env_at(1_000);
         let info = message_info(&reserver, &[]);
-        let mut ctx = build_ctx(deps.as_ref(), env, info);
+        let mut ctx = build_ctx(deps.as_ref(), env.clone(), info);
         let reservation = Reserve {
             reserver: reserver.clone(),
-            reserved_until: Expiration::AtTime(Timestamp::from_seconds(3_000)),
+            reserved_until: env.block.time.plus_seconds(3_000),
         };
 
         let result = contract.on_reserve_plugin(&"token-1".to_string(), &reservation, &mut ctx);

@@ -794,9 +794,9 @@ pub mod default_plugins {
     ) -> StdResult<bool> {
         if let Some(time_lock) = &ctx.data.time_lock {
             if let Some(reservation) = &ctx.data.reservation {
-                if reservation.reserved_until
-                    > Expiration::AtTime(ctx.env.block.time.plus_seconds(time_lock.as_secs()))
-                {
+                if Expiration::AtTime(reservation.reserved_until).gt(&Expiration::AtTime(
+                    ctx.env.block.time.plus_seconds(time_lock.as_secs()),
+                )) {
                     return Err(cosmwasm_std::StdError::generic_err(format!(
                         "Reservation end time {} exceeds the collection time lock {}",
                         reservation.reserved_until,

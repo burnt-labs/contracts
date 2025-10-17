@@ -1,4 +1,8 @@
-use cosmwasm_std::{BankMsg, Coin, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{
+    BankMsg, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    Timestamp,
+};
+use cw721::Expiration;
 use cw721::{state::NftInfo, traits::Cw721State};
 
 use crate::{
@@ -101,7 +105,7 @@ where
     check_can_list(deps.as_ref(), &env, info.sender.as_ref(), &nft_info)?;
 
     if let Some(reserved) = listing.reserved {
-        if !reserved.reserved_until.is_expired(&env.block) {
+        if !Expiration::AtTime(reserved.reserved_until).is_expired(&env.block) {
             return Err(ContractError::ReservedAsset { id: id.clone() });
         }
     }
@@ -137,7 +141,7 @@ where
     check_can_list(deps.as_ref(), &env, info.sender.as_ref(), &nft_info)?;
 
     if let Some(reserved) = &listing.reserved {
-        if !reserved.reserved_until.is_expired(&env.block) {
+        if !Expiration::AtTime(reserved.reserved_until).is_expired(&env.block) {
             return Err(ContractError::ReservedAsset { id: id.clone() });
         }
     }
@@ -347,12 +351,6 @@ where
         None => Err(ContractError::Unauthorized {}),
     }
 }
-
-#[cfg(test)]
-use cosmwasm_std::{CosmosMsg, StdError};
-
-#[cfg(test)]
-use cw721::Expiration;
 
 #[cfg(test)]
 fn expect_ok<T, E: core::fmt::Debug>(res: Result<T, E>) -> T {
@@ -901,7 +899,7 @@ fn test_buy() {
                 price: price.clone(),
                 reserved: Some(Reserve {
                     reserver: buyer_addr.clone(),
-                    reserved_until: Expiration::AtHeight(env.block.height + 100),
+                    reserved_until: env.block.time.plus_seconds(600),
                 }),
                 marketplace_fee_bps: None,
                 marketplace_fee_recipient: None,
@@ -953,7 +951,7 @@ fn test_buy() {
                 price: price.clone(),
                 reserved: Some(Reserve {
                     reserver: buyer_addr.clone(),
-                    reserved_until: Expiration::AtHeight(env.block.height + 100),
+                    reserved_until: env.block.time.plus_seconds(600),
                 }),
                 marketplace_fee_bps: None,
                 marketplace_fee_recipient: None,
@@ -1135,7 +1133,7 @@ fn test_delist() {
                 seller: seller_addr.clone(),
                 price: price.clone(),
                 reserved: Some(Reserve {
-                    reserved_until: Expiration::AtHeight(env.block.height + 100),
+                    reserved_until: env.block.time.plus_seconds(600),
                     reserver: seller_addr.clone(),
                 }),
                 marketplace_fee_bps: None,
@@ -1184,7 +1182,7 @@ fn test_reserve() {
         // cannot reserve unlisted item
         let reservation = Reserve {
             reserver: buyer_addr.clone(),
-            reserved_until: Expiration::AtHeight(env.block.height + 100),
+            reserved_until: env.block.time.plus_seconds(600),
         };
         let err = expect_err(reserve::<Empty, Empty>(
             deps.as_mut(),
@@ -1293,7 +1291,7 @@ fn test_unreserve() {
 
         let reservation = Reserve {
             reserver: reserver_addr.clone(),
-            reserved_until: Expiration::AtHeight(env.block.height + 10),
+            reserved_until: env.block.time.plus_seconds(600),
         };
 
         expect_ok(AssetConfig::<Empty>::default().listings.save(
@@ -1368,7 +1366,7 @@ fn test_unreserve() {
                 price: Coin::new(150 as u128, "uxion"),
                 reserved: Some(Reserve {
                     reserver: reserver_addr.clone(),
-                    reserved_until: Expiration::AtHeight(env.block.height + 10),
+                    reserved_until: env.block.time.plus_seconds(600),
                 }),
                 marketplace_fee_bps: None,
                 marketplace_fee_recipient: None,
@@ -1435,7 +1433,7 @@ fn test_unreserve() {
                 price: Coin::new(200 as u128, "uxion"),
                 reserved: Some(Reserve {
                     reserver: reserver_addr.clone(),
-                    reserved_until: Expiration::AtHeight(env.block.height + 10),
+                    reserved_until: env.block.time.plus_seconds(600),
                 }),
                 marketplace_fee_bps: None,
                 marketplace_fee_recipient: None,
