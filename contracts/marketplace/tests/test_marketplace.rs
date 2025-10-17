@@ -215,9 +215,7 @@ mod tests {
                 .wrap()
                 .query_wasm_smart::<Listing>(
                     marketplace_contract.clone(),
-                    &QueryMsg::Listing {
-                        listing_id: listing_id,
-                    },
+                    &QueryMsg::Listing { listing_id },
                 )
                 .unwrap();
 
@@ -692,7 +690,7 @@ mod tests {
                 buyer.clone(),
                 marketplace_contract.clone(),
                 &buy_msg,
-                &[price.clone()],
+                std::slice::from_ref(&price),
             );
 
             match result {
@@ -1103,7 +1101,7 @@ mod tests {
                 buyer.clone(),
                 marketplace_contract.clone(),
                 &offer_msg,
-                &[price.clone()],
+                std::slice::from_ref(&price),
             );
 
             assert!(result.is_ok());
@@ -1195,7 +1193,7 @@ mod tests {
                 buyer.clone(),
                 marketplace_contract.clone(),
                 &offer_msg,
-                &[price.clone()],
+                std::slice::from_ref(&price),
             );
 
             assert!(result.is_err());
@@ -1237,7 +1235,7 @@ mod tests {
                 buyer.clone(),
                 marketplace_contract.clone(),
                 &offer_msg,
-                &[insufficient.clone()],
+                std::slice::from_ref(&insufficient),
             );
 
             assert!(result.is_err());
@@ -1274,7 +1272,7 @@ mod tests {
                 buyer.clone(),
                 marketplace_contract.clone(),
                 &offer_msg,
-                &[price.clone()],
+                std::slice::from_ref(&price),
             );
 
             // Offers can be created for nonexistent tokens
@@ -1475,7 +1473,7 @@ mod tests {
                 buyer.clone(),
                 marketplace_contract.clone(),
                 &offer_msg,
-                &[price.clone()],
+                std::slice::from_ref(&price),
             );
 
             assert!(result.is_ok());
@@ -1540,7 +1538,7 @@ mod tests {
                 buyer.clone(),
                 marketplace_contract.clone(),
                 &offer_msg,
-                &[price.clone()],
+                std::slice::from_ref(&price),
             );
 
             assert!(result.is_err());
@@ -1577,7 +1575,7 @@ mod tests {
                 buyer.clone(),
                 marketplace_contract.clone(),
                 &offer_msg,
-                &[insufficient.clone()],
+                std::slice::from_ref(&insufficient),
             );
 
             assert!(result.is_err());

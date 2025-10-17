@@ -1,6 +1,9 @@
 use std::env;
 
 use crate::error::ContractError;
+use crate::events::{
+    cancel_listing_event, create_listing_event, item_sold_event, update_config_event,
+};
 use crate::helpers::{
     asset_buy_msg, asset_list_msg, generate_id, not_listed, only_manager, only_owner,
     query_listing, valid_payment,
@@ -14,14 +17,14 @@ use crate::state::init_auto_increment;
 use crate::state::{listings, Listing, ListingStatus};
 use crate::state::{Config, CONFIG};
 use cosmwasm_std::{
-    ensure_eq, entry_point, to_json_binary, Addr, Coin, DepsMut, Env, MessageInfo, Response,
-    WasmMsg,
+    ensure_eq, to_json_binary, Addr, Coin, DepsMut, Env, MessageInfo, Response, WasmMsg,
 };
 use cw2::set_contract_version;
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-#[entry_point]
+
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -35,10 +38,7 @@ pub fn instantiate(
     Ok(Response::new().add_attribute("method", "instantiate"))
 }
 
-use crate::events::{
-    cancel_listing_event, create_listing_event, item_sold_event, update_config_event,
-};
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -202,7 +202,7 @@ pub fn execute_cancel_listing(
 
     let mut sub_msgs = vec![];
 
-    if let Ok(_) = asset_listing {
+    if asset_listing.is_ok() {
         let cancel_listing = asset::msg::ExecuteMsg::<
             cw721::DefaultOptionalNftExtensionMsg,
             cw721::DefaultOptionalCollectionExtensionMsg,
@@ -288,7 +288,7 @@ pub fn execute_reject_sale(
     Ok(Response::default())
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     Ok(Response::default())
 }

@@ -1,4 +1,4 @@
-use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, Env, Order, StdResult};
+use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env, Order, StdResult};
 use cw_storage_plus::Bound;
 
 use crate::msg::QueryMsg;
@@ -7,7 +7,7 @@ use crate::state::{
     PendingSale, CONFIG,
 };
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_json_binary(&query_config(_deps)?),
@@ -27,7 +27,7 @@ pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 pub fn query_pending_sale(deps: Deps, id: String) -> StdResult<PendingSale> {
-    Ok(pending_sales().load(deps.storage, id)?)
+    pending_sales().load(deps.storage, id)
 }
 
 pub fn query_pending_sales(
@@ -63,20 +63,20 @@ pub fn query_pending_sales_by_expiry(
 }
 
 pub fn query_config(deps: Deps) -> StdResult<Config<Addr>> {
-    Ok(CONFIG.load(deps.storage)?)
+    CONFIG.load(deps.storage)
 }
 
 pub fn query_listing(deps: Deps, listing_id: String) -> StdResult<Listing> {
-    Ok(listings().load(deps.storage, listing_id)?)
+    listings().load(deps.storage, listing_id)
 }
 
 pub fn query_offer(deps: Deps, offer_id: String) -> StdResult<Offer> {
-    Ok(offers().load(deps.storage, offer_id)?)
+    offers().load(deps.storage, offer_id)
 }
 
 pub fn query_collection_offer(
     deps: Deps,
     collection_offer_id: String,
 ) -> StdResult<CollectionOffer> {
-    Ok(collection_offers().load(deps.storage, collection_offer_id)?)
+    collection_offers().load(deps.storage, collection_offer_id)
 }

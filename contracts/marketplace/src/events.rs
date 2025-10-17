@@ -32,6 +32,7 @@ pub fn cancel_listing_event(id: String, collection: Addr, owner: Addr, token_id:
         .add_attribute("token_id", token_id)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn item_sold_event(
     id: String,
     collection: Addr,

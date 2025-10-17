@@ -33,11 +33,9 @@ pub fn only_owner(
             }
             Ok(())
         }
-        Err(_) => {
-            return Err(ContractError::Unauthorized {
-                message: "sender is not owner".to_string(),
-            })
-        }
+        Err(_) => Err(ContractError::Unauthorized {
+            message: "sender is not owner".to_string(),
+        }),
     }
 }
 
@@ -96,7 +94,7 @@ pub fn valid_payment(
     price: Coin,
     valid_denom: String,
 ) -> Result<(), ContractError> {
-    let payment = one_coin(&info)?;
+    let payment = one_coin(info)?;
     // check if the payment is the valid denom
     ensure_eq!(
         payment.denom,
@@ -145,8 +143,8 @@ pub fn asset_list_msg(
             token_id: token_id.clone(),
             price: price.clone(),
             reservation: None,
-            marketplace_fee_bps: marketplace_fee_bps,
-            marketplace_fee_recipient: marketplace_fee_recipient,
+            marketplace_fee_bps,
+            marketplace_fee_recipient,
         },
     }
 }
