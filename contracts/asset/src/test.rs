@@ -534,7 +534,6 @@ mod asset_pluggable_tests {
                 &Plugin::Royalty {
                     bps: 500,
                     recipient: royalty_recipient.clone(),
-                    on_primary: true,
                 },
             )
             .unwrap();
@@ -1255,7 +1254,6 @@ mod asset_pluggable_sellable_test {
                 &Plugin::Royalty {
                     bps: 500,
                     recipient: royalty_recipient.clone(),
-                    on_primary: true,
                 },
             )
             .unwrap();
