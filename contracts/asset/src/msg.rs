@@ -18,6 +18,10 @@ pub enum AssetExtensionExecuteMsg {
         token_id: String,
         reservation: Reserve,
     },
+    UnReserve {
+        token_id: String,
+        delist: Option<bool>,
+    },
     Delist {
         token_id: String,
     },

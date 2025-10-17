@@ -155,6 +155,49 @@ where
         .add_attribute("reserver", reservation.reserver.to_string())
         .add_attribute("reserved_until", reservation.reserved_until.to_string()))
 }
+pub fn unreserve<TNftExtension, TCustomResponseMsg>(
+    deps: DepsMut,
+    env: &Env,
+    info: &MessageInfo,
+    id: String,
+    delist: bool,
+) -> Result<Response<TCustomResponseMsg>, ContractError>
+where
+    TNftExtension: Cw721State,
+    TCustomResponseMsg: CustomMsg,
+{
+    let asset_config = AssetConfig::<TNftExtension>::default();
+
+    let mut listing = asset_config
+        .listings
+        .may_load(deps.storage, &id)?
+        .ok_or_else(|| ContractError::ListingNotFound { id: id.clone() })?;
+
+    let reserved = listing
+        .reserved
+        .as_ref()
+        .ok_or_else(|| ContractError::ReservationNotFound { id: id.clone() })?;
+
+    if reserved.reserver != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let response = Response::<TCustomResponseMsg>::default()
+        .add_attribute("action", "unreserve")
+        .add_attribute("id", id.clone())
+        .add_attribute("collection", env.contract.address.clone())
+        .add_attribute("reserver", info.sender.to_string());
+
+    if delist {
+        asset_config.listings.remove(deps.storage, &id)?;
+        return Ok(response.add_attribute("delisted", "true"));
+    }
+
+    listing.reserved = None;
+    asset_config.listings.save(deps.storage, &id, &listing)?;
+
+    Ok(response.add_attribute("delisted", "false"))
+}
 pub fn buy<TNftExtension, TCustomResponseMsg>(
     deps: DepsMut,
     _env: &Env,
@@ -1220,6 +1263,237 @@ fn test_reserve() {
             err,
             ContractError::ReservedAsset {
                 id: "token-1".to_string()
+            }
+        );
+    }
+}
+
+#[test]
+fn test_unreserve() {
+    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
+    use cosmwasm_std::{Coin, Empty};
+
+    // reserver can remove reservation while keeping listing active
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let owner_addr = deps.api.addr_make("owner");
+        let reserver_addr = deps.api.addr_make("reserver");
+        let nft_info = NftInfo {
+            owner: owner_addr.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-1",
+            &nft_info,
+        ));
+
+        let reservation = Reserve {
+            reserver: reserver_addr.clone(),
+            reserved_until: Expiration::AtHeight(env.block.height + 10),
+        };
+
+        expect_ok(AssetConfig::<Empty>::default().listings.save(
+            deps.as_mut().storage,
+            "token-1",
+            &ListingInfo {
+                id: "token-1".to_string(),
+                seller: owner_addr.clone(),
+                price: Coin::new(100 as u128, "uxion"),
+                reserved: Some(reservation.clone()),
+                marketplace_fee_bps: None,
+                marketplace_fee_recipient: None,
+            },
+        ));
+
+        let response = expect_ok(unreserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&reserver_addr, &[]),
+            "token-1".to_string(),
+            false,
+        ));
+
+        let attrs: Vec<(String, String)> = response
+            .attributes
+            .iter()
+            .map(|attr| (attr.key.clone(), attr.value.clone()))
+            .collect();
+        assert_eq!(
+            attrs,
+            vec![
+                ("action".to_string(), "unreserve".to_string()),
+                ("id".to_string(), "token-1".to_string()),
+                ("collection".to_string(), env.contract.address.to_string()),
+                ("reserver".to_string(), reserver_addr.to_string()),
+                ("delisted".to_string(), "false".to_string()),
+            ],
+        );
+
+        let stored = expect_ok(
+            AssetConfig::<Empty>::default()
+                .listings
+                .load(deps.as_ref().storage, "token-1"),
+        );
+        assert!(stored.reserved.is_none());
+    }
+
+    // reserver can delist when requested
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let owner_addr = deps.api.addr_make("owner");
+        let reserver_addr = deps.api.addr_make("reserver");
+        let nft_info = NftInfo {
+            owner: owner_addr.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-2",
+            &nft_info,
+        ));
+
+        expect_ok(AssetConfig::<Empty>::default().listings.save(
+            deps.as_mut().storage,
+            "token-2",
+            &ListingInfo {
+                id: "token-2".to_string(),
+                seller: owner_addr.clone(),
+                price: Coin::new(150 as u128, "uxion"),
+                reserved: Some(Reserve {
+                    reserver: reserver_addr.clone(),
+                    reserved_until: Expiration::AtHeight(env.block.height + 10),
+                }),
+                marketplace_fee_bps: None,
+                marketplace_fee_recipient: None,
+            },
+        ));
+
+        let response = expect_ok(unreserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&reserver_addr, &[]),
+            "token-2".to_string(),
+            true,
+        ));
+
+        let attrs: Vec<(String, String)> = response
+            .attributes
+            .iter()
+            .map(|attr| (attr.key.clone(), attr.value.clone()))
+            .collect();
+        assert_eq!(
+            attrs,
+            vec![
+                ("action".to_string(), "unreserve".to_string()),
+                ("id".to_string(), "token-2".to_string()),
+                ("collection".to_string(), env.contract.address.to_string()),
+                ("reserver".to_string(), reserver_addr.to_string()),
+                ("delisted".to_string(), "true".to_string()),
+            ],
+        );
+
+        let stored = expect_ok(
+            AssetConfig::<Empty>::default()
+                .listings
+                .may_load(deps.as_ref().storage, "token-2"),
+        );
+        assert!(stored.is_none());
+    }
+
+    // non-reserver cannot unreserve
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let owner_addr = deps.api.addr_make("owner");
+        let reserver_addr = deps.api.addr_make("reserver");
+        let intruder_addr = deps.api.addr_make("intruder");
+        let nft_info = NftInfo {
+            owner: owner_addr.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-3",
+            &nft_info,
+        ));
+
+        expect_ok(AssetConfig::<Empty>::default().listings.save(
+            deps.as_mut().storage,
+            "token-3",
+            &ListingInfo {
+                id: "token-3".to_string(),
+                seller: owner_addr.clone(),
+                price: Coin::new(200 as u128, "uxion"),
+                reserved: Some(Reserve {
+                    reserver: reserver_addr.clone(),
+                    reserved_until: Expiration::AtHeight(env.block.height + 10),
+                }),
+                marketplace_fee_bps: None,
+                marketplace_fee_recipient: None,
+            },
+        ));
+
+        let err = expect_err(unreserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&intruder_addr, &[]),
+            "token-3".to_string(),
+            false,
+        ));
+        assert_eq!(err, ContractError::Unauthorized {});
+    }
+
+    // cannot unreserve when listing not reserved
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let owner_addr = deps.api.addr_make("owner");
+        let reserver_addr = deps.api.addr_make("reserver");
+        let nft_info = NftInfo {
+            owner: owner_addr.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-4",
+            &nft_info,
+        ));
+
+        expect_ok(AssetConfig::<Empty>::default().listings.save(
+            deps.as_mut().storage,
+            "token-4",
+            &ListingInfo {
+                id: "token-4".to_string(),
+                seller: owner_addr.clone(),
+                price: Coin::new(250 as u128, "uxion"),
+                reserved: None,
+                marketplace_fee_bps: None,
+                marketplace_fee_recipient: None,
+            },
+        ));
+
+        let err = expect_err(unreserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&reserver_addr, &[]),
+            "token-4".to_string(),
+            false,
+        ));
+        assert_eq!(
+            err,
+            ContractError::ReservationNotFound {
+                id: "token-4".to_string()
             }
         );
     }
