@@ -57,17 +57,15 @@ pub fn query_listing(
     querier: &QuerierWrapper,
     collection: &Addr,
     token_id: &str,
-) -> Result<ListingInfo<cw721::DefaultOptionalNftExtension>, ContractError> {
-    if let Ok(listing) = querier
-        .query_wasm_smart::<ListingInfo<cw721::DefaultOptionalNftExtension>>(
-            collection.clone(),
-            &AssetQueryMsg::<Empty, Empty, AssetExtensionQueryMsg>::Extension {
-                msg: AssetExtensionQueryMsg::GetListing {
-                    token_id: token_id.to_string(),
-                },
+) -> Result<ListingInfo, ContractError> {
+    if let Ok(listing) = querier.query_wasm_smart::<ListingInfo>(
+        collection.clone(),
+        &AssetQueryMsg::<Empty, Empty, AssetExtensionQueryMsg>::Extension {
+            msg: AssetExtensionQueryMsg::GetListing {
+                token_id: token_id.to_string(),
             },
-        )
-    {
+        },
+    ) {
         Ok(listing)
     } else {
         Err(ContractError::NotListed {})
@@ -147,8 +145,8 @@ pub fn asset_list_msg(
             token_id: token_id.clone(),
             price: price.clone(),
             reservation: None,
-            marketplace_fee_bps: None,
-            marketplace_fee_recipient: None,
+            marketplace_fee_bps: marketplace_fee_bps,
+            marketplace_fee_recipient: marketplace_fee_recipient,
         },
     }
 }

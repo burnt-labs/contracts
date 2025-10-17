@@ -842,7 +842,7 @@ mod asset_pluggable_tests {
     #[test]
     fn save_plugin_saves_all_plugins() {
         let mut deps = mock_dependencies();
-        let mut contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
+        let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
             Default::default();
 
         let plugins = vec![

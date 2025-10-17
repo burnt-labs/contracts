@@ -909,10 +909,9 @@ mod tests {
             let mut app = setup_app_with_balances();
             let buyer = app.api().addr_make("buyer");
             let manager = app.api().addr_make("manager");
-            let minter = app.api().addr_make("minter");
 
             // Setup contracts
-            let asset_contract = setup_asset_contract(&mut app, &minter);
+
             let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
 
             // Try to buy item that's not listed
