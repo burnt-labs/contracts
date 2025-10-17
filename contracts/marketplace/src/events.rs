@@ -107,3 +107,54 @@ pub fn create_collection_offer_event(
     .add_attribute("collection", collection.to_string())
     .add_attribute("price", price.to_string())
 }
+
+pub fn pending_sale_created_event(
+    id: String,
+    collection: Addr,
+    token_id: String,
+    buyer: Addr,
+    seller: Addr,
+    price: Coin,
+) -> Event {
+    Event::new(format!("{}/pending-sale-created", env!("CARGO_PKG_NAME")))
+        .add_attribute("id", id)
+        .add_attribute("collection", collection.to_string())
+        .add_attribute("token_id", token_id)
+        .add_attribute("buyer", buyer.to_string())
+        .add_attribute("seller", seller.to_string())
+        .add_attribute("price", price.to_string())
+}
+
+pub fn sale_approved_event(
+    pending_sale_id: String,
+    collection: Addr,
+    token_id: String,
+    buyer: Addr,
+    seller: Addr,
+    price: Coin,
+) -> Event {
+    Event::new(format!("{}/sale-approved", env!("CARGO_PKG_NAME")))
+        .add_attribute("pending_sale_id", pending_sale_id)
+        .add_attribute("collection", collection.to_string())
+        .add_attribute("token_id", token_id)
+        .add_attribute("buyer", buyer.to_string())
+        .add_attribute("seller", seller.to_string())
+        .add_attribute("price", price.to_string())
+}
+
+pub fn sale_rejected_event(
+    pending_sale_id: String,
+    collection: Addr,
+    token_id: String,
+    buyer: Addr,
+    seller: Addr,
+    price: Coin,
+) -> Event {
+    Event::new(format!("{}/sale-rejected", env!("CARGO_PKG_NAME")))
+        .add_attribute("pending_sale_id", pending_sale_id)
+        .add_attribute("collection", collection.to_string())
+        .add_attribute("token_id", token_id)
+        .add_attribute("buyer", buyer.to_string())
+        .add_attribute("seller", seller.to_string())
+        .add_attribute("price", price.to_string())
+}

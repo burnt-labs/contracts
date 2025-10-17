@@ -2,11 +2,12 @@ use std::env;
 
 use crate::error::ContractError;
 use crate::events::{
-    cancel_listing_event, create_listing_event, item_sold_event, update_config_event,
+    cancel_listing_event, create_listing_event, item_sold_event, pending_sale_created_event,
+    sale_approved_event, sale_rejected_event, update_config_event,
 };
 use crate::helpers::{
-    asset_buy_msg, asset_list_msg, generate_id, not_listed, only_manager, only_owner,
-    query_listing, valid_payment,
+    asset_buy_msg, asset_delist_msg, asset_list_msg, asset_reserve_msg, generate_id, not_listed,
+    only_manager, only_owner, query_listing, valid_payment,
 };
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::offers::{
@@ -14,10 +15,10 @@ use crate::offers::{
     execute_cancel_offer, execute_create_collection_offer, execute_create_offer,
 };
 use crate::state::init_auto_increment;
-use crate::state::{listings, Listing, ListingStatus};
+use crate::state::{listings, pending_sales, Listing, ListingStatus, PendingSale, SaleType};
 use crate::state::{Config, CONFIG};
 use cosmwasm_std::{
-    ensure_eq, to_json_binary, Addr, Coin, DepsMut, Env, MessageInfo, Response, WasmMsg,
+    ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -54,7 +55,7 @@ pub fn execute(
         } => execute_create_listing(deps, info, api.addr_validate(&collection)?, price, token_id),
         ExecuteMsg::CancelListing { listing_id } => execute_cancel_listing(deps, info, listing_id),
         ExecuteMsg::BuyItem { listing_id, price } => {
-            execute_buy_item(deps, info, listing_id, price)
+            execute_buy_item(deps, env, info, listing_id, price)
         }
         ExecuteMsg::CreateOffer {
             collection,
@@ -230,12 +231,15 @@ pub fn execute_cancel_listing(
 
 pub fn execute_buy_item(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     listing_id: String,
     price: Coin,
 ) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
     let listing = listings().load(deps.storage, listing_id.clone())?;
-    // prevent price mismatch due to possible frontrunning
+
+    // Prevent price mismatch due to possible frontrunning
     if listing.price != price {
         return Err(ContractError::InvalidPrice {
             expected: listing.price,
@@ -243,10 +247,15 @@ pub fn execute_buy_item(
         });
     }
 
-    // check payment and funds are valid
-    valid_payment(&info, price.clone(), listing.price.denom)?;
+    // Check payment and funds are valid
+    valid_payment(&info, price.clone(), listing.price.denom.clone())?;
 
-    // remove the listing from state
+    // if approvals are enabled, create pending sale.
+    if config.sale_approvals {
+        return execute_create_pending_sale(deps, env, info, listing_id, listing, price);
+    }
+
+    // remove listing
     listings().remove(deps.storage, listing_id.clone())?;
 
     let buy_msg = asset_buy_msg(info.sender.clone(), listing.token_id.clone());
@@ -265,27 +274,168 @@ pub fn execute_buy_item(
         .add_message(WasmMsg::Execute {
             contract_addr: listing.collection.clone().to_string(),
             msg: to_json_binary(&buy_msg)?,
-            // send the payment to the asset contract
             funds: info.funds,
         }))
 }
 
-pub fn execute_approve_sale(
-    _deps: DepsMut,
-    _info: MessageInfo,
-    _id: String,
+fn execute_create_pending_sale(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    listing_id: String,
+    listing: Listing,
+    price: Coin,
 ) -> Result<Response, ContractError> {
-    // TODO: Implement approve sale functionality
-    Ok(Response::default())
+    let pending_sale_id = generate_id(vec![
+        listing_id.as_bytes(),
+        info.sender.as_bytes(),
+        &env.block.height.to_string().as_bytes(),
+    ]);
+
+    let pending_sale = PendingSale {
+        id: pending_sale_id.clone(),
+        collection: listing.collection.clone(),
+        token_id: listing.token_id.clone(),
+        price: price.clone(),
+        seller: listing.seller.clone(),
+        buyer: info.sender.clone(),
+        sale_type: SaleType::BuyNow,
+        time: env.block.time.seconds(),
+        expiration: env.block.time.seconds() + 86400, // 24 hours
+    };
+
+    pending_sales().save(deps.storage, pending_sale_id.clone(), &pending_sale)?;
+
+    // update listing status to reserved
+    listings().update(deps.storage, listing_id.clone(), |l| match l {
+        Some(mut listing) => {
+            listing.status = ListingStatus::Reserved;
+            Ok(listing)
+        }
+        None => Err(ContractError::ListingNotFound { id: listing_id }),
+    })?;
+
+    // Reserve the NFT in the asset contract
+    let reserve_msg = asset_reserve_msg(
+        listing.token_id.clone(),
+        info.sender.clone(),
+        cw721::Expiration::AtTime(env.block.time.plus_seconds(86400)),
+    );
+
+    // Funds are escrowed in contract (sent by buyer in info.funds)
+    Ok(Response::new()
+        .add_event(pending_sale_created_event(
+            pending_sale_id,
+            listing.collection.clone(),
+            listing.token_id,
+            info.sender,
+            listing.seller,
+            price,
+        ))
+        .add_message(WasmMsg::Execute {
+            contract_addr: listing.collection.to_string(),
+            msg: to_json_binary(&reserve_msg)?,
+            funds: vec![],
+        })
+        .add_attribute("action", "pending_sale_created"))
+}
+
+pub fn execute_approve_sale(
+    deps: DepsMut,
+    info: MessageInfo,
+    pending_sale_id: String,
+) -> Result<Response, ContractError> {
+    // Only manager can approve
+    only_manager(&info, &deps)?;
+
+    let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
+
+    // Generate listing_id to find the listing
+    let listing_id = generate_id(vec![
+        pending_sale.collection.as_bytes(),
+        pending_sale.token_id.as_bytes(),
+    ]);
+
+    // Execute the buy on asset contract
+    let buy_msg = asset_buy_msg(pending_sale.buyer.clone(), pending_sale.token_id.clone());
+
+    // delete original listing
+    listings().remove(deps.storage, listing_id.clone())?;
+
+    // remove from queue
+    pending_sales().remove(deps.storage, pending_sale_id.clone())?;
+
+    Ok(Response::new()
+        .add_event(sale_approved_event(
+            pending_sale_id,
+            pending_sale.collection.clone(),
+            pending_sale.token_id.clone(),
+            pending_sale.buyer.clone(),
+            pending_sale.seller.clone(),
+            pending_sale.price.clone(),
+        ))
+        .add_event(item_sold_event(
+            listing_id,
+            pending_sale.collection.clone(),
+            pending_sale.seller,
+            pending_sale.buyer,
+            pending_sale.token_id.clone(),
+            pending_sale.price.clone(),
+            None,
+            None,
+        ))
+        .add_message(WasmMsg::Execute {
+            contract_addr: pending_sale.collection.to_string(),
+            msg: to_json_binary(&buy_msg)?,
+            funds: vec![pending_sale.price],
+        }))
 }
 
 pub fn execute_reject_sale(
-    _deps: DepsMut,
-    _info: MessageInfo,
-    _id: String,
+    deps: DepsMut,
+    info: MessageInfo,
+    pending_sale_id: String,
 ) -> Result<Response, ContractError> {
-    // TODO: Implement reject sale functionality
-    Ok(Response::default())
+    // Only manager can reject
+    only_manager(&info, &deps)?;
+
+    let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
+
+    let listing_id = generate_id(vec![
+        pending_sale.collection.as_bytes(),
+        pending_sale.token_id.as_bytes(),
+    ]);
+
+    // delete the listing
+    listings().remove(deps.storage, listing_id)?;
+
+    // delist from asset contract
+    let delist_msg = asset_delist_msg(pending_sale.token_id.clone());
+
+    // refund buyer
+    let refund_msg = BankMsg::Send {
+        to_address: pending_sale.buyer.to_string(),
+        amount: vec![pending_sale.price.clone()],
+    };
+
+    // remove pending sale from the queue
+    pending_sales().remove(deps.storage, pending_sale_id.clone())?;
+
+    Ok(Response::new()
+        .add_event(sale_rejected_event(
+            pending_sale_id,
+            pending_sale.collection.clone(),
+            pending_sale.token_id,
+            pending_sale.buyer.clone(),
+            pending_sale.seller,
+            pending_sale.price,
+        ))
+        .add_message(WasmMsg::Execute {
+            contract_addr: pending_sale.collection.to_string(),
+            msg: to_json_binary(&delist_msg)?,
+            funds: vec![],
+        })
+        .add_message(refund_msg))
 }
 
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]

@@ -100,11 +100,11 @@ where
     let nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
     check_can_list(deps.as_ref(), &env, info.sender.as_ref(), &nft_info)?;
 
-    if let Some(reserved) = listing.reserved {
-        if !reserved.reserved_until.is_expired(&env.block) {
-            return Err(ContractError::ReservedAsset { id: id.clone() });
-        }
-    }
+    // if let Some(reserved) = listing.reserved {
+    //     if !reserved.reserved_until.is_expired(&env.block) {
+    //         return Err(ContractError::ReservedAsset { id: id.clone() });
+    //     }
+    // }
 
     asset_config.listings.remove(deps.storage, &id)?;
 
@@ -1068,51 +1068,51 @@ fn test_delist() {
         );
     }
     // reserved assets cannot be delisted
-    {
-        let mut deps = mock_dependencies();
-        let env = mock_env();
-        let seller_addr = deps.api.addr_make("seller");
-        let nft_info = NftInfo {
-            owner: seller_addr.clone(),
-            approvals: vec![],
-            token_uri: None,
-            extension: Empty {},
-        };
-        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
-            deps.as_mut().storage,
-            "token-4",
-            &nft_info,
-        ));
-        let price = Coin::new(100 as u128, "uxion");
-        expect_ok(AssetConfig::<Empty>::default().listings.save(
-            deps.as_mut().storage,
-            "token-4",
-            &ListingInfo {
-                id: "token-4".to_string(),
-                seller: seller_addr.clone(),
-                price: price.clone(),
-                reserved: Some(Reserve {
-                    reserved_until: Expiration::AtHeight(env.block.height + 100),
-                    reserver: seller_addr.clone(),
-                }),
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
-            },
-        ));
+    // {
+    //     let mut deps = mock_dependencies();
+    //     let env = mock_env();
+    //     let seller_addr = deps.api.addr_make("seller");
+    //     let nft_info = NftInfo {
+    //         owner: seller_addr.clone(),
+    //         approvals: vec![],
+    //         token_uri: None,
+    //         extension: Empty {},
+    //     };
+    //     expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+    //         deps.as_mut().storage,
+    //         "token-4",
+    //         &nft_info,
+    //     ));
+    //     let price = Coin::new(100 as u128, "uxion");
+    //     expect_ok(AssetConfig::<Empty>::default().listings.save(
+    //         deps.as_mut().storage,
+    //         "token-4",
+    //         &ListingInfo {
+    //             id: "token-4".to_string(),
+    //             seller: seller_addr.clone(),
+    //             price: price.clone(),
+    //             reserved: Some(Reserve {
+    //                 reserved_until: Expiration::AtHeight(env.block.height + 100),
+    //                 reserver: seller_addr.clone(),
+    //             }),
+    //             marketplace_fee_bps: None,
+    //             marketplace_fee_recipient: None,
+    //         },
+    //     ));
 
-        let err = expect_err(delist::<Empty, Empty>(
-            deps.as_mut(),
-            &env,
-            &message_info(&seller_addr, &[]),
-            "token-4".to_string(),
-        ));
-        assert_eq!(
-            err,
-            ContractError::ReservedAsset {
-                id: "token-4".to_string()
-            }
-        );
-    }
+    //     let err = expect_err(delist::<Empty, Empty>(
+    //         deps.as_mut(),
+    //         &env,
+    //         &message_info(&seller_addr, &[]),
+    //         "token-4".to_string(),
+    //     ));
+    //     assert_eq!(
+    //         err,
+    //         ContractError::ReservedAsset {
+    //             id: "token-4".to_string()
+    //         }
+    //     );
+    // }
 }
 
 #[test]

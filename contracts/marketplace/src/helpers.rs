@@ -168,3 +168,43 @@ pub fn asset_buy_msg(
         },
     }
 }
+
+pub fn asset_reserve_msg(
+    token_id: String,
+    reserver: Addr,
+    reserved_until: cw721::Expiration,
+) -> asset::msg::ExecuteMsg<
+    cw721::DefaultOptionalNftExtensionMsg,
+    cw721::DefaultOptionalCollectionExtensionMsg,
+    AssetExecuteMsg,
+> {
+    asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        AssetExecuteMsg,
+    >::UpdateExtension {
+        msg: AssetExecuteMsg::Reserve {
+            token_id,
+            reservation: asset::state::Reserve {
+                reserver,
+                reserved_until,
+            },
+        },
+    }
+}
+
+pub fn asset_delist_msg(
+    token_id: String,
+) -> asset::msg::ExecuteMsg<
+    cw721::DefaultOptionalNftExtensionMsg,
+    cw721::DefaultOptionalCollectionExtensionMsg,
+    AssetExecuteMsg,
+> {
+    asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        AssetExecuteMsg,
+    >::UpdateExtension {
+        msg: AssetExecuteMsg::Delist { token_id },
+    }
+}
