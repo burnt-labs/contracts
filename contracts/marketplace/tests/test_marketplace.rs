@@ -1069,6 +1069,163 @@ mod tests {
             // The error is wrapped by the test framework, so we check for the generic error
             assert!(error_msg.contains("Error executing") || error_msg.contains("WasmMsg"));
         }
+
+        #[test]
+        fn test_buy_item_success_with_royalties() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+            let royalty_recipient = app.api().addr_make("royalty_recipient");
+
+            // Setup contracts
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+            // Set up royalty plugin on the collection (5% = 500 bps)
+            let royalty_plugin = asset::plugin::Plugin::Royalty {
+                bps: 500, // 5%
+                recipient: royalty_recipient.clone(),
+                on_primary: true, // Collect royalties on all sales including primary
+            };
+
+            let set_plugin_msg = asset::msg::ExecuteMsg::<
+                cw721::DefaultOptionalNftExtensionMsg,
+                cw721::DefaultOptionalCollectionExtensionMsg,
+                asset::msg::AssetExtensionExecuteMsg,
+            >::UpdateExtension {
+                msg: asset::msg::AssetExtensionExecuteMsg::SetCollectionPlugin {
+                    plugins: vec![royalty_plugin],
+                },
+            };
+
+            app.execute_contract(minter.clone(), asset_contract.clone(), &set_plugin_msg, &[])
+                .unwrap();
+
+            // Mint NFT to seller
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            // Approve marketplace contract to manage the NFT
+            let approve_msg = Cw721ExecuteMsg::Approve {
+                spender: marketplace_contract.to_string(),
+                token_id: "token1".to_string(),
+                expires: None,
+            };
+            app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+                .unwrap();
+
+            // Create listing with price of 1000 uxion
+            let price = coin(1000, "uxion");
+            let list_msg = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price: price.clone(),
+                token_id: "token1".to_string(),
+            };
+
+            let result =
+                app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+            assert!(result.is_ok());
+
+            // Extract listing ID from events
+            let events = result.unwrap().events;
+            let listing_id = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/list-item")
+                .unwrap()
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap()
+                .value
+                .clone();
+
+            // Get initial balances
+            let seller_balance_before = app.wrap().query_balance(&seller, "uxion").unwrap().amount;
+            let buyer_balance_before = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+            let manager_balance_before =
+                app.wrap().query_balance(&manager, "uxion").unwrap().amount;
+            let royalty_recipient_balance_before = app
+                .wrap()
+                .query_balance(&royalty_recipient, "uxion")
+                .unwrap()
+                .amount;
+
+            // Buy item
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                std::slice::from_ref(&price),
+            );
+
+            assert!(result.is_ok());
+
+            // Get final balances
+            let seller_balance_after = app.wrap().query_balance(&seller, "uxion").unwrap().amount;
+            let buyer_balance_after = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+            let manager_balance_after = app.wrap().query_balance(&manager, "uxion").unwrap().amount;
+            let royalty_recipient_balance_after = app
+                .wrap()
+                .query_balance(&royalty_recipient, "uxion")
+                .unwrap()
+                .amount;
+
+            // Calculate expected amounts
+            // Price: 1000 uxion
+            // Marketplace fee (2.5% = 250 bps): 1000 * 250 / 10000 = 25 uxion
+            // Royalty (5% = 500 bps): 1000 * 500 / 10000 = 50 uxion
+            // Seller gets: 1000 - 25 - 50 = 925 uxion
+            let expected_marketplace_fee = 25u128;
+            let expected_royalty = 50u128;
+            let expected_seller_payment = 925u128;
+
+            // Verify payment distribution
+            use cosmwasm_std::Uint128;
+
+            assert_eq!(
+                buyer_balance_after,
+                buyer_balance_before - Uint128::from(1000u128),
+                "Buyer should have paid 1000 uxion"
+            );
+
+            assert_eq!(
+                seller_balance_after,
+                seller_balance_before + Uint128::from(expected_seller_payment),
+                "Seller should receive {} uxion (1000 - 25 marketplace fee - 50 royalty)",
+                expected_seller_payment
+            );
+
+            assert_eq!(
+                manager_balance_after,
+                manager_balance_before + Uint128::from(expected_marketplace_fee),
+                "Manager should receive {} uxion marketplace fee",
+                expected_marketplace_fee
+            );
+
+            assert_eq!(
+                royalty_recipient_balance_after,
+                royalty_recipient_balance_before + Uint128::from(expected_royalty),
+                "Royalty recipient should receive {} uxion royalty",
+                expected_royalty
+            );
+
+            // Verify NFT ownership changed
+            let owner_query = cw721_base::msg::QueryMsg::OwnerOf {
+                token_id: "token1".to_string(),
+                include_expired: Some(false),
+            };
+            let owner_resp: cw721::msg::OwnerOfResponse = app
+                .wrap()
+                .query_wasm_smart(asset_contract.clone(), &owner_query)
+                .unwrap();
+            assert_eq!(owner_resp.owner, buyer.to_string());
+        }
     }
 
     mod create_offer_tests {
