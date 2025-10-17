@@ -72,7 +72,9 @@ pub fn query(
 
     use crate::error::ContractError;
 
-     let contract: AssetBaseContract<'static> = AssetContract::default();
+    let contract: AssetBaseContract<'static> = AssetContract::default();
 
-    contract.query(deps, &env, msg).map_err(|err| ContractError::from(err).into())
+    contract
+        .query(deps, &env, msg)
+        .map_err(|err| ContractError::from(err).into())
 }
