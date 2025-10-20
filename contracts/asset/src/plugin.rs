@@ -49,7 +49,6 @@ pub struct RoyaltyInfo {
     pub primary_complete: bool,
 }
 
-
 pub struct DefaultXionAssetContext {
     pub token_id: String,
     pub seller: Option<Addr>,

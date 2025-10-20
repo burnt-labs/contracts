@@ -1,6 +1,4 @@
-use cosmwasm_std::{
-    BankMsg, Coin, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response,
-};
+use cosmwasm_std::{BankMsg, Coin, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response};
 use cw721::Expiration;
 use cw721::{state::NftInfo, traits::Cw721State};
 
