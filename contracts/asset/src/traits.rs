@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     error::ContractError,
-    execute::{buy, delist, list, reserve},
+    execute::{buy, delist, list, reserve, unreserve},
     msg::{AssetExtensionExecuteMsg, AssetExtensionQueryMsg},
     plugin::PluggableAsset,
     state::{AssetConfig, Reserve},
@@ -168,6 +168,17 @@ pub trait SellableAsset<
     ) -> Result<Response<TCustomResponseMsg>, ContractError> {
         reserve::<TNftExtension, TCustomResponseMsg>(deps, env, info, id, reservation)
     }
+    fn unreserve(
+        &self,
+        deps: DepsMut,
+        env: &Env,
+        info: &MessageInfo,
+        id: String,
+        delist: bool,
+    ) -> Result<Response<TCustomResponseMsg>, ContractError> {
+        unreserve::<TNftExtension, TCustomResponseMsg>(deps, env, info, id, delist)
+    }
+
     fn buy(
         &self,
         deps: DepsMut,
@@ -268,6 +279,9 @@ where
                 token_id,
                 reservation,
             } => Ok(self.reserve(deps, env, info, token_id, reservation)?),
+            AssetExtensionExecuteMsg::UnReserve { token_id, delist } => {
+                Ok(self.unreserve(deps, env, info, token_id, delist.unwrap_or(false))?)
+            }
             AssetExtensionExecuteMsg::Delist { token_id } => {
                 Ok(self.delist(deps, env, info, token_id)?)
             }

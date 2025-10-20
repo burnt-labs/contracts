@@ -44,7 +44,6 @@ where
 pub struct RoyaltyInfo {
     pub collection_royalty_bps: Option<u16>,
     pub collection_royalty_recipient: Option<Addr>,
-    pub collection_royalty_on_primary: Option<bool>,
 
     pub primary_complete: bool,
 }
@@ -54,7 +53,6 @@ impl Default for RoyaltyInfo {
         RoyaltyInfo {
             collection_royalty_bps: None,
             collection_royalty_recipient: None,
-            collection_royalty_on_primary: None,
             primary_complete: false,
         }
     }
@@ -101,35 +99,15 @@ pub type DefaultPluginCtx<'a> = PluginCtx<'a, DefaultXionAssetContext, Empty>;
 
 #[cw_serde]
 pub enum Plugin {
-    ExactPrice {
-        amount: Coin,
-    },
-    MinimumPrice {
-        amount: Coin,
-    },
-    RequiresProof {
-        proof: Vec<u8>,
-    },
-    NotBefore {
-        time: Expiration,
-    },
-    NotAfter {
-        time: Expiration,
-    },
-    TimeLock {
-        time: Duration,
-    },
-    Royalty {
-        bps: u16,
-        recipient: Addr,
-        on_primary: bool,
-    },
-    AllowedMarketplaces {
-        marketplaces: Vec<Addr>,
-    },
-    AllowedCurrencies {
-        denoms: Vec<Coin>,
-    },
+    ExactPrice { amount: Coin },
+    MinimumPrice { amount: Coin },
+    RequiresProof { proof: Vec<u8> },
+    NotBefore { time: Expiration },
+    NotAfter { time: Expiration },
+    TimeLock { time: Duration },
+    Royalty { bps: u16, recipient: Addr },
+    AllowedMarketplaces { marketplaces: Vec<Addr> },
+    AllowedCurrencies { denoms: Vec<Coin> },
 }
 
 impl Display for Plugin {
@@ -141,15 +119,9 @@ impl Display for Plugin {
             Plugin::NotBefore { time } => write!(f, "NotBefore: {}", time),
             Plugin::NotAfter { time } => write!(f, "NotAfter: {}", time),
             Plugin::TimeLock { time } => write!(f, "TimeLock: {:?}", time),
-            Plugin::Royalty {
-                bps,
-                recipient,
-                on_primary,
-            } => write!(
-                f,
-                "Royalty: {} bps to {} on_primary: {}",
-                bps, recipient, on_primary
-            ),
+            Plugin::Royalty { bps, recipient } => {
+                write!(f, "Royalty: {} bps to {}", bps, recipient)
+            }
             Plugin::AllowedMarketplaces { marketplaces } => {
                 write!(f, "AllowedMarketplaces: {:?}", marketplaces)
             }
@@ -186,14 +158,9 @@ impl Plugin {
                 ctx.data.not_after = *time;
                 default_plugins::not_after_plugin(ctx)?;
             }
-            Plugin::Royalty {
-                bps,
-                recipient,
-                on_primary,
-            } => {
+            Plugin::Royalty { bps, recipient } => {
                 ctx.royalty.collection_royalty_bps = Some(*bps);
                 ctx.royalty.collection_royalty_recipient = Some((*recipient).clone());
-                ctx.royalty.collection_royalty_on_primary = Some(*on_primary);
                 default_plugins::royalty_plugin(ctx)?;
             }
             Plugin::AllowedMarketplaces { marketplaces } => {
@@ -217,14 +184,9 @@ impl Plugin {
         ctx: &mut PluginCtx<T, U>,
     ) -> StdResult<bool> {
         match self {
-            Plugin::Royalty {
-                bps,
-                recipient,
-                on_primary,
-            } => {
+            Plugin::Royalty { bps, recipient } => {
                 ctx.royalty.collection_royalty_bps = Some(*bps);
                 ctx.royalty.collection_royalty_recipient = Some((*recipient).clone());
-                ctx.royalty.collection_royalty_on_primary = Some(*on_primary);
                 default_plugins::is_transfer_enabled_plugin(ctx)?;
             }
             _ => {}
@@ -832,9 +794,9 @@ pub mod default_plugins {
     ) -> StdResult<bool> {
         if let Some(time_lock) = &ctx.data.time_lock {
             if let Some(reservation) = &ctx.data.reservation {
-                if reservation.reserved_until
-                    > Expiration::AtTime(ctx.env.block.time.plus_seconds(time_lock.as_secs()))
-                {
+                if Expiration::AtTime(reservation.reserved_until).gt(&Expiration::AtTime(
+                    ctx.env.block.time.plus_seconds(time_lock.as_secs()),
+                )) {
                     return Err(cosmwasm_std::StdError::generic_err(format!(
                         "Reservation end time {} exceeds the collection time lock {}",
                         reservation.reserved_until,
@@ -847,24 +809,15 @@ pub mod default_plugins {
     }
 
     pub fn royalty_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> StdResult<bool> {
-        let (recipient, bps, on_primary) = match (
+        let (recipient, bps) = match (
             ctx.royalty.collection_royalty_recipient.clone(),
             ctx.royalty.collection_royalty_bps,
-            ctx.royalty.collection_royalty_on_primary,
         ) {
-            (Some(recipient), Some(bps), on_primary) => (recipient, bps, on_primary),
+            (Some(recipient), Some(bps)) => (recipient, bps),
             _ => return Ok(true),
         };
 
         if bps == 0 {
-            return Ok(true);
-        }
-
-        let is_primary_sale = !ctx.royalty.primary_complete;
-        let collect_on_primary = on_primary.unwrap_or(false);
-        let should_collect = !is_primary_sale || collect_on_primary;
-
-        if !should_collect {
             return Ok(true);
         }
 
