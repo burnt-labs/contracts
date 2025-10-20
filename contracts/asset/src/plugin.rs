@@ -41,6 +41,7 @@ where
     pub data: Context,
 }
 
+#[derive(Default)]
 pub struct RoyaltyInfo {
     pub collection_royalty_bps: Option<u16>,
     pub collection_royalty_recipient: Option<Addr>,
@@ -48,15 +49,6 @@ pub struct RoyaltyInfo {
     pub primary_complete: bool,
 }
 
-impl Default for RoyaltyInfo {
-    fn default() -> Self {
-        RoyaltyInfo {
-            collection_royalty_bps: None,
-            collection_royalty_recipient: None,
-            primary_complete: false,
-        }
-    }
-}
 
 pub struct DefaultXionAssetContext {
     pub token_id: String,
@@ -183,13 +175,10 @@ impl Plugin {
         &self,
         ctx: &mut PluginCtx<T, U>,
     ) -> StdResult<bool> {
-        match self {
-            Plugin::Royalty { bps, recipient } => {
-                ctx.royalty.collection_royalty_bps = Some(*bps);
-                ctx.royalty.collection_royalty_recipient = Some((*recipient).clone());
-                default_plugins::is_transfer_enabled_plugin(ctx)?;
-            }
-            _ => {}
+        if let Plugin::Royalty { bps, recipient } = self {
+            ctx.royalty.collection_royalty_bps = Some(*bps);
+            ctx.royalty.collection_royalty_recipient = Some((*recipient).clone());
+            default_plugins::is_transfer_enabled_plugin(ctx)?;
         }
         Ok(true)
     }
@@ -264,7 +253,7 @@ pub trait PluggableAsset<
                     token_id,
                 } => self.on_transfer_plugin(recipient, token_id, &mut plugin_ctx)?,
                 Cw721ExecuteMsg::UpdateExtension { msg } => {
-                    self.on_update_extension_plugin(&msg, &mut plugin_ctx)?
+                    self.on_update_extension_plugin(msg, &mut plugin_ctx)?
                 }
                 _ => true,
             };
@@ -307,21 +296,21 @@ pub trait PluggableAsset<
         Ok(true)
     }
 
-    fn on_update_extension_plugin<'a>(
+    fn on_update_extension_plugin(
         &self,
         _msg: &TExtensionMsg,
-        _ctx: &'a mut PluginCtx<Context, TCustomResponseMsg>,
+        _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
         Ok(true)
     }
 
-    fn on_list_plugin<'a>(
+    fn on_list_plugin(
         &self,
         _token_id: &String,
         _price: &Coin,
         _reservation: &Option<Reserve>,
         _marketplace_fee_bps: &Option<u16>,
-        _ctx: &'a mut PluginCtx<Context, TCustomResponseMsg>,
+        _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
         Ok(true)
     }
@@ -415,9 +404,9 @@ where
                 Cw721ExecuteMsg::TransferNft {
                     recipient,
                     token_id,
-                } => self.on_transfer_plugin(&recipient, &token_id, &mut plugin_ctx)?,
+                } => self.on_transfer_plugin(recipient, token_id, &mut plugin_ctx)?,
                 Cw721ExecuteMsg::UpdateExtension { msg } => {
-                    self.on_update_extension_plugin(&msg, &mut plugin_ctx)?
+                    self.on_update_extension_plugin(msg, &mut plugin_ctx)?
                 }
                 _ => true,
             };
@@ -826,7 +815,7 @@ pub mod default_plugins {
                 return Ok(true);
             }
         } else {
-            return Err(cosmwasm_std::StdError::generic_err(
+            Err(cosmwasm_std::StdError::generic_err(
                 "No ask price set for royalty calculation".to_string(),
             ))?;
         }

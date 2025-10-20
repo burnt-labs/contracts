@@ -1,6 +1,5 @@
 use cosmwasm_std::{
-    BankMsg, Coin, CosmosMsg, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    Timestamp,
+    BankMsg, Coin, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response,
 };
 use cw721::Expiration;
 use cw721::{state::NftInfo, traits::Cw721State};
@@ -28,7 +27,7 @@ where
     // make sure the caller is the owner of the token
     let nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
     // check if we can list the asset
-    check_can_list(deps.as_ref(), &env, info.sender.as_ref(), &nft_info)?;
+    check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;
     // make sure the price is greater than zero
     if price.amount.is_zero() {
         return Err(ContractError::InvalidListingPrice {
@@ -102,7 +101,7 @@ where
 
     // only the ones who can list can delist
     let nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
-    check_can_list(deps.as_ref(), &env, info.sender.as_ref(), &nft_info)?;
+    check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;
 
     asset_config.listings.remove(deps.storage, &id)?;
 
@@ -132,7 +131,7 @@ where
 
     // only the ones who can list can reserve
     let nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
-    check_can_list(deps.as_ref(), &env, info.sender.as_ref(), &nft_info)?;
+    check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;
 
     if let Some(reserved) = &listing.reserved {
         if !Expiration::AtTime(reserved.reserved_until).is_expired(&env.block) {
@@ -179,9 +178,8 @@ where
     let nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
 
     if reserved.reserver != info.sender {
-        check_can_list(deps.as_ref(), &env, info.sender.as_ref(), &nft_info)?;
+        check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;
     }
-
 
     let response = Response::<TCustomResponseMsg>::default()
         .add_attribute("action", "unreserve")
@@ -240,7 +238,7 @@ where
     if let Some(market_fee) = listing.marketplace_fee_bps {
         let fee_amount = payment
             .amount
-            .checked_multiply_ratio(market_fee, 10_000 as u128)
+            .checked_multiply_ratio(market_fee, 10_000_u128)
             .map_err(|_| ContractError::InsufficientFunds {})?;
         payment.amount = payment
             .amount
@@ -395,7 +393,7 @@ fn test_list() {
             &nft_info,
         ));
 
-        let price = Coin::new(100 as u128, "uxion");
+        let price = Coin::new(100_u128, "uxion");
         let response = expect_ok(list::<Empty, Empty>(
             deps.as_mut(),
             &env,
@@ -439,7 +437,7 @@ fn test_list() {
             &env,
             &message_info(&owner_addr, &[]),
             "token-1".to_string(),
-            Coin::new(200 as u128, "uxion"),
+            Coin::new(200_u128, "uxion"),
             None,
             None,
             None,
@@ -474,7 +472,7 @@ fn test_list() {
             &env,
             &message_info(&intruder_addr, &[]),
             "token-2".to_string(),
-            Coin::new(100 as u128, "uxion"),
+            Coin::new(100_u128, "uxion"),
             None,
             None,
             None,
@@ -503,7 +501,7 @@ fn test_list() {
             &nft_info,
         ));
 
-        let price = Coin::new(100 as u128, "uxion");
+        let price = Coin::new(100_u128, "uxion");
         let response = expect_ok(list::<Empty, Empty>(
             deps.as_mut(),
             &env,
@@ -567,7 +565,7 @@ fn test_list() {
             &cw721::Expiration::AtHeight(env.block.height + 100),
         ));
 
-        let price = Coin::new(100 as u128, "uxion");
+        let price = Coin::new(100_u128, "uxion");
         let response = expect_ok(list::<Empty, Empty>(
             deps.as_mut(),
             &env,
@@ -639,7 +637,7 @@ fn test_list() {
             &env,
             &message_info(&exp_approval_addr, &[]),
             "token-5".to_string(),
-            Coin::new(100 as u128, "uxion"),
+            Coin::new(100_u128, "uxion"),
             None,
             None,
             None,
@@ -669,7 +667,7 @@ fn test_list() {
             &env,
             &message_info(&owner_addr, &[]),
             "token-3".to_string(),
-            Coin::new(0 as u128, "uxion"),
+            Coin::new(0_u128, "uxion"),
             None,
             None,
             None,
@@ -687,7 +685,7 @@ fn test_list() {
             &env,
             &message_info(&owner_addr, &[]),
             "token-999".to_string(),
-            Coin::new(100 as u128, "uxion"),
+            Coin::new(100_u128, "uxion"),
             None,
             None,
             None,
@@ -722,7 +720,7 @@ fn test_buy() {
             "token-1",
             &nft_info,
         ));
-        let price = coin(100 as u128, "uxion");
+        let price = coin(100_u128, "uxion");
         expect_ok(AssetConfig::<Empty>::default().listings.save(
             deps.as_mut().storage,
             "token-1",
@@ -744,7 +742,7 @@ fn test_buy() {
             None,
             vec![(
                 owner_addr.to_string(),
-                coin(10 as u128, "uxion"),
+                coin(10_u128, "uxion"),
                 "royalties".to_string(),
             )],
         ));
@@ -776,11 +774,11 @@ fn test_buy() {
             vec![
                 CosmosMsg::Bank(BankMsg::Send {
                     to_address: seller_addr.to_string(),
-                    amount: coins(1 as u128, "uxion"),
+                    amount: coins(1_u128, "uxion"),
                 }),
                 CosmosMsg::Bank(BankMsg::Send {
                     to_address: seller_addr.to_string(),
-                    amount: coins(89 as u128, "uxion"),
+                    amount: coins(89_u128, "uxion"),
                 })
             ],
         );
@@ -819,7 +817,7 @@ fn test_buy() {
             "token-2",
             &nft_info,
         ));
-        let price = coin(100 as u128, "uxion");
+        let price = coin(100_u128, "uxion");
         expect_ok(AssetConfig::<Empty>::default().listings.save(
             deps.as_mut().storage,
             "token-2",
@@ -836,7 +834,7 @@ fn test_buy() {
         let err = expect_err(buy::<Empty, Empty>(
             deps.as_mut(),
             &env,
-            &message_info(&buyer_addr, &[coin(50 as u128, "uxion")]),
+            &message_info(&buyer_addr, &[coin(50_u128, "uxion")]),
             "token-2".to_string(),
             None,
             vec![],
@@ -857,7 +855,7 @@ fn test_buy() {
         let err = expect_err(buy::<Empty, Empty>(
             deps.as_mut(),
             &env,
-            &message_info(&buyer_addr, &[coin(100 as u128, "uxion")]),
+            &message_info(&buyer_addr, &[coin(100_u128, "uxion")]),
             "token-3".to_string(),
             None,
             vec![],
@@ -886,7 +884,7 @@ fn test_buy() {
             "token-4",
             &nft_info,
         ));
-        let price = coin(100 as u128, "uxion");
+        let price = coin(100_u128, "uxion");
         expect_ok(AssetConfig::<Empty>::default().listings.save(
             deps.as_mut().storage,
             "token-4",
@@ -1003,7 +1001,7 @@ fn test_delist() {
             "token-1",
             &nft_info,
         ));
-        let price = Coin::new(100 as u128, "uxion");
+        let price = Coin::new(100_u128, "uxion");
         expect_ok(AssetConfig::<Empty>::default().listings.save(
             deps.as_mut().storage,
             "token-1",
@@ -1066,7 +1064,7 @@ fn test_delist() {
             "token-2",
             &nft_info,
         ));
-        let price = Coin::new(100 as u128, "uxion");
+        let price = Coin::new(100_u128, "uxion");
         expect_ok(AssetConfig::<Empty>::default().listings.save(
             deps.as_mut().storage,
             "token-2",
@@ -1149,7 +1147,7 @@ fn test_reserve() {
             }
         );
         // list item first
-        let price = cosmwasm_std::Coin::new(100 as u128, "uxion");
+        let price = cosmwasm_std::Coin::new(100_u128, "uxion");
         expect_ok(AssetConfig::<Empty>::default().listings.save(
             deps.as_mut().storage,
             "token-1",
@@ -1251,7 +1249,7 @@ fn test_unreserve() {
             &ListingInfo {
                 id: "token-1".to_string(),
                 seller: owner_addr.clone(),
-                price: Coin::new(100 as u128, "uxion"),
+                price: Coin::new(100_u128, "uxion"),
                 reserved: Some(reservation.clone()),
                 marketplace_fee_bps: None,
                 marketplace_fee_recipient: None,
@@ -1314,7 +1312,7 @@ fn test_unreserve() {
             &ListingInfo {
                 id: "token-2".to_string(),
                 seller: owner_addr.clone(),
-                price: Coin::new(150 as u128, "uxion"),
+                price: Coin::new(150_u128, "uxion"),
                 reserved: Some(Reserve {
                     reserver: reserver_addr.clone(),
                     reserved_until: env.block.time.plus_seconds(600),
@@ -1381,7 +1379,7 @@ fn test_unreserve() {
             &ListingInfo {
                 id: "token-3".to_string(),
                 seller: owner_addr.clone(),
-                price: Coin::new(200 as u128, "uxion"),
+                price: Coin::new(200_u128, "uxion"),
                 reserved: Some(Reserve {
                     reserver: reserver_addr.clone(),
                     reserved_until: env.block.time.plus_seconds(600),
@@ -1425,7 +1423,7 @@ fn test_unreserve() {
             &ListingInfo {
                 id: "token-4".to_string(),
                 seller: owner_addr.clone(),
-                price: Coin::new(250 as u128, "uxion"),
+                price: Coin::new(250_u128, "uxion"),
                 reserved: None,
                 marketplace_fee_bps: None,
                 marketplace_fee_recipient: None,

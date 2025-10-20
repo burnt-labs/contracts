@@ -1,7 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin, Timestamp};
 use cw_storage_plus::{IndexList, IndexedMap, Item, Map, MultiIndex};
-use cw721::{Expiration, state::Cw721Config, traits::Cw721State};
+use cw721::{state::Cw721Config, traits::Cw721State};
 
 use crate::plugin::Plugin;
 

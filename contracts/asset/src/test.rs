@@ -319,7 +319,7 @@ mod asset_pluggable_tests {
         let contract =
             AssetContract::<'_, Empty, Empty, Empty, Empty, AssetExtensionExecuteMsg>::default();
 
-        let min_price = Coin::new(50 as u128, "uxion");
+        let min_price = Coin::new(50_u128, "uxion");
         contract
             .config
             .collection_plugins
@@ -843,7 +843,7 @@ mod asset_pluggable_tests {
     #[test]
     fn save_plugin_saves_all_plugins() {
         let mut deps = mock_dependencies();
-        let mut contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
+        let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> =
             Default::default();
 
         let plugins = vec![
