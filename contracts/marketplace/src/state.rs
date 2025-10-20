@@ -82,14 +82,14 @@ pub const CONFIG: Item<Config<Addr>> = Item::new("config");
 #[cw_serde]
 pub enum ListingStatus {
     Active,
-    PendingApproval,
+    Reserved,
 }
 
 impl std::fmt::Display for ListingStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ListingStatus::Active => write!(f, "Active"),
-            ListingStatus::PendingApproval => write!(f, "PendingApproval"),
+            ListingStatus::Reserved => write!(f, "Reserved"),
         }
     }
 }

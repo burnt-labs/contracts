@@ -1901,4 +1901,635 @@ mod tests {
             assert!(result.is_err());
         }
     }
+
+    mod approval_queue_tests {
+        use super::*;
+        use xion_nft_marketplace::state::PendingSale;
+
+        fn setup_marketplace_with_approvals(app: &mut App, manager: &Addr) -> Addr {
+            let marketplace_code_id = app.store_code(marketplace_contract());
+
+            let config_json = json!({
+                "manager": manager.to_string(),
+                "fee_recipient": manager.to_string(),
+                "sale_approvals": true,  // Enable approval flow
+                "fee_bps": 250,
+                "listing_denom": "uxion"
+            });
+
+            let instantiate_msg = InstantiateMsg {
+                config: serde_json::from_value(config_json).unwrap(),
+            };
+
+            app.instantiate_contract(
+                marketplace_code_id,
+                manager.clone(),
+                &instantiate_msg,
+                &[],
+                "test-marketplace-approvals",
+                None,
+            )
+            .unwrap()
+        }
+
+        fn create_listing_helper(
+            app: &mut App,
+            marketplace_contract: &Addr,
+            asset_contract: &Addr,
+            seller: &Addr,
+            token_id: &str,
+            price: cosmwasm_std::Coin,
+        ) -> String {
+            // Approve marketplace contract
+            let approve_msg = Cw721ExecuteMsg::Approve {
+                spender: marketplace_contract.to_string(),
+                token_id: token_id.to_string(),
+                expires: None,
+            };
+            app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+                .unwrap();
+
+            let list_msg = ExecuteMsg::ListItem {
+                collection: asset_contract.to_string(),
+                price,
+                token_id: token_id.to_string(),
+            };
+
+            let result =
+                app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+            assert!(result.is_ok());
+
+            // Extract listing ID from events
+            let events = result.unwrap().events;
+            events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/list-item")
+                .unwrap()
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap()
+                .value
+                .clone()
+        }
+
+        #[test]
+        fn test_buy_with_approvals_disabled() {
+            // This should work exactly like the existing test
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_contract(&mut app, &manager); // Approvals OFF
+
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Buy should execute immediately
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price],
+            );
+
+            assert!(result.is_ok());
+
+            // Verify NFT was transferred
+            let owner_query = cw721_base::msg::QueryMsg::OwnerOf {
+                token_id: "token1".to_string(),
+                include_expired: Some(false),
+            };
+            let owner_resp: cw721::msg::OwnerOfResponse = app
+                .wrap()
+                .query_wasm_smart(asset_contract.clone(), &owner_query)
+                .unwrap();
+            assert_eq!(owner_resp.owner, buyer.to_string());
+
+            // Listing should be deleted
+            let listing_query = app.wrap().query_wasm_smart::<Listing>(
+                marketplace_contract.clone(),
+                &QueryMsg::Listing { listing_id },
+            );
+            assert!(listing_query.is_err());
+        }
+
+        #[test]
+        fn test_buy_with_approvals_enabled_creates_pending_sale() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Buy should create pending sale
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            let result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price.clone()],
+            );
+
+            assert!(result.is_ok());
+
+            // Extract pending sale ID from events
+            let events = result.unwrap().events;
+            let pending_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+                .expect("pending-sale-created event should be emitted");
+
+            let pending_sale_id = pending_event
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap()
+                .value
+                .clone();
+
+            // Verify pending sale exists
+            let pending_sale: PendingSale = app
+                .wrap()
+                .query_wasm_smart(
+                    marketplace_contract.clone(),
+                    &QueryMsg::PendingSale {
+                        id: pending_sale_id.clone(),
+                    },
+                )
+                .unwrap();
+
+            assert_eq!(pending_sale.buyer, buyer);
+            assert_eq!(pending_sale.seller, seller);
+            assert_eq!(pending_sale.price, price);
+
+            // Listing should still exist but Reserved
+            let listing: Listing = app
+                .wrap()
+                .query_wasm_smart(
+                    marketplace_contract.clone(),
+                    &QueryMsg::Listing { listing_id },
+                )
+                .unwrap();
+
+            assert_eq!(listing.status, ListingStatus::Reserved);
+
+            // NFT should NOT be transferred yet
+            let owner_query = cw721_base::msg::QueryMsg::OwnerOf {
+                token_id: "token1".to_string(),
+                include_expired: Some(false),
+            };
+            let owner_resp: cw721::msg::OwnerOfResponse = app
+                .wrap()
+                .query_wasm_smart(asset_contract.clone(), &owner_query)
+                .unwrap();
+            assert_eq!(owner_resp.owner, seller.to_string());
+        }
+
+        #[test]
+        fn test_approve_sale_success() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Create pending sale
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            let buy_result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price.clone()],
+            );
+
+            let pending_sale_id = buy_result
+                .unwrap()
+                .events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+                .unwrap()
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap()
+                .value
+                .clone();
+
+            // Approve the sale
+            let approve_msg = ExecuteMsg::ApproveSale {
+                id: pending_sale_id.clone(),
+            };
+
+            let result = app.execute_contract(
+                manager.clone(),
+                marketplace_contract.clone(),
+                &approve_msg,
+                &[],
+            );
+
+            assert!(result.is_ok());
+
+            // Verify sale was approved
+            let events = result.unwrap().events;
+            let approved_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/sale-approved");
+            assert!(approved_event.is_some());
+
+            // NFT should be transferred to buyer
+            let owner_query = cw721_base::msg::QueryMsg::OwnerOf {
+                token_id: "token1".to_string(),
+                include_expired: Some(false),
+            };
+            let owner_resp: cw721::msg::OwnerOfResponse = app
+                .wrap()
+                .query_wasm_smart(asset_contract.clone(), &owner_query)
+                .unwrap();
+            assert_eq!(owner_resp.owner, buyer.to_string());
+
+            // Listing should be deleted
+            let listing_query = app.wrap().query_wasm_smart::<Listing>(
+                marketplace_contract.clone(),
+                &QueryMsg::Listing { listing_id },
+            );
+            assert!(listing_query.is_err());
+
+            // Pending sale should be deleted
+            let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(
+                marketplace_contract.clone(),
+                &QueryMsg::PendingSale {
+                    id: pending_sale_id,
+                },
+            );
+            assert!(pending_sale_query.is_err());
+        }
+
+        #[test]
+        fn test_approve_sale_unauthorized() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+            let unauthorized = app.api().addr_make("unauthorized");
+
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Create pending sale
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id,
+                price: price.clone(),
+            };
+
+            let buy_result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price],
+            );
+
+            let pending_sale_id = buy_result
+                .unwrap()
+                .events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+                .unwrap()
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap()
+                .value
+                .clone();
+
+            // Try to approve with unauthorized user
+            let approve_msg = ExecuteMsg::ApproveSale {
+                id: pending_sale_id,
+            };
+
+            let result = app.execute_contract(
+                unauthorized.clone(),
+                marketplace_contract.clone(),
+                &approve_msg,
+                &[],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::Unauthorized {
+                    message: "sender is not manager".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_reject_sale_success() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Get buyer balance before
+            let buyer_balance_before = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+
+            // Create pending sale
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            let buy_result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price.clone()],
+            );
+
+            let pending_sale_id = buy_result
+                .unwrap()
+                .events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+                .unwrap()
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap()
+                .value
+                .clone();
+
+            // Reject the sale
+            let reject_msg = ExecuteMsg::RejectSale {
+                id: pending_sale_id.clone(),
+            };
+
+            let result = app.execute_contract(
+                manager.clone(),
+                marketplace_contract.clone(),
+                &reject_msg,
+                &[],
+            );
+
+            assert!(result.is_ok());
+
+            // Verify rejection event
+            let events = result.unwrap().events;
+            let rejected_event = events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/sale-rejected");
+            assert!(rejected_event.is_some());
+
+            // Buyer should be refunded
+            let buyer_balance_after = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+            assert_eq!(buyer_balance_before, buyer_balance_after);
+
+            // Listing should be DELETED (not restored to Active)
+            let listing_query = app.wrap().query_wasm_smart::<Listing>(
+                marketplace_contract.clone(),
+                &QueryMsg::Listing { listing_id },
+            );
+            assert!(
+                listing_query.is_err(),
+                "Listing should be deleted after rejection"
+            );
+
+            // NFT should still belong to seller
+            let owner_query = cw721_base::msg::QueryMsg::OwnerOf {
+                token_id: "token1".to_string(),
+                include_expired: Some(false),
+            };
+            let owner_resp: cw721::msg::OwnerOfResponse = app
+                .wrap()
+                .query_wasm_smart(asset_contract.clone(), &owner_query)
+                .unwrap();
+            assert_eq!(owner_resp.owner, seller.to_string());
+
+            // Pending sale should be deleted
+            let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(
+                marketplace_contract.clone(),
+                &QueryMsg::PendingSale {
+                    id: pending_sale_id,
+                },
+            );
+            assert!(pending_sale_query.is_err());
+        }
+
+        #[test]
+        fn test_reject_sale_unauthorized() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+            let unauthorized = app.api().addr_make("unauthorized");
+
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Create pending sale
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id,
+                price: price.clone(),
+            };
+
+            let buy_result = app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price],
+            );
+
+            let pending_sale_id = buy_result
+                .unwrap()
+                .events
+                .iter()
+                .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+                .unwrap()
+                .attributes
+                .iter()
+                .find(|a| a.key == "id")
+                .unwrap()
+                .value
+                .clone();
+
+            // Try to reject with unauthorized user
+            let reject_msg = ExecuteMsg::RejectSale {
+                id: pending_sale_id,
+            };
+
+            let result = app.execute_contract(
+                unauthorized.clone(),
+                marketplace_contract.clone(),
+                &reject_msg,
+                &[],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::Unauthorized {
+                    message: "sender is not manager".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        #[test]
+        fn test_cannot_cancel_reserved_listing() {
+            let mut app = setup_app_with_balances();
+            let minter = app.api().addr_make("minter");
+            let seller = app.api().addr_make("seller");
+            let buyer = app.api().addr_make("buyer");
+            let manager = app.api().addr_make("manager");
+
+            let asset_contract = setup_asset_contract(&mut app, &minter);
+            let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+            mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+            let price = coin(100, "uxion");
+            let listing_id = create_listing_helper(
+                &mut app,
+                &marketplace_contract,
+                &asset_contract,
+                &seller,
+                "token1",
+                price.clone(),
+            );
+
+            // Create pending sale (reserves the listing)
+            let buy_msg = ExecuteMsg::BuyItem {
+                listing_id: listing_id.clone(),
+                price: price.clone(),
+            };
+
+            app.execute_contract(
+                buyer.clone(),
+                marketplace_contract.clone(),
+                &buy_msg,
+                &[price],
+            )
+            .unwrap();
+
+            // Try to cancel the Reserved listing
+            let cancel_msg = ExecuteMsg::CancelListing {
+                listing_id: listing_id.clone(),
+            };
+
+            let result = app.execute_contract(
+                seller.clone(),
+                marketplace_contract.clone(),
+                &cancel_msg,
+                &[],
+            );
+
+            assert!(result.is_err());
+            assert_error(
+                result,
+                xion_nft_marketplace::error::ContractError::InvalidListingStatus {
+                    expected: "Active".to_string(),
+                    actual: "Reserved".to_string(),
+                }
+                .to_string(),
+            );
+        }
+    }
 }
