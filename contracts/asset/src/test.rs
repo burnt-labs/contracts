@@ -1200,7 +1200,7 @@ mod asset_pluggable_sellable_test {
 
     use crate::{
         msg::AssetExtensionExecuteMsg,
-        plugin::{Plugin, PluginCtx},
+        plugin::Plugin,
         state::{AssetConfig, ListingInfo},
         traits::DefaultAssetContract,
         traits::PluggableAsset,
