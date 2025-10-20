@@ -698,7 +698,7 @@ fn test_list() {
 #[test]
 fn test_buy() {
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
-    use cosmwasm_std::{Empty, coin, coins, CosmosMsg};
+    use cosmwasm_std::{CosmosMsg, Empty, coin, coins};
 
     // successful buy transfers ownership, pays seller, pays royalties, removes listing, and emits attributes
     {

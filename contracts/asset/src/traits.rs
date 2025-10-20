@@ -7,12 +7,19 @@ use crate::{
     plugin::{Plugin, PluginCtx},
     state::{AssetConfig, Reserve},
 };
-use cosmwasm_std::{to_json_binary, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult,
+    to_json_binary,
+};
 use cw_storage_plus::Bound;
-use cw721::{error::Cw721ContractError, msg::Cw721ExecuteMsg, traits::{
-    Contains, Cw721CustomMsg, Cw721Execute, Cw721Query, Cw721State, FromAttributesState,
-    StateFactory, ToAttributesState,
-}};
+use cw721::{
+    error::Cw721ContractError,
+    msg::Cw721ExecuteMsg,
+    traits::{
+        Contains, Cw721CustomMsg, Cw721Execute, Cw721Query, Cw721State, FromAttributesState,
+        StateFactory, ToAttributesState,
+    },
+};
 
 pub struct AssetContract<
     'a,

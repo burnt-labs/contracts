@@ -198,8 +198,6 @@ impl Plugin {
     }
 }
 
-
-
 impl<TNftExtension, TNftExtensionMsg, TCollectionExtension, TCollectionExtensionMsg>
     PluggableAsset<
         DefaultXionAssetContext,
