@@ -372,7 +372,7 @@ fn expect_some<T>(opt: Option<T>) -> T {
 #[test]
 fn test_list() {
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
-    use cosmwasm_std::{Coin, Empty};
+    use cosmwasm_std::{Coin, Empty, StdError};
 
     // successful listing stores state and emits attributes
     {
@@ -698,7 +698,7 @@ fn test_list() {
 #[test]
 fn test_buy() {
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
-    use cosmwasm_std::{Empty, coin, coins};
+    use cosmwasm_std::{Empty, coin, coins, CosmosMsg};
 
     // successful buy transfers ownership, pays seller, pays royalties, removes listing, and emits attributes
     {
