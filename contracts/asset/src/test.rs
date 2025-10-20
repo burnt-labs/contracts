@@ -3,8 +3,7 @@ mod plugins_test {
     use std::time::Duration;
 
     use crate::{
-        plugin::{DefaultXionAssetContext, PluginCtx, default_plugins},
-        state::Reserve,
+        default_plugins, plugin::{DefaultXionAssetContext, PluginCtx}, state::Reserve
     };
     use cosmwasm_std::{
         Addr, BankMsg, Coin, CosmosMsg, Deps, Empty, Env, MessageInfo, Response, Timestamp,
@@ -281,7 +280,8 @@ mod asset_pluggable_tests {
 
     use crate::{
         msg::AssetExtensionExecuteMsg,
-        plugin::{DefaultXionAssetContext, PluggableAsset, Plugin, PluginCtx, RoyaltyInfo},
+        plugin::{DefaultXionAssetContext, Plugin, PluginCtx, RoyaltyInfo},
+        traits::PluggableAsset,
         state::{ListingInfo, Reserve},
         traits::{AssetContract, DefaultAssetContract},
     };
@@ -1198,7 +1198,8 @@ mod asset_pluggable_sellable_test {
 
     use crate::{
         msg::AssetExtensionExecuteMsg,
-        plugin::{PluggableAsset, Plugin},
+        plugin::{Plugin, PluginCtx},
+        traits::PluggableAsset,
         state::{AssetConfig, ListingInfo},
         traits::DefaultAssetContract,
     };

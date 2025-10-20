@@ -4,15 +4,15 @@ use crate::{
     error::ContractError,
     execute::{buy, delist, list, reserve, unreserve},
     msg::{AssetExtensionExecuteMsg, AssetExtensionQueryMsg},
-    plugin::PluggableAsset,
+    plugin::{Plugin, PluginCtx},
     state::{AssetConfig, Reserve},
 };
-use cosmwasm_std::{Coin, CustomMsg, DepsMut, Empty, Env, MessageInfo, Response, to_json_binary};
+use cosmwasm_std::{to_json_binary, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult};
 use cw_storage_plus::Bound;
-use cw721::traits::{
+use cw721::{error::Cw721ContractError, msg::Cw721ExecuteMsg, traits::{
     Contains, Cw721CustomMsg, Cw721Execute, Cw721Query, Cw721State, FromAttributesState,
     StateFactory, ToAttributesState,
-};
+}};
 
 pub struct AssetContract<
     'a,
@@ -384,4 +384,170 @@ where
             }
         }
     }
+}
+
+/// The concept of a plugin is to be able to hook into the execution flow when a certain action
+/// is performed.
+/// e.g. when an asset is listed, de-listed, transferred, or sold.
+/// Plugins can modify their context, and return errors to abort the action.
+/// Plugins can also add custom messages to be executed after the main action is performed.
+/// This returned response is merged into the main response.
+/// We have a default implementation that does nothing for convenience.
+/// Bare in mind that the context is shared between all plugins(code) that run so they can affect each other.
+/// This trait is expected to be implemented by an asset contract or any contract conforming to cw721 standard.
+pub trait PluggableAsset<
+    Context,
+    TNftExtension,
+    TNftExtensionMsg,
+    TCollectionExtension,
+    TCollectionExtensionMsg,
+    TExtensionMsg,
+    TCustomResponseMsg,
+> where
+    TCollectionExtension: Cw721State,
+    TCollectionExtension: FromAttributesState + ToAttributesState,
+    TCollectionExtensionMsg: Cw721CustomMsg,
+    TCollectionExtensionMsg: StateFactory<TCollectionExtension>,
+    TNftExtension: Cw721State,
+    TNftExtensionMsg: Cw721CustomMsg,
+    TNftExtensionMsg: StateFactory<TNftExtension>,
+    TCustomResponseMsg: CustomMsg,
+    Self: Cw721Execute<
+            TNftExtension,
+            TNftExtensionMsg,
+            TCollectionExtension,
+            TCollectionExtensionMsg,
+            TExtensionMsg,
+            TCustomResponseMsg,
+        >,
+{
+    /// Use this method instead of the execute method of the cw721 contract to
+    /// execute plugins before executing the main action.
+    /// After plugins have executed, the execute method of cw721 is called.
+    fn execute_pluggable(
+        &self,
+        deps: DepsMut,
+        env: &Env,
+        info: &MessageInfo,
+        msg: Cw721ExecuteMsg<TNftExtensionMsg, TCollectionExtensionMsg, TExtensionMsg>,
+    ) -> Result<Response<TCustomResponseMsg>, Cw721ContractError> {
+        let plugin_response: Response<TCustomResponseMsg>;
+        {
+            let mut plugin_ctx = Self::get_plugin_ctx(deps.as_ref(), env, info);
+
+            match &msg {
+                Cw721ExecuteMsg::TransferNft {
+                    recipient,
+                    token_id,
+                } => self.on_transfer_plugin(recipient, token_id, &mut plugin_ctx)?,
+                Cw721ExecuteMsg::UpdateExtension { msg } => {
+                    self.on_update_extension_plugin(msg, &mut plugin_ctx)?
+                }
+                _ => true,
+            };
+            plugin_response = plugin_ctx.response;
+        }
+        let mut response = self.execute(deps, env, info, msg)?;
+
+        response.messages.extend(plugin_response.messages);
+        response.events.extend(plugin_response.events);
+        response.attributes.extend(plugin_response.attributes);
+
+        if let Some(plugin_data) = plugin_response.data {
+            match &mut response.data {
+                Some(existing) => {
+                    let mut combined = Vec::with_capacity(existing.len() + plugin_data.len());
+                    combined.extend_from_slice(existing.as_slice());
+                    combined.extend_from_slice(plugin_data.as_slice());
+                    *existing = Binary::from(combined);
+                }
+                None => response.data = Some(plugin_data),
+            }
+        }
+
+        Ok(response)
+    }
+
+    fn on_transfer_plugin(
+        &self,
+        _recipient: &String,
+        _token_id: &String,
+        ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
+    ) -> StdResult<bool> {
+        // for transfers we run the royalty plugin if set
+        let royalty_plugin = AssetConfig::<TNftExtension>::default()
+            .collection_plugins
+            .may_load(ctx.deps.storage, "Royalty")?;
+        if let Some(plugin) = royalty_plugin {
+            plugin.run_raw_transfer_plugin(ctx)?;
+        }
+        Ok(true)
+    }
+
+    fn on_update_extension_plugin(
+        &self,
+        _msg: &TExtensionMsg,
+        _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
+    ) -> StdResult<bool> {
+        Ok(true)
+    }
+
+    fn on_list_plugin(
+        &self,
+        _token_id: &String,
+        _price: &Coin,
+        _reservation: &Option<Reserve>,
+        _marketplace_fee_bps: &Option<u16>,
+        _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
+    ) -> StdResult<bool> {
+        Ok(true)
+    }
+
+    fn on_delist_plugin(
+        &self,
+        _token_id: &String,
+        _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
+    ) -> StdResult<bool> {
+        Ok(true)
+    }
+
+    fn on_buy_plugin(
+        &self,
+        _token_id: &String,
+        _recipient: &Option<String>,
+        _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
+    ) -> StdResult<bool> {
+        Ok(true)
+    }
+
+    fn on_reserve_plugin(
+        &self,
+        _token_id: &String,
+        _reserver: &Reserve,
+        _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
+    ) -> StdResult<bool> {
+        Ok(true)
+    }
+
+    fn get_plugin_ctx<'a>(
+        deps: Deps<'a>,
+        env: &Env,
+        info: &MessageInfo,
+    ) -> PluginCtx<'a, Context, TCustomResponseMsg>;
+
+    fn save_plugin(
+        &self,
+        deps: DepsMut,
+        env: &Env,
+        info: &MessageInfo,
+        plugins: &Vec<Plugin>,
+    ) -> StdResult<()>;
+
+    fn remove_plugin(
+        &self,
+        deps: DepsMut,
+        env: &Env,
+        info: &MessageInfo,
+        plugins: &Vec<String>,
+    ) -> StdResult<()>;
 }
