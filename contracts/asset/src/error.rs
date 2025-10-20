@@ -16,6 +16,9 @@ pub enum ContractError {
     #[error("Reserved asset: {id}")]
     ReservedAsset { id: String }, // e.g. listing is reserved
 
+    #[error("Reservation not found: {id}")]
+    ReservationNotFound { id: String },
+
     #[error("Invalid listing price: {price}")]
     InvalidListingPrice { price: u128 },
 

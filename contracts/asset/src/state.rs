@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Coin};
+use cosmwasm_std::{Addr, Coin, Timestamp};
 use cw_storage_plus::{IndexList, IndexedMap, Item, Map, MultiIndex};
 use cw721::{Expiration, state::Cw721Config, traits::Cw721State};
 
@@ -18,7 +18,7 @@ pub struct ListingInfo {
 #[cw_serde]
 pub struct Reserve {
     pub reserver: Addr,
-    pub reserved_until: Expiration,
+    pub reserved_until: Timestamp,
 }
 
 pub struct AssetConfig<'a, TNftExtension>
