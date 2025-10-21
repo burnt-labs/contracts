@@ -1,0 +1,120 @@
+use cosmwasm_std::{
+    Coin, Empty,
+    testing::{message_info, mock_dependencies, mock_env},
+};
+use cw721::state::NftInfo;
+
+use crate::{
+    error::ContractError,
+    execute::reserve,
+    state::{AssetConfig, ListingInfo, Reserve},
+};
+
+use super::helpers::{expect_err, expect_ok, expect_some};
+
+#[test]
+fn reserve_flow() {
+    // successful reserve stores state and emits attributes
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let owner_addr = deps.api.addr_make("owner");
+        let buyer_addr = deps.api.addr_make("buyer");
+        let nft_info = NftInfo {
+            owner: owner_addr.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-1",
+            &nft_info,
+        ));
+
+        // cannot reserve unlisted item
+        let reservation = Reserve {
+            reserver: buyer_addr.clone(),
+            reserved_until: env.block.time.plus_seconds(600),
+        };
+        let err = expect_err(reserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&owner_addr, &[]),
+            "token-1".to_string(),
+            reservation.clone(),
+        ));
+        assert_eq!(
+            err,
+            ContractError::ListingNotFound {
+                id: "token-1".to_string()
+            }
+        );
+        // list item first
+        let price = Coin::new(100_u128, "uxion");
+        expect_ok(AssetConfig::<Empty>::default().listings.save(
+            deps.as_mut().storage,
+            "token-1",
+            &ListingInfo {
+                id: "token-1".to_string(),
+                seller: owner_addr.clone(),
+                price: price.clone(),
+                reserved: None,
+                marketplace_fee_bps: None,
+                marketplace_fee_recipient: None,
+            },
+        ));
+        let response = expect_ok(reserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&owner_addr, &[]),
+            "token-1".to_string(),
+            reservation.clone(),
+        ));
+
+        let attrs: Vec<(String, String)> = response
+            .attributes
+            .iter()
+            .map(|attr| (attr.key.clone(), attr.value.clone()))
+            .collect();
+        assert_eq!(
+            attrs,
+            vec![
+                ("action".to_string(), "reserve".to_string()),
+                ("id".to_string(), "token-1".to_string()),
+                ("collection".to_string(), env.contract.address.to_string()),
+                ("reserver".to_string(), buyer_addr.to_string()),
+                (
+                    "reserved_until".to_string(),
+                    reservation.reserved_until.to_string()
+                ),
+            ],
+        );
+
+        let stored = expect_ok(
+            AssetConfig::<Empty>::default()
+                .listings
+                .load(deps.as_ref().storage, "token-1"),
+        );
+        assert_eq!(stored.seller, owner_addr);
+        assert!(stored.reserved.is_some());
+        let reserved = expect_some(stored.reserved);
+        assert_eq!(reserved.reserver, buyer_addr);
+        assert_eq!(reserved.reserved_until, reservation.reserved_until);
+
+        // cannot reserve already reserved item
+        let err = expect_err(reserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&owner_addr, &[]),
+            "token-1".to_string(),
+            reservation.clone(),
+        ));
+        assert_eq!(
+            err,
+            ContractError::ReservedAsset {
+                id: "token-1".to_string()
+            }
+        );
+    }
+}

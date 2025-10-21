@@ -8,7 +8,8 @@ pub mod execute;
 pub mod msg;
 pub mod plugin;
 pub mod state;
-mod test;
+#[cfg(test)]
+mod tests;
 pub mod traits;
 
 pub const CONTRACT_NAME: &str = "asset";
