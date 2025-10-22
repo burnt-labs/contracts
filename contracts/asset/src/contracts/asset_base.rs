@@ -2,19 +2,12 @@
 use crate::msg::AssetExtensionQueryMsg;
 // Default implementation of the xion asset standard showing how to set up a contract
 // to use the default trait XionAssetExecuteExtension
-use crate::plugin::PluggableAsset;
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw721::{
     DefaultOptionalCollectionExtension, DefaultOptionalCollectionExtensionMsg,
-    DefaultOptionalNftExtension, DefaultOptionalNftExtensionMsg, traits::Cw721Execute,
+    DefaultOptionalNftExtension, DefaultOptionalNftExtensionMsg,
 };
 
-use crate::{
-    CONTRACT_NAME, CONTRACT_VERSION,
-    error::ContractResult,
-    msg::{AssetExtensionExecuteMsg, ExecuteMsg, InstantiateMsg},
-    traits::{AssetContract, DefaultAssetContract},
-};
+use crate::traits::DefaultAssetContract;
 type AssetBaseContract<'a> = DefaultAssetContract<
     'a,
     DefaultOptionalNftExtension,
