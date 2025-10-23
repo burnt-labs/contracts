@@ -229,14 +229,12 @@ pub fn add_auth_method(
         }
         AddAuthenticator::ZKEmail {
             id,
-            dkim_domain,
+            email_salt,
             signature,
         } => {
             // extract email salt from signature
-            let email_salt = zkemail::extract_email_salt(signature)?;
             let auth = Authenticator::ZKEmail {
-                email_salt: email_salt.clone(),
-                dkim_domain: dkim_domain.clone(),
+                email_salt: (*email_salt).clone()
             };
             if !auth.verify(
                 deps.as_ref(),
@@ -449,7 +447,7 @@ pub mod tests {
 
         let mut add_authenticator = AddAuthenticator::ZKEmail {
             id: 1,
-            dkim_domain: "gmail.com".to_string(),
+            email_salt: "test_email_salt".to_string(),
             signature: signature_binary,
         };
 
