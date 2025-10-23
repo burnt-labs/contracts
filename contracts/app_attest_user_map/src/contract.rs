@@ -3,7 +3,7 @@ use crate::error::ContractResult;
 use crate::msg::InstantiateMsg;
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::state::{APP_ID, USER_MAP};
-use cosmwasm_std::{entry_point, from_json, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, QueryRequest, Response, StdResult, WasmQuery};
+use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult};
 use crate::error::ContractError::InvalidAppId;
 
 #[entry_point]
