@@ -2,7 +2,7 @@ use crate::error::ContractResult;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{from_json, Binary, Deps};
 use cosmos_sdk_proto::{
-    prost::Message, traits::MessageExt, xion::v1::dkim::{QueryVerifyRequest, QueryVerifyResponse}
+    prost::Message, traits::MessageExt, xion::v1::dkim::{QueryDkimPubKeysRequest, QueryDkimPubKeysResponse}
 };
 
 #[cw_serde]
@@ -16,7 +16,6 @@ pub struct SnarkJsProof {
     protocol: String,
 }
 
-
 #[cw_serde]
 pub struct ZKEmailSignature {
     proof: SnarkJsProof,
@@ -26,15 +25,20 @@ pub struct ZKEmailSignature {
 
 pub fn verify(
     deps: Deps,
-    tx_bytes: &Binary,
-    sig_bytes: &Binary,
+    tx_bytes: &str,
+    sig_bytes: &[u8],
     email_salt: &str,
-    dkim_domain: &str,
 ) -> ContractResult<bool> {
+
+    // split the sig_bytes into 2 parts proof and publicOutputs
+    let sig: ZKEmailSignature = from_json(sig_bytes.to_vec())?;
+    let proof = sig.proof;
+    let public_outputs = sig.public_outputs;
+
     let verification_request = QueryVerifyRequest {
         tx_bytes: tx_bytes.to_vec(),
-        proof: sig_bytes.to_vec(),
-        dkim_domain: dkim_domain.to_owned(),
+        proof: proof.into(),
+        public_inputs: public_outputs.clone(),
         email_salt: email_salt.to_owned(),
     };
     let verification_request_byte = verification_request.to_bytes()?;
@@ -46,23 +50,7 @@ pub fn verify(
     let res: QueryVerifyResponse = QueryVerifyResponse::decode(verification_response.as_slice())?;
 
     Ok(res.verified)
-}
-
-pub fn extract_email_salt(signature: &Binary) -> ContractResult<String> {
-    // convert signature to a string
-    let sig_str = String::from_utf8(signature.to_vec())?;
-    // get email salt from signature.publicOutputs[32] as a string
-    let sig: ZKEmailSignature = from_json(sig_str)?;
-    
-    // Check if we have enough public outputs
-    if sig.public_outputs.len() < 33 {
-        return Err(crate::error::ContractError::Std(cosmwasm_std::StdError::generic_err(
-            "Insufficient public outputs: expected at least 33 elements",
-        )));
-    }
-    
-    let email_salt = sig.public_outputs[32].clone().to_string();
-    Ok(email_salt)
+    // Ok(true)
 }
 
 #[cfg(test)]
@@ -253,71 +241,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_email_salt_success() {
-        let json_str = sample_signature_json();
-        let signature_binary = Binary::from(json_str.as_bytes());
-
-        let result = extract_email_salt(&signature_binary);
-        assert!(result.is_ok());
-        
-        let email_salt = result.unwrap();
-        // The email salt should be at index 32 of publicOutputs
-        assert_eq!(email_salt, "8106355043968901587346579634598098765933160394002251948170420219958523220425");
-    }
-
-    #[test]
-    fn test_extract_email_salt_invalid_json() {
-        let invalid_json = "invalid json";
-        let signature_binary = Binary::from(invalid_json.as_bytes());
-
-        let result = extract_email_salt(&signature_binary);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_extract_email_salt_invalid_utf8() {
-        // Create invalid UTF-8 bytes
-        let invalid_utf8 = vec![0xff, 0xfe, 0xfd];
-        let signature_binary = Binary::from(invalid_utf8);
-
-        let result = extract_email_salt(&signature_binary);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_extract_email_salt_missing_field() {
-        let incomplete_json = r#"{
-            "proof": {
-                "pi_a": ["1", "2", "3"],
-                "pi_b": [["4", "5"], ["6", "7"], ["8", "9"]],
-                "pi_c": ["10", "11", "12"],
-                "protocol": "groth16"
-            }
-        }"#;
-        let signature_binary = Binary::from(incomplete_json.as_bytes());
-
-        let result = extract_email_salt(&signature_binary);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_extract_email_salt_insufficient_public_outputs() {
-        let json_with_short_outputs = r#"{
-            "proof": {
-                "pi_a": ["1", "2", "3"],
-                "pi_b": [["4", "5"], ["6", "7"], ["8", "9"]],
-                "pi_c": ["10", "11", "12"],
-                "protocol": "groth16"
-            },
-            "publicOutputs": ["1", "2", "3"]
-        }"#;
-        let signature_binary = Binary::from(json_with_short_outputs.as_bytes());
-
-        let result = extract_email_salt(&signature_binary);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_zkemail_signature_field_names() {
         // Test that the JSON field names match exactly (camelCase vs snake_case)
         let json_str = sample_signature_json();
@@ -376,10 +299,9 @@ mod tests {
 
         let result = verify(
             deps.as_ref(),
-            &Binary::from(env.contract.address.as_bytes()),
+            &env.contract.address.as_str(),
             &signature_binary,
             "any_salt",
-            "any_domain",
         );
 
         assert!(result.is_ok());
@@ -395,10 +317,9 @@ mod tests {
 
         let result = verify(
             deps.as_ref(),
-            &Binary::from(env.contract.address.as_bytes()),
+            &env.contract.address.as_str(),
             &signature_binary,
             "any_salt",
-            "any_domain",
         );
 
         assert!(result.is_ok());
@@ -503,43 +424,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_email_salt_with_exact_33_elements() {
-        // Create a signature with exactly 33 elements (so index 32 exists but barely)
-        let json_with_33_outputs = r#"{
-            "proof": {
-                "pi_a": ["1", "2", "3"],
-                "pi_b": [["4", "5"], ["6", "7"], ["8", "9"]],
-                "pi_c": ["10", "11", "12"],
-                "protocol": "groth16"
-            },
-            "publicOutputs": ["0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","email_salt_value"]
-        }"#;
-        let signature_binary = Binary::from(json_with_33_outputs.as_bytes());
-
-        let result = extract_email_salt(&signature_binary);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "email_salt_value");
-    }
-
-    #[test]
-    fn test_extract_email_salt_with_numeric_values() {
-        let json_with_numeric_outputs = r#"{
-            "proof": {
-                "pi_a": ["1", "2", "3"],
-                "pi_b": [["4", "5"], ["6", "7"], ["8", "9"]],
-                "pi_c": ["10", "11", "12"],
-                "protocol": "groth16"
-            },
-            "publicOutputs": ["0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","42"]
-        }"#;
-        let signature_binary = Binary::from(json_with_numeric_outputs.as_bytes());
-
-        let result = extract_email_salt(&signature_binary);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "42");
-    }
-
-    #[test]
     fn test_verify_signature_parsing_edge_cases() {
         let deps = mock_dependencies();
         let env = mock_env();
@@ -558,10 +442,9 @@ mod tests {
 
         let result = verify(
             deps.as_ref(),
-            &Binary::from(env.contract.address.as_bytes()),
+            &env.contract.address.as_str(),
             &signature_binary,
             "any_salt",
-            "example.com",
         );
 
         // Should succeed because verify is hardcoded to return true
@@ -591,24 +474,6 @@ mod tests {
             assert_eq!(proof.protocol, deserialized.protocol);
             assert_eq!(proof.protocol, protocol);
         }
-    }
-
-    #[test]
-    fn test_binary_from_different_sources() {
-        let json_str = sample_signature_json();
-        
-        // Test Binary created from string bytes
-        let binary_from_str = Binary::from(json_str.as_bytes());
-        let result1 = extract_email_salt(&binary_from_str);
-        assert!(result1.is_ok());
-        
-        // Test Binary created from Vec<u8>
-        let binary_from_vec = Binary::from(json_str.as_bytes().to_vec());
-        let result2 = extract_email_salt(&binary_from_vec);
-        assert!(result2.is_ok());
-        
-        // Results should be identical
-        assert_eq!(result1.unwrap(), result2.unwrap());
     }
 
     #[test]
