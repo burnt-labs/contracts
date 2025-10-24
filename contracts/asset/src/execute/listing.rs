@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
 use cw721::traits::Cw721State;
 
 use crate::{
@@ -21,6 +21,7 @@ where
     TNftExtension: Cw721State,
     TCustomResponseMsg: CustomMsg,
 {
+    let mut response = Response::<TCustomResponseMsg>::default();
     let asset_config = AssetConfig::<TNftExtension>::default();
     // make sure the caller is the owner of the token
     let nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
@@ -40,13 +41,16 @@ where
                     return Err(ContractError::InvalidMarketplaceFee { bps, recipient });
                 }
                 let recipient_addr = deps.api.addr_validate(&recipient)?;
+                response = response.add_attribute("marketplace_fee_bps", bps.to_string()).add_attribute("marketplace_fee_recipient", recipient_addr.to_string());
                 (Some(bps), Some(recipient_addr))
             }
             (Some(bps), None) => {
-                return Err(ContractError::InvalidMarketplaceFee {
-                    bps,
-                    recipient: "".to_string(),
-                });
+                let recipient_addr = info.sender.clone();
+                if bps > 10_000 {
+                    return Err(ContractError::InvalidMarketplaceFee { bps, recipient: recipient_addr.to_string() });
+                }
+                response = response.add_attribute("marketplace_fee_bps", bps.to_string()).add_attribute("marketplace_fee_recipient", recipient_addr.to_string());
+                (Some(bps), Some(recipient_addr))
             }
             (None, Some(recipient)) => {
                 return Err(ContractError::InvalidMarketplaceFee { bps: 0, recipient });
@@ -76,19 +80,18 @@ where
         marketplace_fee_recipient: validated_marketplace_fee_recipient.clone(),
     };
     asset_config.listings.save(deps.storage, &id, &listing)?;
-    Ok(Response::default()
+    response = response
         .add_attribute("action", "list")
         .add_attribute("id", id)
         .add_attribute("collection", env.contract.address.clone())
         .add_attribute("price", price.amount.to_string())
         .add_attribute("denom", price.denom.to_string())
         .add_attribute("seller", nft_info.owner.clone().to_string())
-        .add_attribute("marketplace_fee_bps", validated_marketplace_fee_bps.unwrap_or(0).to_string())
-        .add_attribute("marketplace_fee_recipient", validated_marketplace_fee_recipient.unwrap_or(Addr::unchecked("")).to_string())
         .add_attribute(
             "reserved_until",
             reservation.map_or("none".to_string(), |r| r.reserved_until.to_string()),
-        ))
+        );
+    Ok(response)
 }
 
 pub fn delist<TNftExtension, TCustomResponseMsg>(
