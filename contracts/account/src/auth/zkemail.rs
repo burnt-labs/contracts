@@ -2,7 +2,7 @@ use crate::error::ContractResult;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{from_json, Binary, Deps};
 use cosmos_sdk_proto::{
-    prost::Message, traits::MessageExt, xion::v1::dkim::{QueryDkimPubKeysRequest, QueryDkimPubKeysResponse}
+    prost::Message, traits::MessageExt, xion::v1::dkim::{QueryVerifyRequest, QueryVerifyResponse}
 };
 
 #[cw_serde]
@@ -36,10 +36,10 @@ pub fn verify(
     let public_outputs = sig.public_outputs;
 
     let verification_request = QueryVerifyRequest {
-        tx_bytes: tx_bytes.to_vec(),
-        proof: proof.into(),
+        tx_bytes: tx_bytes.as_bytes().to_vec(),
+        proof: serde_json::to_vec(&proof)?,
         public_inputs: public_outputs.clone(),
-        email_salt: email_salt.to_owned(),
+        email_hash: email_salt.as_bytes().to_vec(),
     };
     let verification_request_byte = verification_request.to_bytes()?;
     let verification_response: Binary = deps.querier.query_grpc(
@@ -50,16 +50,11 @@ pub fn verify(
     let res: QueryVerifyResponse = QueryVerifyResponse::decode(verification_response.as_slice())?;
 
     Ok(res.verified)
-    // Ok(true)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::{
-        testing::{mock_dependencies, mock_env},
-        Binary,
-    };
 
     // Sample test data based on the provided signature
     fn sample_zkemail_signature() -> ZKEmailSignature {
@@ -133,7 +128,6 @@ mod tests {
     fn sample_signature_json() -> String {
         r#"{
             "proof": {
-                "curve": "bn128",
                 "pi_a": [
                     "13359235437905510146488545267580847868768563960781729194939527523243795688772",
                     "16255212479465089639502013432936572417100794023004408906770080834142123006135",
@@ -290,43 +284,6 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_with_hardcoded_return() {
-        // Since verify() is currently hardcoded to return true, test that behavior
-        let deps = mock_dependencies();
-        let env = mock_env();
-        let json_str = sample_signature_json();
-        let signature_binary = Binary::from(json_str.as_bytes());
-
-        let result = verify(
-            deps.as_ref(),
-            &env.contract.address.as_str(),
-            &signature_binary,
-            "any_salt",
-        );
-
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
-    }
-
-    #[test]
-    fn test_verify_with_empty_params() {
-        let deps = mock_dependencies();
-        let env = mock_env();
-        let json_str = sample_signature_json();
-        let signature_binary = Binary::from(json_str.as_bytes());
-
-        let result = verify(
-            deps.as_ref(),
-            &env.contract.address.as_str(),
-            &signature_binary,
-            "any_salt",
-        );
-
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
-    }
-
-    #[test]
     fn test_snarkjs_proof_with_empty_fields() {
         let proof = SnarkJsProof {
             pi_a: ["".to_string(), "".to_string(), "".to_string()],
@@ -424,35 +381,6 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_signature_parsing_edge_cases() {
-        let deps = mock_dependencies();
-        let env = mock_env();
-        
-        // Test with minimal valid JSON
-        let minimal_json = r#"{
-            "proof": {
-                "pi_a": ["1", "2", "3"],
-                "pi_b": [["4", "5"], ["6", "7"], ["8", "9"]],
-                "pi_c": ["10", "11", "12"],
-                "protocol": "groth16"
-            },
-            "publicOutputs": []
-        }"#;
-        let signature_binary = Binary::from(minimal_json.as_bytes());
-
-        let result = verify(
-            deps.as_ref(),
-            &env.contract.address.as_str(),
-            &signature_binary,
-            "any_salt",
-        );
-
-        // Should succeed because verify is hardcoded to return true
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
-    }
-
-    #[test]
     fn test_multiple_proof_protocols() {
         let protocols = vec!["groth16", "plonk", "stark", "custom_protocol"];
         
@@ -501,5 +429,44 @@ mod tests {
         let parsed_back: serde_json::Value = serde_json::from_str(&serialized).unwrap();
         assert!(parsed_back.get("publicOutputs").is_some());
         assert!(parsed_back.get("public_outputs").is_none()); // Should not exist
+    }
+
+    #[test]
+    fn test_signature_parsing_from_bytes() {
+        let json_str = sample_signature_json();
+        let sig_bytes = json_str.as_bytes();
+        
+        // Test parsing signature from bytes using from_json
+        let sig: ZKEmailSignature = from_json(sig_bytes.to_vec()).unwrap();
+        
+        // Verify the parsed signature matches our sample
+        assert_eq!(sig.proof.protocol, "groth16");
+        assert_eq!(sig.public_outputs.len(), 34);
+        assert_eq!(sig.public_outputs[0], "2018721414038404820327");
+        assert_eq!(sig.public_outputs[33], "1");
+    }
+
+    #[test]
+    fn test_query_verify_request_creation() {
+        let signature = sample_zkemail_signature();
+        let tx_bytes = "test_transaction";
+        let email_salt = "test_salt";
+        
+        // Test creating QueryVerifyRequest from signature components
+        let verification_request = QueryVerifyRequest {
+            tx_bytes: tx_bytes.as_bytes().to_vec(),
+            proof: serde_json::to_vec(&signature.proof).unwrap(),
+            public_inputs: signature.public_outputs.clone(),
+            email_hash: email_salt.as_bytes().to_vec(),
+        };
+        
+        // Verify the request is properly constructed
+        assert_eq!(verification_request.tx_bytes, tx_bytes.as_bytes());
+        assert_eq!(verification_request.email_hash, email_salt.as_bytes());
+        assert_eq!(verification_request.public_inputs, signature.public_outputs);
+        
+        // Verify proof serialization
+        let proof_bytes = serde_json::to_vec(&signature.proof).unwrap();
+        assert_eq!(verification_request.proof, proof_bytes);
     }
 }

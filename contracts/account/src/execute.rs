@@ -2,7 +2,7 @@ use std::borrow::BorrowMut;
 
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
-use crate::auth::{jwt, passkey, AddAuthenticator, Authenticator, zkemail};
+use crate::auth::{jwt, passkey, AddAuthenticator, Authenticator};
 use crate::{
     error::{ContractError, ContractResult},
     state::AUTHENTICATORS,
