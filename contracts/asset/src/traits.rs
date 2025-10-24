@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::{
     error::ContractError,
     execute::{buy, delist, list, reserve, unreserve},
-    msg::{AssetExtensionExecuteMsg, AssetExtensionQueryMsg},
+    msg::{AssetExtensionExecuteMsg, AssetExtensionQueryMsg, ReserveMsg},
     plugin::{Plugin, PluginCtx},
     state::{AssetConfig, Reserve},
 };
@@ -141,7 +141,7 @@ pub trait SellableAsset<
         info: &MessageInfo,
         id: String,
         price: Coin,
-        reservation: Option<Reserve>,
+        reservation: Option<ReserveMsg>,
         marketplace_fee_bps: Option<u16>,
         marketplace_fee_recipient: Option<String>,
     ) -> Result<Response<TCustomResponseMsg>, ContractError> {
@@ -171,7 +171,7 @@ pub trait SellableAsset<
         env: &Env,
         info: &MessageInfo,
         id: String,
-        reservation: Reserve,
+        reservation: ReserveMsg,
     ) -> Result<Response<TCustomResponseMsg>, ContractError> {
         reserve::<TNftExtension, TCustomResponseMsg>(deps, env, info, id, reservation)
     }
@@ -503,7 +503,7 @@ pub trait PluggableAsset<
         &self,
         _token_id: &String,
         _price: &Coin,
-        _reservation: &Option<Reserve>,
+        _reservation: &Option<ReserveMsg>,
         _marketplace_fee_bps: &Option<u16>,
         _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
@@ -530,7 +530,7 @@ pub trait PluggableAsset<
     fn on_reserve_plugin(
         &self,
         _token_id: &String,
-        _reserver: &Reserve,
+        _reserver: &ReserveMsg,
         _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
         Ok(true)

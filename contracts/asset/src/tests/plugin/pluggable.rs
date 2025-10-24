@@ -7,7 +7,7 @@ use cosmwasm_std::{
 use cw721::{Expiration, state::NftInfo};
 
 use crate::{
-    msg::AssetExtensionExecuteMsg,
+    msg::{AssetExtensionExecuteMsg, ReserveMsg},
     plugin::{DefaultXionAssetContext, Plugin, PluginCtx, RoyaltyInfo},
     state::{ListingInfo, Reserve},
     traits::{AssetContract, DefaultAssetContract, PluggableAsset},
@@ -448,8 +448,8 @@ fn on_reserve_plugin_respects_allowed_marketplaces_and_time_lock() {
     let env = env_at(1_000);
     let info = message_info(&reserver, &[]);
     let mut ctx = build_ctx(deps.as_ref(), env.clone(), info);
-    let reservation = Reserve {
-        reserver: reserver.clone(),
+    let reservation = ReserveMsg {
+        reserver: Some(reserver.clone().to_string()),
         reserved_until: env.block.time.plus_seconds(1_500),
     };
 
@@ -458,7 +458,7 @@ fn on_reserve_plugin_respects_allowed_marketplaces_and_time_lock() {
         .unwrap();
 
     assert!(result);
-    assert_eq!(ctx.data.reservation.as_ref().unwrap().reserver, reserver);
+    assert_eq!(ctx.data.reservation.unwrap().reserver.unwrap(), Some(reserver.to_string()).unwrap());
     assert_eq!(ctx.data.time_lock, Some(Duration::from_secs(2_000)));
 }
 
@@ -484,8 +484,8 @@ fn on_reserve_plugin_errors_for_disallowed_marketplace() {
     let env = env_at(1_000);
     let info = message_info(&reserver, &[]);
     let mut ctx = build_ctx(deps.as_ref(), env.clone(), info);
-    let reservation = Reserve {
-        reserver: reserver.clone(),
+    let reservation = ReserveMsg {
+        reserver: Some(reserver.clone().to_string()),
         reserved_until: env.block.time.plus_seconds(1_200),
     };
 
@@ -532,8 +532,8 @@ fn on_reserve_plugin_errors_when_time_lock_exceeded() {
     let env = env_at(1_000);
     let info = message_info(&reserver, &[]);
     let mut ctx = build_ctx(deps.as_ref(), env.clone(), info);
-    let reservation = Reserve {
-        reserver: reserver.clone(),
+    let reservation = ReserveMsg {
+        reserver: Some(reserver.clone().to_string()),
         reserved_until: env.block.time.plus_seconds(3_000),
     };
 

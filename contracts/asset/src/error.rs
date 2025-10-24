@@ -31,6 +31,9 @@ pub enum ContractError {
     #[error("No payment")]
     NoPayment {},
 
+    #[error("Multiple payments sent")]
+    MultiplePaymentsSent {},
+
     #[error("Plugin error: {msg}")]
     PluginError { msg: String },
 

@@ -2,8 +2,7 @@ use cosmwasm_std::{CustomMsg, DepsMut, Env, MessageInfo, Response};
 use cw721::{Expiration, traits::Cw721State};
 
 use crate::{
-    error::ContractError,
-    state::{AssetConfig, Reserve},
+    error::ContractError, msg::ReserveMsg, state::{AssetConfig, Reserve}
 };
 
 use super::permissions::check_can_list;
@@ -13,7 +12,7 @@ pub fn reserve<TNftExtension, TCustomResponseMsg>(
     env: &Env,
     info: &MessageInfo,
     id: String,
-    reservation: Reserve,
+    reservation: ReserveMsg,
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
 where
     TNftExtension: Cw721State,
@@ -36,8 +35,9 @@ where
         }
     }
 
+    let reserver = if let Some(reserver) = reservation.reserver { deps.api.addr_validate(&reserver)? } else { info.sender.clone() };
     listing.reserved = Some(Reserve {
-        reserver: reservation.reserver.clone(),
+        reserver: reserver.clone(),
         reserved_until: reservation.reserved_until,
     });
     asset_config.listings.save(deps.storage, &id, &listing)?;
@@ -46,7 +46,7 @@ where
         .add_attribute("action", "reserve")
         .add_attribute("id", id)
         .add_attribute("collection", env.contract.address.clone())
-        .add_attribute("reserver", reservation.reserver.to_string())
+        .add_attribute("reserver", reserver.to_string())
         .add_attribute("reserved_until", reservation.reserved_until.to_string()))
 }
 

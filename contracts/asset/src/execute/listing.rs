@@ -2,8 +2,7 @@ use cosmwasm_std::{Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
 use cw721::traits::Cw721State;
 
 use crate::{
-    error::ContractError,
-    state::{AssetConfig, ListingInfo, Reserve},
+    error::ContractError, msg::ReserveMsg, state::{AssetConfig, ListingInfo, Reserve}
 };
 
 use super::permissions::check_can_list;
@@ -14,7 +13,7 @@ pub fn list<TNftExtension, TCustomResponseMsg>(
     info: &MessageInfo,
     id: String,
     price: Coin,
-    reservation: Option<Reserve>,
+    reservation: Option<ReserveMsg>,
     marketplace_fee_bps: Option<u16>,
     marketplace_fee_recipient: Option<String>,
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
@@ -59,6 +58,14 @@ where
     if old_listing.is_some() {
         return Err(ContractError::ListingAlreadyExists { id });
     }
+    // todo convert reservation msg to state reservation
+    let reservation = match reservation {
+        Some(reserve_msg) => Some(Reserve {
+            reserver: if let Some(reserver) = reserve_msg.reserver { deps.api.addr_validate(&reserver)? } else { info.sender.clone() },
+            reserved_until: reserve_msg.reserved_until,
+        }),
+        None => None,
+    };
     // Save the listing
     let listing = ListingInfo {
         id: id.clone(),

@@ -5,9 +5,7 @@ use cosmwasm_std::{
 use cw721::state::NftInfo;
 
 use crate::{
-    error::ContractError,
-    execute::reserve,
-    state::{AssetConfig, ListingInfo, Reserve},
+    error::ContractError, execute::reserve, msg::ReserveMsg, state::{AssetConfig, ListingInfo, Reserve}
 };
 
 use super::helpers::{expect_err, expect_ok, expect_some};
@@ -33,8 +31,8 @@ fn reserve_flow() {
         ));
 
         // cannot reserve unlisted item
-        let reservation = Reserve {
-            reserver: buyer_addr.clone(),
+        let reservation = ReserveMsg {
+            reserver: Some(buyer_addr.clone().to_string()),
             reserved_until: env.block.time.plus_seconds(600),
         };
         let err = expect_err(reserve::<Empty, Empty>(

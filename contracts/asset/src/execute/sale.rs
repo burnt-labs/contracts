@@ -25,6 +25,11 @@ where
     let price = listing.price.clone();
     let seller = listing.seller.clone();
 
+        // only one coin can be sent
+    if info.funds.len() > 1 {
+        return Err(ContractError::MultiplePaymentsSent {  });
+    }
+
     let mut payment = info
         .funds
         .iter()
@@ -32,6 +37,8 @@ where
         .ok_or_else(|| ContractError::NoPayment {})?
         .clone();
 
+    // check for underpayment but overpayment are absorbed if an exact price
+    // plugin is not set on the asset
     if payment.amount.lt(&price.amount) || payment.denom != price.denom {
         return Err(ContractError::InvalidPayment {
             price: payment.amount.u128(),

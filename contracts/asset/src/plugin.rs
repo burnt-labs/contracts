@@ -18,7 +18,7 @@ use cw721::{
 use crate::{
     default_plugins,
     error::ContractError,
-    msg::AssetExtensionExecuteMsg,
+    msg::{AssetExtensionExecuteMsg, ReserveMsg},
     state::{AssetConfig, Reserve},
     traits::{DefaultAssetContract, PluggableAsset, SellableAsset},
 };
@@ -60,7 +60,7 @@ pub struct DefaultXionAssetContext {
 
     pub not_before: Expiration, // timestamp before which an asset cannot be listed
     pub not_after: Expiration,  // timestamp after which an asset cannot be listed
-    pub reservation: Option<Reserve>,
+    pub reservation: Option<ReserveMsg>,
     pub time_lock: Option<Duration>,
 
     pub allowed_marketplaces: Option<Vec<Addr>>,
@@ -314,7 +314,7 @@ where
         &self,
         token_id: &String,
         price: &Coin,
-        reservation: &Option<Reserve>,
+        reservation: &Option<ReserveMsg>,
         marketplace_fee_bps: &Option<u16>,
         ctx: &mut DefaultPluginCtx,
     ) -> StdResult<bool> {
@@ -421,7 +421,7 @@ where
     fn on_reserve_plugin(
         &self,
         token_id: &String,
-        reservation: &Reserve,
+        reservation: &ReserveMsg,
         ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>,
     ) -> StdResult<bool> {
         let config = AssetConfig::<TNftExtension>::default();
