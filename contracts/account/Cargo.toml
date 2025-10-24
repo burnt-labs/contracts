@@ -32,4 +32,3 @@ rsa                = { workspace = true }
 getrandom          = { workspace = true }
 p256               = { workspace = true }
 cosmos-sdk-proto   = { workspace = true }
-# zkemail = {path = "../zkemail", features = ["library"]}
