@@ -1,4 +1,4 @@
-use cosmwasm_std::{Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{Addr, Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
 use cw721::traits::Cw721State;
 
 use crate::{
@@ -73,7 +73,7 @@ where
         price: price.clone(),
         reserved: reservation.clone(),
         marketplace_fee_bps: validated_marketplace_fee_bps,
-        marketplace_fee_recipient: validated_marketplace_fee_recipient,
+        marketplace_fee_recipient: validated_marketplace_fee_recipient.clone(),
     };
     asset_config.listings.save(deps.storage, &id, &listing)?;
     Ok(Response::default()
@@ -83,6 +83,8 @@ where
         .add_attribute("price", price.amount.to_string())
         .add_attribute("denom", price.denom.to_string())
         .add_attribute("seller", nft_info.owner.clone().to_string())
+        .add_attribute("marketplace_fee_bps", validated_marketplace_fee_bps.unwrap_or(0).to_string())
+        .add_attribute("marketplace_fee_recipient", validated_marketplace_fee_recipient.unwrap_or(Addr::unchecked("")).to_string())
         .add_attribute(
             "reserved_until",
             reservation.map_or("none".to_string(), |r| r.reserved_until.to_string()),

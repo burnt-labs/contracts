@@ -1,4 +1,4 @@
-use cosmwasm_std::{BankMsg, Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{Addr, BankMsg, Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
 use cw721::traits::Cw721State;
 
 use crate::{error::ContractError, state::AssetConfig};
@@ -57,7 +57,7 @@ where
             .amount
             .checked_sub(fee_amount)
             .map_err(|_| ContractError::InsufficientFunds {})?;
-        if let Some(recipient) = listing.marketplace_fee_recipient {
+        if let Some(recipient) = &listing.marketplace_fee_recipient {
             if !fee_amount.is_zero() {
                 response = response.add_attribute("marketplace_fee", fee_amount.to_string());
                 response = response.add_message(BankMsg::Send {
@@ -111,6 +111,8 @@ where
         .add_attribute("price", price.amount.to_string())
         .add_attribute("denom", price.denom)
         .add_attribute("seller", seller.to_string())
-        .add_attribute("buyer", buyer.to_string());
+        .add_attribute("buyer", buyer.to_string())
+        .add_attribute("marketplace_fee_bps", listing.marketplace_fee_bps.unwrap_or(0).to_string())
+        .add_attribute("marketplace_fee_recipient", listing.marketplace_fee_recipient.unwrap_or(Addr::unchecked("")).to_string());
     Ok(response)
 }
