@@ -2,24 +2,21 @@ use std::{fmt::Display, time::Duration};
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    Addr, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult,
-    coin,
+    coin, Addr, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response,
+    StdError, StdResult,
 };
 use cw721::{
-    Expiration,
-    error::Cw721ContractError,
-    msg::Cw721ExecuteMsg,
-    traits::{
+    error::Cw721ContractError, msg::Cw721ExecuteMsg, state::CREATOR, traits::{
         Cw721CustomMsg, Cw721Execute, Cw721State, FromAttributesState, StateFactory,
         ToAttributesState,
-    },
+    }, Expiration
 };
 
 use crate::{
-    default_plugins,
+    default_plugins::{self},
     error::ContractError,
     msg::{AssetExtensionExecuteMsg, ReserveMsg},
-    state::{AssetConfig, Reserve},
+    state::{AssetConfig},
     traits::{DefaultAssetContract, PluggableAsset, SellableAsset},
 };
 
@@ -239,6 +236,11 @@ where
                     recipient,
                     token_id,
                 } => self.on_transfer_plugin(recipient, token_id, &mut plugin_ctx)?,
+                Cw721ExecuteMsg::SendNft {
+                    contract,
+                    token_id,
+                    ..
+                } => self.on_transfer_plugin(contract, token_id, &mut plugin_ctx)?,
                 Cw721ExecuteMsg::UpdateExtension { msg } => {
                     self.on_update_extension_plugin(msg, &mut plugin_ctx)?
                 }
@@ -388,6 +390,13 @@ where
             ctx.deps.storage,
             Plugin::AllowedCurrencies { denoms: [].into() }.get_plugin_name(),
         )?;
+        let exact_price_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::ExactPrice {
+                amount: coin(0, ""),
+            }
+            .get_plugin_name(),
+        )?;
         let royalty_plugin = config
             .collection_plugins
             .may_load(ctx.deps.storage, "Royalty")?;
@@ -406,9 +415,9 @@ where
             plugin.run_asset_plugin(ctx)?;
         }
         // Exact price plugin disabled for buys for now
-        // if let Some(plugin) = exact_price_plugin {
-        //     plugin.run_asset_plugin(ctx)?;
-        // }
+        if let Some(plugin) = exact_price_plugin {
+            plugin.run_asset_plugin(ctx)?;
+        }
         if let Some(plugin) = allowed_marketplaces_plugin {
             plugin.run_asset_plugin(ctx)?;
         }
@@ -472,9 +481,12 @@ where
         &self,
         deps: DepsMut,
         _env: &Env,
-        _info: &MessageInfo,
+        info: &MessageInfo,
         plugins: &Vec<Plugin>,
     ) -> StdResult<()> {
+        CREATOR
+            .assert_owner(deps.storage, &info.sender)
+            .map_err(|err| StdError::generic_err(err.to_string()))?;
         for plugin in plugins {
             self.config
                 .collection_plugins
@@ -487,9 +499,12 @@ where
         &self,
         deps: DepsMut,
         _env: &Env,
-        _info: &MessageInfo,
+        info: &MessageInfo,
         plugins: &Vec<String>,
     ) -> StdResult<()> {
+        CREATOR
+            .assert_owner(deps.storage, &info.sender)
+            .map_err(|err| StdError::generic_err(err.to_string()))?;
         for plugin in plugins {
             self.config.collection_plugins.remove(deps.storage, plugin);
         }

@@ -80,9 +80,3 @@ impl<'a> IndexList<ListingInfo> for ListingIndexes<'a> {
         Box::new(v.into_iter())
     }
 }
-
-// Collection-wide plugins
-pub const COLLECTION_PLUGINS_ID: Item<Vec<String>> = Item::new("collection_plugins");
-
-// Optional token-specific overrides
-pub const TOKEN_PLUGINS: Map<&str, Vec<String>> = Map::new("token_plugins");

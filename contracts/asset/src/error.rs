@@ -37,6 +37,9 @@ pub enum ContractError {
     #[error("Plugin error: {msg}")]
     PluginError { msg: String },
 
+    #[error("Stale listing")]
+    StaleListing {},
+
     #[error("Invalid marketplace fee: {bps}, {recipient}")]
     InvalidMarketplaceFee { bps: u16, recipient: String },
 }

@@ -4,7 +4,10 @@ use cosmwasm_std::{
     Addr, Coin, Deps, Empty, Env, MessageInfo, Response, Timestamp,
     testing::{message_info, mock_dependencies, mock_env},
 };
-use cw721::{Expiration, state::NftInfo};
+use cw721::{
+    Expiration,
+    state::{NftInfo, CREATOR},
+};
 
 use crate::{
     msg::{AssetExtensionExecuteMsg, ReserveMsg},
@@ -560,6 +563,14 @@ fn save_plugin_saves_all_plugins() {
     let mut deps = mock_dependencies();
     let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
 
+    let owner = deps.api.addr_make("admin");
+    {
+        let mut deps_mut = deps.as_mut();
+        CREATOR
+            .initialize_owner(deps_mut.storage, deps_mut.api, Some(owner.as_str()))
+            .unwrap();
+    }
+
     let plugins = vec![
         Plugin::MinimumPrice {
             amount: Coin::new(50u128, "uxion"),
@@ -576,7 +587,7 @@ fn save_plugin_saves_all_plugins() {
     ];
 
     let env = env_at(1_000);
-    let info = message_info(&deps.api.addr_make("admin"), &[]);
+    let info = message_info(&owner, &[]);
     contract
         .save_plugin(deps.as_mut(), &env, &info, &plugins)
         .unwrap();
@@ -603,6 +614,14 @@ fn remove_plugin_removes_specified_plugin() {
     let mut deps = mock_dependencies();
     let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
 
+    let owner = deps.api.addr_make("admin");
+    {
+        let mut deps_mut = deps.as_mut();
+        CREATOR
+            .initialize_owner(deps_mut.storage, deps_mut.api, Some(owner.as_str()))
+            .unwrap();
+    }
+
     let plugins = vec![
         Plugin::MinimumPrice {
             amount: Coin::new(50u128, "uxion"),
@@ -619,7 +638,7 @@ fn remove_plugin_removes_specified_plugin() {
     ];
 
     let env = env_at(1_000);
-    let info = message_info(&deps.api.addr_make("admin"), &[]);
+    let info = message_info(&owner, &[]);
     contract
         .save_plugin(deps.as_mut(), &env, &info, &plugins)
         .unwrap();
@@ -643,4 +662,34 @@ fn remove_plugin_removes_specified_plugin() {
     assert!(!stored_plugins.contains(&Plugin::NotAfter {
         time: Expiration::AtTime(Timestamp::from_seconds(1_500))
     }));
+}
+
+#[test]
+fn save_plugin_rejects_non_owner() {
+    let mut deps = mock_dependencies();
+    let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
+
+    let owner = deps.api.addr_make("admin");
+    {
+        let mut deps_mut = deps.as_mut();
+        CREATOR
+            .initialize_owner(deps_mut.storage, deps_mut.api, Some(owner.as_str()))
+            .unwrap();
+    }
+
+    let env = env_at(1_000);
+    let non_owner = deps.api.addr_make("intruder");
+    let info = message_info(&non_owner, &[]);
+    let plugins = vec![Plugin::ExactPrice {
+        amount: Coin::new(100u128, "uxion"),
+    }];
+
+    let err = contract
+        .save_plugin(deps.as_mut(), &env, &info, &plugins)
+        .expect_err("expected unauthorized");
+    assert_eq!(
+        err.to_string(),
+        cosmwasm_std::StdError::generic_err("Caller is not the contract's current owner")
+            .to_string()
+    );
 }

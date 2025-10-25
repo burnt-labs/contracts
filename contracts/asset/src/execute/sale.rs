@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, BankMsg, Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{BankMsg, Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
 use cw721::traits::Cw721State;
 
 use crate::{error::ContractError, state::AssetConfig};
@@ -22,12 +22,22 @@ where
         .may_load(deps.storage, &id)?
         .ok_or(ContractError::ListingNotFound { id: id.clone() })?;
 
+    let mut nft_info = asset_config
+        .cw721_config
+        .nft_info
+        .load(deps.storage, &id)
+        .map_err(|_| ContractError::ListingNotFound { id: id.clone() })?;
+
     let price = listing.price.clone();
     let seller = listing.seller.clone();
 
+    if seller != nft_info.owner {
+        return Err(ContractError::StaleListing {});
+    }
+
         // only one coin can be sent
     if info.funds.len() > 1 {
-        return Err(ContractError::MultiplePaymentsSent {  });
+        return Err(ContractError::MultiplePaymentsSent {});
     }
 
     let mut payment = info
@@ -90,8 +100,6 @@ where
             return Err(ContractError::Unauthorized {});
         }
     }
-
-    let mut nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
 
     nft_info.owner = buyer.clone();
     nft_info.approvals.clear();

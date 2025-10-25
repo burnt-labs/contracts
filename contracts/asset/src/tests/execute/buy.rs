@@ -249,6 +249,22 @@ fn buy_flow() {
                 ("buyer".to_string(), buyer_addr.to_string()),
             ],
         );
+        // reset ownership back to seller for subsequent scenario
+        expect_ok(
+            AssetConfig::<Empty>::default()
+                .cw721_config
+                .nft_info
+                .save(
+                    deps.as_mut().storage,
+                    "token-4",
+                    &NftInfo {
+                        owner: seller_addr.clone(),
+                        approvals: vec![],
+                        token_uri: None,
+                        extension: Empty {},
+                    },
+                ),
+        );
         // successful buy on behalf of reserver
         expect_ok(AssetConfig::<Empty>::default().listings.save(
             deps.as_mut().storage,
