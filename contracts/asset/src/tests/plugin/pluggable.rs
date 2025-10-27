@@ -12,7 +12,7 @@ use cw721::{
 use crate::{
     msg::{AssetExtensionExecuteMsg, ReserveMsg},
     plugin::{DefaultXionAssetContext, Plugin, PluginCtx, RoyaltyInfo},
-    state::{ListingInfo, Reserve},
+    state::ListingInfo,
     traits::{AssetContract, DefaultAssetContract, PluggableAsset},
 };
 
@@ -96,13 +96,13 @@ fn on_list_plugin_runs_all_configured_plugins() {
     let token_id = "token-1".to_string();
     let price = Coin::new(100u128, "uxion");
 
-    let result = contract.on_list_plugin(&token_id, &price, &None, &Some(10), &mut ctx);
+    let result = contract.on_list_plugin(&token_id, &price, &None, &mut ctx);
 
     assert!(result.unwrap());
     assert_eq!(ctx.data.token_id, token_id);
     assert_eq!(ctx.data.ask_price, Some(price));
     assert_eq!(ctx.data.min_price, Some(min_price));
-    assert_eq!(ctx.data.marketplace_fee_bps, Some(10));
+    assert_eq!(ctx.data.marketplace_fee_bps, None);
     let allowed = ctx.data.allowed_currencies.expect("allowed currencies");
     assert!(allowed.iter().any(|coin| coin.denom == "uxion"));
 }
@@ -141,7 +141,7 @@ fn on_list_plugin_returns_error_when_not_after_fails() {
     let token_id = "token-1".to_string();
     let price = Coin::new(100u128, "uxion");
 
-    let result = contract.on_list_plugin(&token_id, &price, &None, &None, &mut ctx);
+    let result = contract.on_list_plugin(&token_id, &price, &None, &mut ctx);
 
     assert_eq!(
         result.expect_err("expected not after error").to_string(),
@@ -176,7 +176,7 @@ fn on_list_plugin_returns_error_when_min_price_fails() {
     let token_id = "token-1".to_string();
     let price = Coin::new(100u128, "uxion");
 
-    let result = contract.on_list_plugin(&token_id, &price, &None, &None, &mut ctx);
+    let result = contract.on_list_plugin(&token_id, &price, &None, &mut ctx);
 
     assert_eq!(
         result.expect_err("expected min price error").to_string(),
@@ -216,8 +216,6 @@ fn on_buy_plugin_runs_allowed_marketplace_and_royalty_plugins() {
                 seller: seller.clone(),
                 price: price.clone(),
                 reserved: None,
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         )
         .unwrap();
@@ -316,8 +314,6 @@ fn on_buy_plugin_errors_when_currency_not_allowed() {
                 seller: seller.clone(),
                 price: price.clone(),
                 reserved: None,
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         )
         .unwrap();
@@ -380,8 +376,6 @@ fn on_buy_plugin_errors_when_marketplace_not_allowed() {
                 seller: seller.clone(),
                 price: price.clone(),
                 reserved: None,
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         )
         .unwrap();
@@ -416,6 +410,69 @@ fn on_buy_plugin_errors_when_marketplace_not_allowed() {
             .to_string(),
         cosmwasm_std::StdError::generic_err("buyer is not an allowed marketplace",).to_string()
     );
+}
+
+#[test]
+fn on_transfer_plugin_blocks_listed_tokens() {
+    let mut deps = mock_dependencies();
+    let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
+
+    let seller = deps.api.addr_make("seller");
+    let nft_info = NftInfo {
+        owner: seller.clone(),
+        approvals: vec![],
+        token_uri: None,
+        extension: Empty::default(),
+    };
+    let listing = ListingInfo {
+        id: "token-1".to_string(),
+        price: Coin::new(100u128, "uxion"),
+        seller: seller.clone(),
+        reserved: None,
+    };
+    contract
+        .config
+        .listings
+        .save(deps.as_mut().storage, "token-1", &listing)
+        .unwrap();
+    contract
+        .config
+        .cw721_config
+        .nft_info
+        .save(deps.as_mut().storage, "token-1", &nft_info)
+        .unwrap();
+
+    let env = env_at(1_000);
+    let info = message_info(&deps.api.addr_make("operator"), &[]);
+    let mut ctx = build_ctx(deps.as_ref(), env, info);
+
+    let err = contract
+        .on_transfer_plugin(
+            &"buyer".to_string(),
+            &"token-1".to_string(),
+            &mut ctx,
+        )
+        .expect_err("expected transfer block");
+
+    assert_eq!(
+        err.to_string(),
+        cosmwasm_std::StdError::generic_err("cannot transfer a token while it is listed")
+            .to_string()
+    );
+}
+
+#[test]
+fn on_transfer_plugin_allows_when_not_listed() {
+    let deps = mock_dependencies();
+    let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
+
+    let env = env_at(1_000);
+    let info = message_info(&deps.api.addr_make("operator"), &[]);
+    let mut ctx = build_ctx(deps.as_ref(), env, info);
+
+    assert!(contract
+        .on_transfer_plugin(&"buyer".to_string(), &"token-1".to_string(), &mut ctx)
+        .is_ok());
 }
 
 #[test]
@@ -565,7 +622,7 @@ fn save_plugin_saves_all_plugins() {
 
     let owner = deps.api.addr_make("admin");
     {
-        let mut deps_mut = deps.as_mut();
+        let deps_mut = deps.as_mut();
         CREATOR
             .initialize_owner(deps_mut.storage, deps_mut.api, Some(owner.as_str()))
             .unwrap();
@@ -616,7 +673,7 @@ fn remove_plugin_removes_specified_plugin() {
 
     let owner = deps.api.addr_make("admin");
     {
-        let mut deps_mut = deps.as_mut();
+        let deps_mut = deps.as_mut();
         CREATOR
             .initialize_owner(deps_mut.storage, deps_mut.api, Some(owner.as_str()))
             .unwrap();
@@ -671,7 +728,7 @@ fn save_plugin_rejects_non_owner() {
 
     let owner = deps.api.addr_make("admin");
     {
-        let mut deps_mut = deps.as_mut();
+        let deps_mut = deps.as_mut();
         CREATOR
             .initialize_owner(deps_mut.storage, deps_mut.api, Some(owner.as_str()))
             .unwrap();

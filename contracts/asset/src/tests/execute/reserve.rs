@@ -5,7 +5,7 @@ use cosmwasm_std::{
 use cw721::state::NftInfo;
 
 use crate::{
-    error::ContractError, execute::reserve, msg::ReserveMsg, state::{AssetConfig, ListingInfo, Reserve}
+    error::ContractError, execute::reserve, msg::ReserveMsg, state::{AssetConfig, ListingInfo}
 };
 
 use super::helpers::{expect_err, expect_ok, expect_some};
@@ -58,8 +58,6 @@ fn reserve_flow() {
                 seller: owner_addr.clone(),
                 price: price.clone(),
                 reserved: None,
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         ));
         let response = expect_ok(reserve::<Empty, Empty>(

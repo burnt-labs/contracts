@@ -296,9 +296,8 @@ where
                 token_id,
                 price,
                 reservation,
-                marketplace_fee_bps,
                 ..
-            } => self.on_list_plugin(token_id, price, reservation, marketplace_fee_bps, ctx),
+            } => self.on_list_plugin(token_id, price, reservation, ctx),
             AssetExtensionExecuteMsg::Reserve {
                 token_id,
                 reservation,
@@ -307,7 +306,11 @@ where
             AssetExtensionExecuteMsg::Buy {
                 token_id,
                 recipient,
-            } => self.on_buy_plugin(token_id, recipient, ctx),
+            } => self.on_buy_plugin(
+                token_id,
+                recipient,
+                ctx,
+            ),
             _ => Ok(true),
         }
     }
@@ -317,7 +320,6 @@ where
         token_id: &String,
         price: &Coin,
         reservation: &Option<ReserveMsg>,
-        marketplace_fee_bps: &Option<u16>,
         ctx: &mut DefaultPluginCtx,
     ) -> StdResult<bool> {
         // for listings we run the minimum price, not before, not after plugins if set
@@ -349,7 +351,7 @@ where
         )?;
         ctx.data.token_id = token_id.to_string();
         ctx.data.ask_price = Some(price.clone());
-        ctx.data.marketplace_fee_bps = *marketplace_fee_bps;
+        ctx.data.marketplace_fee_bps = None;
         ctx.data.reservation = reservation.clone();
         ctx.data.seller = Some(ctx.info.sender.clone());
         if let Some(plugin) = min_price_plugin {
@@ -402,6 +404,7 @@ where
             .may_load(ctx.deps.storage, "Royalty")?;
         ctx.data.token_id = token_id.to_string();
         ctx.data.buyer = Some(ctx.info.sender.clone());
+        ctx.data.marketplace_fee_bps = None;
         // we need to get the listing info to get the ask price
         let listing = self
             .config

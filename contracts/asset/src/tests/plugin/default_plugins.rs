@@ -7,7 +7,7 @@ use cosmwasm_std::{
 use cw721::Expiration;
 
 use crate::{
-    default_plugins, msg::ReserveMsg, plugin::{DefaultXionAssetContext, PluginCtx}, state::Reserve
+    default_plugins, msg::ReserveMsg, plugin::{DefaultXionAssetContext, PluginCtx}
 };
 
 fn env_at(time: u64) -> Env {

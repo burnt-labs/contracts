@@ -58,30 +58,6 @@ where
 
     let mut response = Response::<TCustomResponseMsg>::default();
 
-    if let Some(market_fee) = listing.marketplace_fee_bps {
-        let fee_amount = payment
-            .amount
-            .checked_multiply_ratio(market_fee, 10_000_u128)
-            .map_err(|_| ContractError::InsufficientFunds {})?;
-        payment.amount = payment
-            .amount
-            .checked_sub(fee_amount)
-            .map_err(|_| ContractError::InsufficientFunds {})?;
-        if let Some(recipient) = &listing.marketplace_fee_recipient {
-            if !fee_amount.is_zero() {
-                response = response.add_attribute("marketplace_fee", fee_amount.to_string());
-                response = response.add_attribute("marketplace_fee_recipient", recipient.to_string());
-                response = response.add_message(BankMsg::Send {
-                    to_address: recipient.to_string(),
-                    amount: vec![Coin {
-                        denom: payment.denom.clone(),
-                        amount: fee_amount,
-                    }],
-                });
-            }
-        }
-    }
-
     // remove all other deductions e.g. royalties from payment
     for (_, amount, _) in deductions {
         payment.amount = payment

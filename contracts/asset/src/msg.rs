@@ -1,4 +1,4 @@
-use crate::{plugin::Plugin, state::Reserve};
+use crate::plugin::Plugin;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Coin, Timestamp};
 use cw721::traits::Cw721CustomMsg;
@@ -16,8 +16,6 @@ pub enum AssetExtensionExecuteMsg {
         token_id: String,
         price: Coin,
         reservation: Option<ReserveMsg>,
-        marketplace_fee_bps: Option<u16>,
-        marketplace_fee_recipient: Option<String>,
     },
     Reserve {
         token_id: String,

@@ -41,8 +41,6 @@ fn buy_flow() {
                 seller: seller_addr.clone(),
                 price: price.clone(),
                 reserved: None,
-                marketplace_fee_bps: Some(100),
-                marketplace_fee_recipient: Some(seller_addr.clone()),
             },
         ));
 
@@ -67,8 +65,6 @@ fn buy_flow() {
         assert_eq!(
             attrs,
             vec![
-                ("marketplace_fee".to_string(), "1".to_string()),
-                ("marketplace_fee_recipient".to_string(), seller_addr.clone().to_string()),
                 ("action".to_string(), "buy".to_string()),
                 ("id".to_string(), "token-1".to_string()),
                 ("price".to_string(), price.amount.to_string()),
@@ -87,11 +83,7 @@ fn buy_flow() {
             vec![
                 CosmosMsg::Bank(BankMsg::Send {
                     to_address: seller_addr.to_string(),
-                    amount: coins(1_u128, "uxion"),
-                }),
-                CosmosMsg::Bank(BankMsg::Send {
-                    to_address: seller_addr.to_string(),
-                    amount: coins(89_u128, "uxion"),
+                    amount: coins(90_u128, "uxion"),
                 })
             ],
         );
@@ -139,8 +131,6 @@ fn buy_flow() {
                 seller: seller_addr.clone(),
                 price: price.clone(),
                 reserved: None,
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         ));
 
@@ -209,8 +199,6 @@ fn buy_flow() {
                     reserver: buyer_addr.clone(),
                     reserved_until: env.block.time.plus_seconds(600),
                 }),
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         ));
 
@@ -277,8 +265,6 @@ fn buy_flow() {
                     reserver: buyer_addr.clone(),
                     reserved_until: env.block.time.plus_seconds(600),
                 }),
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         ));
         let mut deps = deps;

@@ -14,13 +14,12 @@ use crate::{
 };
 
 #[test]
-fn buy_deducts_marketplace_and_royalty_fees() {
+fn buy_deducts_royalty_fees() {
     let mut deps = mock_dependencies();
     let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
 
     let seller = deps.api.addr_make("seller");
     let buyer = deps.api.addr_make("buyer");
-    let marketplace = deps.api.addr_make("marketplace");
     let royalty_recipient = deps.api.addr_make("artist");
 
     let price = Coin::new(1_000u128, "uxion");
@@ -36,8 +35,6 @@ fn buy_deducts_marketplace_and_royalty_fees() {
         price: price.clone(),
         seller: seller.clone(),
         reserved: None,
-        marketplace_fee_bps: Some(1_000),
-        marketplace_fee_recipient: Some(marketplace.clone()),
     };
 
     contract
@@ -81,9 +78,8 @@ fn buy_deducts_marketplace_and_royalty_fees() {
         )
         .unwrap();
 
-    assert_eq!(res.messages.len(), 3);
+    assert_eq!(res.messages.len(), 2);
 
-    let mut marketplace_paid = None;
     let mut seller_paid = None;
     let mut royalty_paid = None;
 
@@ -94,9 +90,7 @@ fn buy_deducts_marketplace_and_royalty_fees() {
                     .first()
                     .cloned()
                     .expect("send message must include funds");
-                if *to_address == marketplace.to_string() {
-                    marketplace_paid = Some(coin);
-                } else if *to_address == seller.to_string() {
+                if *to_address == seller.to_string() {
                     seller_paid = Some(coin);
                 } else if *to_address == royalty_recipient.to_string() {
                     royalty_paid = Some(coin);
@@ -109,16 +103,12 @@ fn buy_deducts_marketplace_and_royalty_fees() {
     }
 
     assert_eq!(
-        marketplace_paid.expect("marketplace fee"),
-        Coin::new(100u128, "uxion"),
-    );
-    assert_eq!(
         royalty_paid.expect("royalty fee"),
         Coin::new(50u128, "uxion"),
     );
     assert_eq!(
         seller_paid.expect("seller payment"),
-        Coin::new(850u128, "uxion"),
+        Coin::new(950u128, "uxion"),
     );
 
     let attrs: HashMap<_, _> = res
@@ -126,7 +116,6 @@ fn buy_deducts_marketplace_and_royalty_fees() {
         .iter()
         .map(|attr| (attr.key.clone(), attr.value.clone()))
         .collect();
-    assert_eq!(attrs.get("marketplace_fee"), Some(&"100".to_string()));
     assert_eq!(
         attrs.get("royalty_amount"),
         Some(&Coin::new(50u128, "uxion").to_string()),

@@ -39,8 +39,6 @@ fn delist_flow() {
                 seller: seller_addr.clone(),
                 price: price.clone(),
                 reserved: None,
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         ));
 
@@ -102,8 +100,6 @@ fn delist_flow() {
                 seller: seller_addr.clone(),
                 price: price.clone(),
                 reserved: None,
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         ));
         let err = expect_err(delist::<Empty, Empty>(
