@@ -1,22 +1,27 @@
 use crate::{plugin::Plugin, state::Reserve};
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::Coin;
+use cosmwasm_std::{Coin, Timestamp};
 use cw721::traits::Cw721CustomMsg;
 
 pub type InstantiateMsg<CollectionExtension> = cw721::msg::Cw721InstantiateMsg<CollectionExtension>;
 
 #[cw_serde]
+pub struct ReserveMsg {
+    pub reserver: Option<String>,
+    pub reserved_until: Timestamp,
+}
+#[cw_serde]
 pub enum AssetExtensionExecuteMsg {
     List {
         token_id: String,
         price: Coin,
-        reservation: Option<Reserve>,
+        reservation: Option<ReserveMsg>,
         marketplace_fee_bps: Option<u16>,
         marketplace_fee_recipient: Option<String>,
     },
     Reserve {
         token_id: String,
-        reservation: Reserve,
+        reservation: ReserveMsg,
     },
     UnReserve {
         token_id: String,

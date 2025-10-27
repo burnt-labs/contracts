@@ -3,7 +3,7 @@ use cosmwasm_std::{Addr, Coin, Timestamp};
 use cw_storage_plus::{IndexList, IndexedMap, Item, Map, MultiIndex};
 use cw721::{state::Cw721Config, traits::Cw721State};
 
-use crate::plugin::Plugin;
+use crate::{msg::ReserveMsg, plugin::Plugin};
 
 #[cw_serde]
 pub struct ListingInfo {

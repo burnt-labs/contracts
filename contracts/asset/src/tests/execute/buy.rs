@@ -68,6 +68,7 @@ fn buy_flow() {
             attrs,
             vec![
                 ("marketplace_fee".to_string(), "1".to_string()),
+                ("marketplace_fee_recipient".to_string(), seller_addr.clone().to_string()),
                 ("action".to_string(), "buy".to_string()),
                 ("id".to_string(), "token-1".to_string()),
                 ("price".to_string(), price.amount.to_string()),
