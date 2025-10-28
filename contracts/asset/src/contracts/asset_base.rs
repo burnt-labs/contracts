@@ -1,13 +1,12 @@
+use crate::traits::DefaultAssetContract;
 #[cfg(feature = "asset_base")]
-use crate::msg::AssetExtensionQueryMsg;
+use crate::{error::ContractError, msg::AssetExtensionQueryMsg};
 // Default implementation of the xion asset standard showing how to set up a contract
 // to use the default trait XionAssetExecuteExtension
 use cw721::{
     DefaultOptionalCollectionExtension, DefaultOptionalCollectionExtensionMsg,
     DefaultOptionalNftExtension, DefaultOptionalNftExtensionMsg,
 };
-
-use crate::traits::DefaultAssetContract;
 type AssetBaseContract<'a> = DefaultAssetContract<
     'a,
     DefaultOptionalNftExtension,
@@ -26,9 +25,18 @@ pub fn instantiate(
 ) -> ContractResult<Response> {
     let contract: AssetBaseContract<'static> = AssetContract::default();
 
-    contract
-        .instantiate_with_version(deps, &env, &info, msg, CONTRACT_NAME, CONTRACT_VERSION)
-        .map_err(Into::into)
+    let response = contract
+        .instantiate_with_version(
+            deps.branch(),
+            &env,
+            &info,
+            msg,
+            CONTRACT_NAME,
+            CONTRACT_VERSION,
+        )
+        .map_err(Into::into)?;
+
+    Ok(response)
 }
 
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
@@ -62,8 +70,6 @@ pub fn query(
     >,
 ) -> StdResult<Binary> {
     use cw721::traits::Cw721Query;
-
-    use crate::error::ContractError;
 
     let contract: AssetBaseContract<'static> = AssetContract::default();
 

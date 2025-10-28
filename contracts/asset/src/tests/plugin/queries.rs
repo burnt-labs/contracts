@@ -25,8 +25,6 @@ fn get_listing_returns_saved_listing() {
         price: Coin::new(100u128, "uxion"),
         seller: seller.clone(),
         reserved: None,
-        marketplace_fee_bps: None,
-        marketplace_fee_recipient: None,
     };
 
     contract
@@ -80,8 +78,6 @@ fn get_listings_by_seller_supports_pagination() {
             price: Coin::new(50u128, "uxion"),
             seller: owner.clone(),
             reserved: None,
-            marketplace_fee_bps: None,
-            marketplace_fee_recipient: None,
         };
         contract
             .config
@@ -156,8 +152,6 @@ fn get_all_listings_supports_pagination() {
             price: Coin::new(50u128, "uxion"),
             seller: owner.clone(),
             reserved: None,
-            marketplace_fee_bps: None,
-            marketplace_fee_recipient: None,
         };
         contract
             .config

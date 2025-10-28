@@ -45,8 +45,6 @@ fn unreserve_flow() {
                 seller: owner_addr.clone(),
                 price: Coin::new(100_u128, "uxion"),
                 reserved: Some(reservation.clone()),
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         ));
 
@@ -111,8 +109,6 @@ fn unreserve_flow() {
                     reserver: reserver_addr.clone(),
                     reserved_until: env.block.time.plus_seconds(600),
                 }),
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         ));
 
@@ -178,8 +174,6 @@ fn unreserve_flow() {
                     reserver: reserver_addr.clone(),
                     reserved_until: env.block.time.plus_seconds(600),
                 }),
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         ));
 
@@ -219,8 +213,6 @@ fn unreserve_flow() {
                 seller: owner_addr.clone(),
                 price: Coin::new(250_u128, "uxion"),
                 reserved: None,
-                marketplace_fee_bps: None,
-                marketplace_fee_recipient: None,
             },
         ));
 

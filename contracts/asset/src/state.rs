@@ -1,9 +1,10 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Coin, Timestamp};
-use cw_storage_plus::{IndexList, IndexedMap, Item, Map, MultiIndex};
+use cw_storage_plus::{IndexList, IndexedMap, Map, MultiIndex};
 use cw721::{state::Cw721Config, traits::Cw721State};
 
-use crate::{msg::ReserveMsg, plugin::Plugin};
+use crate::plugin::Plugin;
+
 
 #[cw_serde]
 pub struct ListingInfo {
@@ -11,8 +12,6 @@ pub struct ListingInfo {
     pub price: Coin,
     pub seller: Addr,
     pub reserved: Option<Reserve>,
-    pub marketplace_fee_bps: Option<u16>,
-    pub marketplace_fee_recipient: Option<Addr>,
 }
 
 #[cw_serde]
@@ -80,9 +79,3 @@ impl<'a> IndexList<ListingInfo> for ListingIndexes<'a> {
         Box::new(v.into_iter())
     }
 }
-
-// Collection-wide plugins
-pub const COLLECTION_PLUGINS_ID: Item<Vec<String>> = Item::new("collection_plugins");
-
-// Optional token-specific overrides
-pub const TOKEN_PLUGINS: Map<&str, Vec<String>> = Map::new("token_plugins");

@@ -35,8 +35,6 @@ fn list_flow() {
             "token-1".to_string(),
             price.clone(),
             None,
-            None,
-            None,
         ));
 
         let attrs: Vec<(String, String)> = response
@@ -73,8 +71,6 @@ fn list_flow() {
             "token-1".to_string(),
             Coin::new(200_u128, "uxion"),
             None,
-            None,
-            None,
         ));
         assert_eq!(
             duplicate_err,
@@ -108,8 +104,6 @@ fn list_flow() {
             "token-2".to_string(),
             Coin::new(100_u128, "uxion"),
             None,
-            None,
-            None,
         ));
         assert_eq!(err, ContractError::Unauthorized {});
     }
@@ -142,8 +136,6 @@ fn list_flow() {
             &message_info(&approver_addr, &[]),
             "token-3".to_string(),
             price.clone(),
-            None,
-            None,
             None,
         ));
 
@@ -206,8 +198,6 @@ fn list_flow() {
             &message_info(&operator_addr, &[]),
             "token-4".to_string(),
             price.clone(),
-            None,
-            None,
             None,
         ));
 
@@ -273,8 +263,6 @@ fn list_flow() {
             "token-5".to_string(),
             Coin::new(100_u128, "uxion"),
             None,
-            None,
-            None,
         ));
         assert_eq!(err, ContractError::Unauthorized {});
     }
@@ -303,8 +291,6 @@ fn list_flow() {
             "token-3".to_string(),
             Coin::new(0_u128, "uxion"),
             None,
-            None,
-            None,
         ));
         assert_eq!(err, ContractError::InvalidListingPrice { price: 0 });
     }
@@ -320,8 +306,6 @@ fn list_flow() {
             &message_info(&owner_addr, &[]),
             "token-999".to_string(),
             Coin::new(100_u128, "uxion"),
-            None,
-            None,
             None,
         ));
         match err {

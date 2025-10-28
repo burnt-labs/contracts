@@ -2,24 +2,21 @@ use std::{fmt::Display, time::Duration};
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    Addr, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult,
-    coin,
+    coin, Addr, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response,
+    StdError, StdResult,
 };
 use cw721::{
-    Expiration,
-    error::Cw721ContractError,
-    msg::Cw721ExecuteMsg,
-    traits::{
+    error::Cw721ContractError, msg::Cw721ExecuteMsg, state::CREATOR, traits::{
         Cw721CustomMsg, Cw721Execute, Cw721State, FromAttributesState, StateFactory,
         ToAttributesState,
-    },
+    }, Expiration
 };
 
 use crate::{
-    default_plugins,
+    default_plugins::{self},
     error::ContractError,
     msg::{AssetExtensionExecuteMsg, ReserveMsg},
-    state::{AssetConfig, Reserve},
+    state::{AssetConfig},
     traits::{DefaultAssetContract, PluggableAsset, SellableAsset},
 };
 
@@ -239,6 +236,11 @@ where
                     recipient,
                     token_id,
                 } => self.on_transfer_plugin(recipient, token_id, &mut plugin_ctx)?,
+                Cw721ExecuteMsg::SendNft {
+                    contract,
+                    token_id,
+                    ..
+                } => self.on_transfer_plugin(contract, token_id, &mut plugin_ctx)?,
                 Cw721ExecuteMsg::UpdateExtension { msg } => {
                     self.on_update_extension_plugin(msg, &mut plugin_ctx)?
                 }
@@ -294,9 +296,8 @@ where
                 token_id,
                 price,
                 reservation,
-                marketplace_fee_bps,
                 ..
-            } => self.on_list_plugin(token_id, price, reservation, marketplace_fee_bps, ctx),
+            } => self.on_list_plugin(token_id, price, reservation, ctx),
             AssetExtensionExecuteMsg::Reserve {
                 token_id,
                 reservation,
@@ -305,7 +306,11 @@ where
             AssetExtensionExecuteMsg::Buy {
                 token_id,
                 recipient,
-            } => self.on_buy_plugin(token_id, recipient, ctx),
+            } => self.on_buy_plugin(
+                token_id,
+                recipient,
+                ctx,
+            ),
             _ => Ok(true),
         }
     }
@@ -315,7 +320,6 @@ where
         token_id: &String,
         price: &Coin,
         reservation: &Option<ReserveMsg>,
-        marketplace_fee_bps: &Option<u16>,
         ctx: &mut DefaultPluginCtx,
     ) -> StdResult<bool> {
         // for listings we run the minimum price, not before, not after plugins if set
@@ -347,7 +351,7 @@ where
         )?;
         ctx.data.token_id = token_id.to_string();
         ctx.data.ask_price = Some(price.clone());
-        ctx.data.marketplace_fee_bps = *marketplace_fee_bps;
+        ctx.data.marketplace_fee_bps = None;
         ctx.data.reservation = reservation.clone();
         ctx.data.seller = Some(ctx.info.sender.clone());
         if let Some(plugin) = min_price_plugin {
@@ -388,11 +392,19 @@ where
             ctx.deps.storage,
             Plugin::AllowedCurrencies { denoms: [].into() }.get_plugin_name(),
         )?;
+        let exact_price_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::ExactPrice {
+                amount: coin(0, ""),
+            }
+            .get_plugin_name(),
+        )?;
         let royalty_plugin = config
             .collection_plugins
             .may_load(ctx.deps.storage, "Royalty")?;
         ctx.data.token_id = token_id.to_string();
         ctx.data.buyer = Some(ctx.info.sender.clone());
+        ctx.data.marketplace_fee_bps = None;
         // we need to get the listing info to get the ask price
         let listing = self
             .config
@@ -406,9 +418,9 @@ where
             plugin.run_asset_plugin(ctx)?;
         }
         // Exact price plugin disabled for buys for now
-        // if let Some(plugin) = exact_price_plugin {
-        //     plugin.run_asset_plugin(ctx)?;
-        // }
+        if let Some(plugin) = exact_price_plugin {
+            plugin.run_asset_plugin(ctx)?;
+        }
         if let Some(plugin) = allowed_marketplaces_plugin {
             plugin.run_asset_plugin(ctx)?;
         }
@@ -472,9 +484,12 @@ where
         &self,
         deps: DepsMut,
         _env: &Env,
-        _info: &MessageInfo,
+        info: &MessageInfo,
         plugins: &Vec<Plugin>,
     ) -> StdResult<()> {
+        CREATOR
+            .assert_owner(deps.storage, &info.sender)
+            .map_err(|err| StdError::generic_err(err.to_string()))?;
         for plugin in plugins {
             self.config
                 .collection_plugins
@@ -487,9 +502,12 @@ where
         &self,
         deps: DepsMut,
         _env: &Env,
-        _info: &MessageInfo,
+        info: &MessageInfo,
         plugins: &Vec<String>,
     ) -> StdResult<()> {
+        CREATOR
+            .assert_owner(deps.storage, &info.sender)
+            .map_err(|err| StdError::generic_err(err.to_string()))?;
         for plugin in plugins {
             self.config.collection_plugins.remove(deps.storage, plugin);
         }

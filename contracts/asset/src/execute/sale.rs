@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, BankMsg, Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{BankMsg, Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
 use cw721::traits::Cw721State;
 
 use crate::{error::ContractError, state::AssetConfig};
@@ -22,12 +22,22 @@ where
         .may_load(deps.storage, &id)?
         .ok_or(ContractError::ListingNotFound { id: id.clone() })?;
 
+    let mut nft_info = asset_config
+        .cw721_config
+        .nft_info
+        .load(deps.storage, &id)
+        .map_err(|_| ContractError::ListingNotFound { id: id.clone() })?;
+
     let price = listing.price.clone();
     let seller = listing.seller.clone();
 
+    if seller != nft_info.owner {
+        return Err(ContractError::StaleListing {});
+    }
+
         // only one coin can be sent
     if info.funds.len() > 1 {
-        return Err(ContractError::MultiplePaymentsSent {  });
+        return Err(ContractError::MultiplePaymentsSent {});
     }
 
     let mut payment = info
@@ -48,30 +58,6 @@ where
 
     let mut response = Response::<TCustomResponseMsg>::default();
 
-    if let Some(market_fee) = listing.marketplace_fee_bps {
-        let fee_amount = payment
-            .amount
-            .checked_multiply_ratio(market_fee, 10_000_u128)
-            .map_err(|_| ContractError::InsufficientFunds {})?;
-        payment.amount = payment
-            .amount
-            .checked_sub(fee_amount)
-            .map_err(|_| ContractError::InsufficientFunds {})?;
-        if let Some(recipient) = &listing.marketplace_fee_recipient {
-            if !fee_amount.is_zero() {
-                response = response.add_attribute("marketplace_fee", fee_amount.to_string());
-                response = response.add_attribute("marketplace_fee_recipient", recipient.to_string());
-                response = response.add_message(BankMsg::Send {
-                    to_address: recipient.to_string(),
-                    amount: vec![Coin {
-                        denom: payment.denom.clone(),
-                        amount: fee_amount,
-                    }],
-                });
-            }
-        }
-    }
-
     // remove all other deductions e.g. royalties from payment
     for (_, amount, _) in deductions {
         payment.amount = payment
@@ -90,8 +76,6 @@ where
             return Err(ContractError::Unauthorized {});
         }
     }
-
-    let mut nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
 
     nft_info.owner = buyer.clone();
     nft_info.approvals.clear();

@@ -14,8 +14,6 @@ pub fn list<TNftExtension, TCustomResponseMsg>(
     id: String,
     price: Coin,
     reservation: Option<ReserveMsg>,
-    marketplace_fee_bps: Option<u16>,
-    marketplace_fee_recipient: Option<String>,
 ) -> Result<Response<TCustomResponseMsg>, ContractError>
 where
     TNftExtension: Cw721State,
@@ -34,29 +32,6 @@ where
         });
     }
 
-    let (validated_marketplace_fee_bps, validated_marketplace_fee_recipient) =
-        match (marketplace_fee_bps, marketplace_fee_recipient) {
-            (Some(bps), Some(recipient)) => {
-                if bps > 10_000 {
-                    return Err(ContractError::InvalidMarketplaceFee { bps, recipient });
-                }
-                let recipient_addr = deps.api.addr_validate(&recipient)?;
-                response = response.add_attribute("marketplace_fee_bps", bps.to_string()).add_attribute("marketplace_fee_recipient", recipient_addr.to_string());
-                (Some(bps), Some(recipient_addr))
-            }
-            (Some(bps), None) => {
-                let recipient_addr = info.sender.clone();
-                if bps > 10_000 {
-                    return Err(ContractError::InvalidMarketplaceFee { bps, recipient: recipient_addr.to_string() });
-                }
-                response = response.add_attribute("marketplace_fee_bps", bps.to_string()).add_attribute("marketplace_fee_recipient", recipient_addr.to_string());
-                (Some(bps), Some(recipient_addr))
-            }
-            (None, Some(recipient)) => {
-                return Err(ContractError::InvalidMarketplaceFee { bps: 0, recipient });
-            }
-            (None, None) => (None, None),
-        };
     // Ensure the listing does not already exist
     let old_listing = asset_config.listings.may_load(deps.storage, &id)?;
     if old_listing.is_some() {
@@ -76,8 +51,6 @@ where
         seller: nft_info.owner.clone(),
         price: price.clone(),
         reserved: reservation.clone(),
-        marketplace_fee_bps: validated_marketplace_fee_bps,
-        marketplace_fee_recipient: validated_marketplace_fee_recipient.clone(),
     };
     asset_config.listings.save(deps.storage, &id, &listing)?;
     response = response

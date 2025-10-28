@@ -5,10 +5,10 @@ use crate::{
     execute::{buy, delist, list, reserve, unreserve},
     msg::{AssetExtensionExecuteMsg, AssetExtensionQueryMsg, ReserveMsg},
     plugin::{Plugin, PluginCtx},
-    state::{AssetConfig, Reserve},
+    state::AssetConfig,
 };
 use cosmwasm_std::{
-    Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult,
+    Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdError, StdResult,
     to_json_binary,
 };
 use cw_storage_plus::Bound;
@@ -142,19 +142,8 @@ pub trait SellableAsset<
         id: String,
         price: Coin,
         reservation: Option<ReserveMsg>,
-        marketplace_fee_bps: Option<u16>,
-        marketplace_fee_recipient: Option<String>,
     ) -> Result<Response<TCustomResponseMsg>, ContractError> {
-        list::<TNftExtension, TCustomResponseMsg>(
-            deps,
-            env,
-            info,
-            id,
-            price,
-            reservation,
-            marketplace_fee_bps,
-            marketplace_fee_recipient,
-        )
+        list::<TNftExtension, TCustomResponseMsg>(deps, env, info, id, price, reservation)
     }
     fn delist(
         &self,
@@ -195,7 +184,14 @@ pub trait SellableAsset<
         recipient: Option<String>,
         deductions: Vec<(String, Coin, String)>,
     ) -> Result<Response<TCustomResponseMsg>, ContractError> {
-        buy::<TNftExtension, TCustomResponseMsg>(deps, env, info, id, recipient, deductions)
+        buy::<TNftExtension, TCustomResponseMsg>(
+            deps,
+            env,
+            info,
+            id,
+            recipient,
+            deductions,
+        )
     }
 }
 
@@ -270,8 +266,6 @@ where
                 token_id,
                 price,
                 reservation,
-                marketplace_fee_bps,
-                marketplace_fee_recipient,
             } => Ok(self.list(
                 deps,
                 env,
@@ -279,8 +273,6 @@ where
                 token_id,
                 price,
                 reservation,
-                marketplace_fee_bps,
-                marketplace_fee_recipient,
             )?),
             AssetExtensionExecuteMsg::Reserve {
                 token_id,
@@ -295,7 +287,14 @@ where
             AssetExtensionExecuteMsg::Buy {
                 token_id,
                 recipient,
-            } => Ok(self.buy(deps, env, info, token_id, recipient, [].into())?),
+            } => Ok(self.buy(
+                deps,
+                env,
+                info,
+                token_id,
+                recipient,
+                [].into(),
+            )?),
             AssetExtensionExecuteMsg::SetCollectionPlugin { plugins } => {
                 self.save_plugin(deps, env, info, &plugins)?;
                 Ok(Response::new().add_attribute(
@@ -447,6 +446,11 @@ pub trait PluggableAsset<
                     recipient,
                     token_id,
                 } => self.on_transfer_plugin(recipient, token_id, &mut plugin_ctx)?,
+                Cw721ExecuteMsg::SendNft {
+                    contract,
+                    token_id,
+                    ..
+                } => self.on_transfer_plugin(contract, token_id, &mut plugin_ctx)?,
                 Cw721ExecuteMsg::UpdateExtension { msg } => {
                     self.on_update_extension_plugin(msg, &mut plugin_ctx)?
                 }
@@ -482,11 +486,21 @@ pub trait PluggableAsset<
         ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
         // for transfers we run the royalty plugin if set
-        let royalty_plugin = AssetConfig::<TNftExtension>::default()
+        let config = AssetConfig::<TNftExtension>::default();
+        let royalty_plugin = config
             .collection_plugins
             .may_load(ctx.deps.storage, "Royalty")?;
         if let Some(plugin) = royalty_plugin {
             plugin.run_raw_transfer_plugin(ctx)?;
+        }
+        if AssetConfig::<TNftExtension>::default()
+            .listings
+            .may_load(ctx.deps.storage, _token_id.as_str())?
+            .is_some()
+        {
+            return Err(StdError::generic_err(
+                "cannot transfer a token while it is listed",
+            ));
         }
         Ok(true)
     }
@@ -504,7 +518,6 @@ pub trait PluggableAsset<
         _token_id: &String,
         _price: &Coin,
         _reservation: &Option<ReserveMsg>,
-        _marketplace_fee_bps: &Option<u16>,
         _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
         Ok(true)

@@ -37,8 +37,8 @@ pub enum ContractError {
     #[error("Plugin error: {msg}")]
     PluginError { msg: String },
 
-    #[error("Invalid marketplace fee: {bps}, {recipient}")]
-    InvalidMarketplaceFee { bps: u16, recipient: String },
+    #[error("Stale listing")]
+    StaleListing {},
 }
 
 impl From<ContractError> for cw721::error::Cw721ContractError {
