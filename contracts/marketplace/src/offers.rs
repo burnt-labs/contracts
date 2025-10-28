@@ -88,13 +88,10 @@ pub fn execute_accept_offer(
     if offer.buyer == info.sender {
         return Err(ContractError::InvalidSeller {});
     }
-    let config = CONFIG.load(deps.storage)?;
     // list the item on the asset contract for the specific price
     let list_msg = asset_list_msg(
         token_id.clone(),
-        offer.price.clone(),
-        Some(config.fee_bps as u16),
-        Some(config.fee_recipient.to_string()),
+        offer.price.clone()
     );
     // do a buy on the asset contract for the specific price and buyer
     let buy_msg = asset_buy_msg(info.sender.clone(), token_id.clone());
@@ -216,13 +213,10 @@ pub fn execute_accept_collection_offer(
     if offer.buyer == info.sender {
         return Err(ContractError::InvalidSeller {});
     }
-    let config = CONFIG.load(deps.storage)?;
     // list the item on the asset contract for the specific price
     let list_msg = asset_list_msg(
         token_id.clone(),
-        offer.price.clone(),
-        Some(config.fee_bps as u16),
-        Some(config.fee_recipient.to_string()),
+        offer.price.clone()
     );
     // do a buy on the asset contract for the specific price and buyer
     let buy_msg = asset_buy_msg(info.sender.clone(), token_id.clone());

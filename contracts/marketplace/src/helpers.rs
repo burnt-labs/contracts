@@ -6,11 +6,12 @@ use asset::msg::QueryMsg as AssetQueryMsg;
 use asset::state::ListingInfo;
 use blake2::{Blake2s256, Digest};
 use cosmwasm_std::Timestamp;
-use cosmwasm_std::{ensure, ensure_eq, Coin};
+use cosmwasm_std::{ensure, ensure_eq, Coin, Decimal};
 use cosmwasm_std::{Addr, DepsMut, Empty, MessageInfo, QuerierWrapper};
 use cw721::msg::OwnerOfResponse;
 use cw721_base::msg::QueryMsg;
 use cw_utils::one_coin;
+use cosmwasm_std::StdError;
 
 pub fn only_owner(
     querier: &QuerierWrapper,
@@ -127,9 +128,7 @@ pub fn valid_payment(
 
 pub fn asset_list_msg(
     token_id: String,
-    price: Coin,
-    marketplace_fee_bps: Option<u16>,
-    marketplace_fee_recipient: Option<String>,
+    asset_price: Coin,
 ) -> asset::msg::ExecuteMsg<
     cw721::DefaultOptionalNftExtensionMsg,
     cw721::DefaultOptionalCollectionExtensionMsg,
@@ -142,7 +141,7 @@ pub fn asset_list_msg(
     >::UpdateExtension {
         msg: AssetExecuteMsg::List {
             token_id: token_id.clone(),
-            price: price.clone(),
+            price: asset_price.clone(),
             reservation: None,
         },
     }
@@ -206,4 +205,18 @@ pub fn asset_delist_msg(
     >::UpdateExtension {
         msg: AssetExecuteMsg::Delist { token_id },
     }
+}
+
+
+pub fn calculate_asset_price(
+    price: Coin,
+    fee_bps: u64,
+) -> Result<Coin, StdError>{
+    let fee_decimal = Decimal::bps(fee_bps);
+    let fee_amount = price.amount.mul_ceil(fee_decimal);
+    let asset_amount = price.amount.checked_sub(fee_amount)?;
+    Ok(Coin {
+        denom: price.denom,
+        amount: asset_amount,
+    })
 }
