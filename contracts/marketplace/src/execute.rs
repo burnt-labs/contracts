@@ -244,7 +244,7 @@ pub fn execute_buy_item(
     }
 
     // Check payment and funds are valid
-    valid_payment(&info, price.clone(), listing.price.denom.clone())?;
+    let payment = valid_payment(&info, price.clone(), listing.price.denom.clone())?;
 
     // if approvals are enabled, create pending sale.
     if config.sale_approvals {
@@ -256,6 +256,7 @@ pub fn execute_buy_item(
 
     let buy_msg = asset_buy_msg(recipient, listing.token_id.clone());
     let asset_price = listing.asset_price.clone();
+    let marketplace_fee = payment.amount.checked_sub(asset_price.amount).map_err(|_| ContractError::InsuficientFunds {})?;
     Ok(Response::new()
         .add_event(item_sold_event(
             listing.id,
@@ -271,6 +272,13 @@ pub fn execute_buy_item(
             contract_addr: listing.collection.clone().to_string(),
             msg: to_json_binary(&buy_msg)?,
             funds: vec![asset_price],
+        })
+        .add_message(BankMsg::Send {
+            to_address: config.manager.to_string(),
+            amount: vec![Coin {
+                denom: payment.denom,
+                amount: marketplace_fee,
+            }],
         }))
 }
 

@@ -43,7 +43,7 @@ fn test_buy_item_success() {
     let listing_resp = query_listing(&app.wrap(), &asset_contract, "token1");
     assert!(listing_resp.is_ok());
     let listing = listing_resp.unwrap();
-    assert_eq!(listing.price, price);
+    assert_eq!(listing.price.amount.u128(), 97);
 
     use cw_multi_test::{BankSudo, SudoMsg};
     let funds = vec![coin(10000, "uxion")];
@@ -493,18 +493,18 @@ fn test_buy_item_success_with_royalties() {
         .amount;
 
     let expected_marketplace_fee = 25u128;
-    let expected_royalty = 50u128;
-    let expected_seller_payment = 925u128;
+    let expected_royalty = 48u128;
+    // (1000 - 25 ) * 5%  = 927
+    let expected_seller_payment = 927u128;
 
     assert_eq!(
         buyer_balance_after,
         buyer_balance_before - Uint128::from(1000u128),
         "Buyer should have paid 1000 uxion"
     );
-
     assert_eq!(
-        seller_balance_after,
-        seller_balance_before + Uint128::from(expected_seller_payment),
+        seller_balance_after.u128(),
+        seller_balance_before.u128() + expected_seller_payment,
         "Seller should receive {} uxion (1000 - 25 marketplace fee - 50 royalty)",
         expected_seller_payment
     );

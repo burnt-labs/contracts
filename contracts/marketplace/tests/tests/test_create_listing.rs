@@ -54,7 +54,9 @@ fn test_create_listing_success() {
     let listing_resp = query_listing(&app.wrap(), &asset_contract, "token1");
     assert!(listing_resp.is_ok());
     let listing = listing_resp.unwrap();
-    assert_eq!(listing.price, price);
+
+    // 100 - 2.5% fee = 97.5 floor
+    assert_eq!(listing.price.amount.u128(), 97);
     assert_eq!(listing.seller, seller);
 
     // verify event is emitted

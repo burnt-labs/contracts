@@ -95,7 +95,7 @@ pub fn valid_payment(
     info: &MessageInfo,
     price: Coin,
     valid_denom: String,
-) -> Result<(), ContractError> {
+) -> Result<Coin, ContractError> {
     let payment = one_coin(info)?;
     // check if the payment is the valid denom
     ensure_eq!(
@@ -123,7 +123,7 @@ pub fn valid_payment(
             actual: payment,
         }
     );
-    Ok(())
+    Ok(payment)
 }
 
 pub fn asset_list_msg(
