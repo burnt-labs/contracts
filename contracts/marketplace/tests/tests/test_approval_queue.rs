@@ -1,4 +1,3 @@
-
 use crate::tests::test_helpers::*;
 use cosmwasm_std::coin;
 use cw721_base::msg::QueryMsg as OwnerQueryMsg;
@@ -92,7 +91,7 @@ fn test_buy_with_approvals_enabled_creates_pending_sale() {
         buyer.clone(),
         marketplace_contract.clone(),
         &buy_msg,
-        &[price.clone()],
+        std::slice::from_ref(&price),
     );
 
     assert!(result.is_ok());
@@ -178,7 +177,7 @@ fn test_approve_sale_success() {
         buyer.clone(),
         marketplace_contract.clone(),
         &buy_msg,
-        &[price.clone()],
+        std::slice::from_ref(&price),
     );
 
     let pending_sale_id = buy_result
@@ -342,7 +341,7 @@ fn test_reject_sale_success() {
         buyer.clone(),
         marketplace_contract.clone(),
         &buy_msg,
-        &[price.clone()],
+        std::slice::from_ref(&price),
     );
 
     let pending_sale_id = buy_result
