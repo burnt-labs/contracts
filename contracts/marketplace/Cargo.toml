@@ -1,0 +1,32 @@
+[package]
+edition = "2021"
+name    = "xion-nft-marketplace"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# enable feature if you want to disable entry points
+library = []
+
+[dependencies]
+anyhow.workspace = true
+
+asset           = { path = "../asset", features = ["library", "asset_base"] }
+blake2          = "0.10.6"
+cosmwasm-schema = { workspace = true }
+cosmwasm-std    = { workspace = true }
+cw-address-like = { workspace = true }
+cw-storage-plus = { workspace = true, features = ["macro"] }
+cw-utils        = { workspace = true }
+cw2             = { workspace = true }
+cw721           = { workspace = true }
+cw721-base      = { workspace = true }
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+thiserror       = { workspace = true }
+
+[dev-dependencies]
+anyhow        = { workspace = true }
+cw-multi-test = { version = "2", features = ["staking", "stargate", "cosmwasm_2_2"] }
