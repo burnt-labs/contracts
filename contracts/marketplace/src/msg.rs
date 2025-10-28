@@ -21,6 +21,11 @@ pub enum ExecuteMsg {
         listing_id: String,
         price: Coin,
     },
+    FinalizeFor {
+        listing_id: String,
+        price: Coin,
+        recipient: String,
+    },
     CreateOffer {
         collection: String,
         token_id: String,

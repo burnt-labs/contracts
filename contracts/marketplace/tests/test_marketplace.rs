@@ -1087,7 +1087,6 @@ mod tests {
             let royalty_plugin = asset::plugin::Plugin::Royalty {
                 bps: 500, // 5%
                 recipient: royalty_recipient.clone(),
-                on_primary: true, // Collect royalties on all sales including primary
             };
 
             let set_plugin_msg = asset::msg::ExecuteMsg::<

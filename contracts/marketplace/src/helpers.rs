@@ -143,8 +143,6 @@ pub fn asset_list_msg(
             token_id: token_id.clone(),
             price: price.clone(),
             reservation: None,
-            marketplace_fee_bps,
-            marketplace_fee_recipient,
         },
     }
 }
