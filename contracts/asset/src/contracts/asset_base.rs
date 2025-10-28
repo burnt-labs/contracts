@@ -1,11 +1,18 @@
-use crate::traits::DefaultAssetContract;
-#[cfg(feature = "asset_base")]
-use crate::{error::ContractError, msg::AssetExtensionQueryMsg};
 // Default implementation of the xion asset standard showing how to set up a contract
 // to use the default trait XionAssetExecuteExtension
+#[cfg(feature = "asset_base")]
+use crate::msg::AssetExtensionQueryMsg;
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw721::{
     DefaultOptionalCollectionExtension, DefaultOptionalCollectionExtensionMsg,
-    DefaultOptionalNftExtension, DefaultOptionalNftExtensionMsg,
+    DefaultOptionalNftExtension, DefaultOptionalNftExtensionMsg, traits::Cw721Execute,
+};
+use crate::traits::PluggableAsset;
+use crate::{
+    CONTRACT_NAME, CONTRACT_VERSION,
+    error::ContractResult,
+    msg::{AssetExtensionExecuteMsg, ExecuteMsg, InstantiateMsg},
+    traits::{AssetContract, DefaultAssetContract},
 };
 type AssetBaseContract<'a> = DefaultAssetContract<
     'a,
@@ -14,7 +21,6 @@ type AssetBaseContract<'a> = DefaultAssetContract<
     DefaultOptionalCollectionExtension,
     DefaultOptionalCollectionExtensionMsg,
 >;
-
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 #[cfg(feature = "asset_base")]
 pub fn instantiate(
@@ -23,18 +29,20 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg<DefaultOptionalCollectionExtensionMsg>,
 ) -> ContractResult<Response> {
+    use crate::error::ContractError;
+
     let contract: AssetBaseContract<'static> = AssetContract::default();
 
     let response = contract
         .instantiate_with_version(
-            deps.branch(),
+            deps,
             &env,
             &info,
             msg,
             CONTRACT_NAME,
             CONTRACT_VERSION,
         )
-        .map_err(Into::into)?;
+        .map_err(Into::<ContractError>::into)?;
 
     Ok(response)
 }
@@ -70,6 +78,8 @@ pub fn query(
     >,
 ) -> StdResult<Binary> {
     use cw721::traits::Cw721Query;
+
+    use crate::error::ContractError;
 
     let contract: AssetBaseContract<'static> = AssetContract::default();
 

@@ -5,6 +5,7 @@ use asset::msg::AssetExtensionQueryMsg;
 use asset::msg::QueryMsg as AssetQueryMsg;
 use asset::state::ListingInfo;
 use blake2::{Blake2s256, Digest};
+use cosmwasm_std::Timestamp;
 use cosmwasm_std::{ensure, ensure_eq, Coin};
 use cosmwasm_std::{Addr, DepsMut, Empty, MessageInfo, QuerierWrapper};
 use cw721::msg::OwnerOfResponse;
@@ -170,7 +171,7 @@ pub fn asset_buy_msg(
 pub fn asset_reserve_msg(
     token_id: String,
     reserver: Addr,
-    reserved_until: cw721::Expiration,
+    reserved_until: Timestamp,
 ) -> asset::msg::ExecuteMsg<
     cw721::DefaultOptionalNftExtensionMsg,
     cw721::DefaultOptionalCollectionExtensionMsg,
@@ -183,8 +184,8 @@ pub fn asset_reserve_msg(
     >::UpdateExtension {
         msg: AssetExecuteMsg::Reserve {
             token_id,
-            reservation: asset::state::Reserve {
-                reserver,
+            reservation: asset::msg::ReserveMsg {
+                reserver: Some(reserver.to_string()),
                 reserved_until,
             },
         },

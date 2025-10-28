@@ -316,7 +316,7 @@ fn execute_create_pending_sale(
     let reserve_msg = asset_reserve_msg(
         listing.token_id.clone(),
         info.sender.clone(),
-        cw721::Expiration::AtTime(env.block.time.plus_seconds(86400)),
+        env.block.time.plus_seconds(86400),
     );
 
     // Funds are escrowed in contract (sent by buyer in info.funds)
