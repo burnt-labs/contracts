@@ -35,7 +35,7 @@ where
         return Err(ContractError::StaleListing {});
     }
 
-        // only one coin can be sent
+    // only one coin can be sent
     if info.funds.len() > 1 {
         return Err(ContractError::MultiplePaymentsSent {});
     }

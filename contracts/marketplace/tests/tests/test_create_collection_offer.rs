@@ -1,8 +1,7 @@
-
-use cosmwasm_std::coin;
-use xion_nft_marketplace::msg::ExecuteMsg;
-use cw_multi_test::Executor;
 use crate::tests::test_helpers::*;
+use cosmwasm_std::coin;
+use cw_multi_test::Executor;
+use xion_nft_marketplace::msg::ExecuteMsg;
 
 #[test]
 fn test_create_collection_offer_success() {

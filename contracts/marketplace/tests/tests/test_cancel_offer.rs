@@ -1,4 +1,3 @@
-
 use crate::tests::test_helpers::*;
 use cosmwasm_std::coin;
 use cw_multi_test::Executor;

@@ -1,4 +1,3 @@
-
 use crate::tests::test_helpers::*;
 use cosmwasm_std::{coin, Uint128};
 use cw721_base::msg::ExecuteMsg as Cw721ExecuteMsg;

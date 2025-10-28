@@ -2,21 +2,25 @@ use std::{fmt::Display, time::Duration};
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    coin, Addr, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response,
-    StdError, StdResult,
+    Addr, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdError,
+    StdResult, coin,
 };
 use cw721::{
-    error::Cw721ContractError, msg::Cw721ExecuteMsg, state::CREATOR, traits::{
+    Expiration,
+    error::Cw721ContractError,
+    msg::Cw721ExecuteMsg,
+    state::CREATOR,
+    traits::{
         Cw721CustomMsg, Cw721Execute, Cw721State, FromAttributesState, StateFactory,
         ToAttributesState,
-    }, Expiration
+    },
 };
 
 use crate::{
     default_plugins::{self},
     error::ContractError,
     msg::{AssetExtensionExecuteMsg, ReserveMsg},
-    state::{AssetConfig},
+    state::AssetConfig,
     traits::{DefaultAssetContract, PluggableAsset, SellableAsset},
 };
 
@@ -237,9 +241,7 @@ where
                     token_id,
                 } => self.on_transfer_plugin(recipient, token_id, &mut plugin_ctx)?,
                 Cw721ExecuteMsg::SendNft {
-                    contract,
-                    token_id,
-                    ..
+                    contract, token_id, ..
                 } => self.on_transfer_plugin(contract, token_id, &mut plugin_ctx)?,
                 Cw721ExecuteMsg::UpdateExtension { msg } => {
                     self.on_update_extension_plugin(msg, &mut plugin_ctx)?
@@ -306,11 +308,7 @@ where
             AssetExtensionExecuteMsg::Buy {
                 token_id,
                 recipient,
-            } => self.on_buy_plugin(
-                token_id,
-                recipient,
-                ctx,
-            ),
+            } => self.on_buy_plugin(token_id, recipient, ctx),
             _ => Ok(true),
         }
     }

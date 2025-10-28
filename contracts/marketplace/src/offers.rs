@@ -89,10 +89,7 @@ pub fn execute_accept_offer(
         return Err(ContractError::InvalidSeller {});
     }
     // list the item on the asset contract for the specific price
-    let list_msg = asset_list_msg(
-        token_id.clone(),
-        offer.price.clone()
-    );
+    let list_msg = asset_list_msg(token_id.clone(), offer.price.clone());
     // do a buy on the asset contract for the specific price and buyer
     let buy_msg = asset_buy_msg(info.sender.clone(), token_id.clone());
 
@@ -214,10 +211,7 @@ pub fn execute_accept_collection_offer(
         return Err(ContractError::InvalidSeller {});
     }
     // list the item on the asset contract for the specific price
-    let list_msg = asset_list_msg(
-        token_id.clone(),
-        offer.price.clone()
-    );
+    let list_msg = asset_list_msg(token_id.clone(), offer.price.clone());
     // do a buy on the asset contract for the specific price and buyer
     let buy_msg = asset_buy_msg(info.sender.clone(), token_id.clone());
 

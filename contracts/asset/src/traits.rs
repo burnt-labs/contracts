@@ -184,14 +184,7 @@ pub trait SellableAsset<
         recipient: Option<String>,
         deductions: Vec<(String, Coin, String)>,
     ) -> Result<Response<TCustomResponseMsg>, ContractError> {
-        buy::<TNftExtension, TCustomResponseMsg>(
-            deps,
-            env,
-            info,
-            id,
-            recipient,
-            deductions,
-        )
+        buy::<TNftExtension, TCustomResponseMsg>(deps, env, info, id, recipient, deductions)
     }
 }
 
@@ -266,14 +259,7 @@ where
                 token_id,
                 price,
                 reservation,
-            } => Ok(self.list(
-                deps,
-                env,
-                info,
-                token_id,
-                price,
-                reservation,
-            )?),
+            } => Ok(self.list(deps, env, info, token_id, price, reservation)?),
             AssetExtensionExecuteMsg::Reserve {
                 token_id,
                 reservation,
@@ -287,14 +273,7 @@ where
             AssetExtensionExecuteMsg::Buy {
                 token_id,
                 recipient,
-            } => Ok(self.buy(
-                deps,
-                env,
-                info,
-                token_id,
-                recipient,
-                [].into(),
-            )?),
+            } => Ok(self.buy(deps, env, info, token_id, recipient, [].into())?),
             AssetExtensionExecuteMsg::SetCollectionPlugin { plugins } => {
                 self.save_plugin(deps, env, info, &plugins)?;
                 Ok(Response::new().add_attribute(
@@ -447,9 +426,7 @@ pub trait PluggableAsset<
                     token_id,
                 } => self.on_transfer_plugin(recipient, token_id, &mut plugin_ctx)?,
                 Cw721ExecuteMsg::SendNft {
-                    contract,
-                    token_id,
-                    ..
+                    contract, token_id, ..
                 } => self.on_transfer_plugin(contract, token_id, &mut plugin_ctx)?,
                 Cw721ExecuteMsg::UpdateExtension { msg } => {
                     self.on_update_extension_plugin(msg, &mut plugin_ctx)?

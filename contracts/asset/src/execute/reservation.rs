@@ -2,7 +2,9 @@ use cosmwasm_std::{CustomMsg, DepsMut, Env, MessageInfo, Response};
 use cw721::{Expiration, traits::Cw721State};
 
 use crate::{
-    error::ContractError, msg::ReserveMsg, state::{AssetConfig, Reserve}
+    error::ContractError,
+    msg::ReserveMsg,
+    state::{AssetConfig, Reserve},
 };
 
 use super::permissions::check_can_list;
@@ -35,7 +37,11 @@ where
         }
     }
 
-    let reserver = if let Some(reserver) = reservation.reserver { deps.api.addr_validate(&reserver)? } else { info.sender.clone() };
+    let reserver = if let Some(reserver) = reservation.reserver {
+        deps.api.addr_validate(&reserver)?
+    } else {
+        info.sender.clone()
+    };
     listing.reserved = Some(Reserve {
         reserver: reserver.clone(),
         reserved_until: reservation.reserved_until,

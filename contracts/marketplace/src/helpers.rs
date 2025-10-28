@@ -5,13 +5,13 @@ use asset::msg::AssetExtensionQueryMsg;
 use asset::msg::QueryMsg as AssetQueryMsg;
 use asset::state::ListingInfo;
 use blake2::{Blake2s256, Digest};
+use cosmwasm_std::StdError;
 use cosmwasm_std::Timestamp;
 use cosmwasm_std::{ensure, ensure_eq, Coin, Decimal};
 use cosmwasm_std::{Addr, DepsMut, Empty, MessageInfo, QuerierWrapper};
 use cw721::msg::OwnerOfResponse;
 use cw721_base::msg::QueryMsg;
 use cw_utils::one_coin;
-use cosmwasm_std::StdError;
 
 pub fn only_owner(
     querier: &QuerierWrapper,
@@ -207,11 +207,7 @@ pub fn asset_delist_msg(
     }
 }
 
-
-pub fn calculate_asset_price(
-    price: Coin,
-    fee_bps: u64,
-) -> Result<Coin, StdError>{
+pub fn calculate_asset_price(price: Coin, fee_bps: u64) -> Result<Coin, StdError> {
     let fee_decimal = Decimal::bps(fee_bps);
     let fee_amount = price.amount.mul_ceil(fee_decimal);
     let asset_amount = price.amount.checked_sub(fee_amount)?;

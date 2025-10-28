@@ -2,17 +2,17 @@
 // to use the default trait XionAssetExecuteExtension
 #[cfg(feature = "asset_base")]
 use crate::msg::AssetExtensionQueryMsg;
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
-use cw721::{
-    DefaultOptionalCollectionExtension, DefaultOptionalCollectionExtensionMsg,
-    DefaultOptionalNftExtension, DefaultOptionalNftExtensionMsg, traits::Cw721Execute,
-};
 use crate::traits::PluggableAsset;
 use crate::{
     CONTRACT_NAME, CONTRACT_VERSION,
     error::ContractResult,
     msg::{AssetExtensionExecuteMsg, ExecuteMsg, InstantiateMsg},
     traits::{AssetContract, DefaultAssetContract},
+};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cw721::{
+    DefaultOptionalCollectionExtension, DefaultOptionalCollectionExtensionMsg,
+    DefaultOptionalNftExtension, DefaultOptionalNftExtensionMsg, traits::Cw721Execute,
 };
 type AssetBaseContract<'a> = DefaultAssetContract<
     'a,
@@ -34,14 +34,7 @@ pub fn instantiate(
     let contract: AssetBaseContract<'static> = AssetContract::default();
 
     let response = contract
-        .instantiate_with_version(
-            deps,
-            &env,
-            &info,
-            msg,
-            CONTRACT_NAME,
-            CONTRACT_VERSION,
-        )
+        .instantiate_with_version(deps, &env, &info, msg, CONTRACT_NAME, CONTRACT_VERSION)
         .map_err(Into::<ContractError>::into)?;
 
     Ok(response)

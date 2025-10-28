@@ -7,19 +7,18 @@ use crate::helpers::{
     asset_buy_msg, asset_delist_msg, asset_list_msg, asset_reserve_msg, generate_id, not_listed,
     only_manager, only_owner, query_listing, valid_payment,
 };
-use crate::msg::{ExecuteMsg};
+use crate::msg::ExecuteMsg;
 use crate::offers::{
     execute_accept_collection_offer, execute_accept_offer, execute_cancel_collection_offer,
     execute_cancel_offer, execute_create_collection_offer, execute_create_offer,
 };
 
+use crate::helpers::calculate_asset_price;
 use crate::state::{listings, pending_sales, Listing, ListingStatus, PendingSale, SaleType};
 use crate::state::{Config, CONFIG};
 use cosmwasm_std::{
     ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, WasmMsg,
 };
-use crate::helpers::calculate_asset_price;
-
 
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn execute(
@@ -150,10 +149,7 @@ pub fn execute_create_listing(
         Some(_) => Err(ContractError::AlreadyListed {}),
         None => Ok(listing),
     })?;
-    let list_msg = asset_list_msg(
-        token_id.clone(),
-        asset_price,
-    );
+    let list_msg = asset_list_msg(token_id.clone(), asset_price);
     Ok(Response::new()
         .add_event(create_listing_event(
             id,
@@ -256,7 +252,10 @@ pub fn execute_buy_item(
 
     let buy_msg = asset_buy_msg(recipient, listing.token_id.clone());
     let asset_price = listing.asset_price.clone();
-    let marketplace_fee = payment.amount.checked_sub(asset_price.amount).map_err(|_| ContractError::InsuficientFunds {})?;
+    let marketplace_fee = payment
+        .amount
+        .checked_sub(asset_price.amount)
+        .map_err(|_| ContractError::InsuficientFunds {})?;
     Ok(Response::new()
         .add_event(item_sold_event(
             listing.id,
