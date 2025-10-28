@@ -134,12 +134,14 @@ pub fn execute_create_listing(
 
     // generate consistent id even across relisting helps single lookup
     let id = generate_id(vec![&collection.as_bytes(), &token_id.as_bytes()]);
+    let asset_price = price.clone() - (price.clone() * config.fee_bps as u128 / 10_000);
     let listing = Listing {
         id: id.clone(),
         seller: info.sender.clone(),
         collection: collection.clone(),
         token_id: token_id.clone(),
         price: price.clone(),
+        asset_price: price.clone(),
         status: ListingStatus::Active,
     };
     // reject if listing already exists
@@ -231,15 +233,6 @@ pub fn execute_buy_item(
     price: Coin,
     recipient: Addr,
 ) -> Result<Response, ContractError> {
-}
-pub fn execute_buy_item(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    listing_id: String,
-    price: Coin,
-    recipient: Addr,
-) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let listing = listings().load(deps.storage, listing_id.clone())?;
 
@@ -263,7 +256,7 @@ pub fn execute_buy_item(
     listings().remove(deps.storage, listing_id.clone())?;
 
     let buy_msg = asset_buy_msg(recipient, listing.token_id.clone());
-
+    let asset_price = listing.asset_price.clone();
     Ok(Response::new()
         .add_event(item_sold_event(
             listing.id,
@@ -278,7 +271,7 @@ pub fn execute_buy_item(
         .add_message(WasmMsg::Execute {
             contract_addr: listing.collection.clone().to_string(),
             msg: to_json_binary(&buy_msg)?,
-            funds: info.funds,
+            funds: vec![asset_price],
         }))
 }
 

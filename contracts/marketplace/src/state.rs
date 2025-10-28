@@ -100,6 +100,7 @@ pub struct Listing {
     pub collection: Addr,
     pub token_id: String,
     pub price: Coin,
+    pub asset_price: Coin,
     pub seller: Addr,
     pub status: ListingStatus,
 }
