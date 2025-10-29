@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 use cw721::{
     Expiration,
-    state::{NftInfo, CREATOR},
+    state::{CREATOR, NftInfo},
 };
 
 use crate::{
@@ -447,11 +447,7 @@ fn on_transfer_plugin_blocks_listed_tokens() {
     let mut ctx = build_ctx(deps.as_ref(), env, info);
 
     let err = contract
-        .on_transfer_plugin(
-            &"buyer".to_string(),
-            &"token-1".to_string(),
-            &mut ctx,
-        )
+        .on_transfer_plugin(&"buyer".to_string(), &"token-1".to_string(), &mut ctx)
         .expect_err("expected transfer block");
 
     assert_eq!(
@@ -470,9 +466,11 @@ fn on_transfer_plugin_allows_when_not_listed() {
     let info = message_info(&deps.api.addr_make("operator"), &[]);
     let mut ctx = build_ctx(deps.as_ref(), env, info);
 
-    assert!(contract
-        .on_transfer_plugin(&"buyer".to_string(), &"token-1".to_string(), &mut ctx)
-        .is_ok());
+    assert!(
+        contract
+            .on_transfer_plugin(&"buyer".to_string(), &"token-1".to_string(), &mut ctx)
+            .is_ok()
+    );
 }
 
 #[test]
@@ -518,7 +516,10 @@ fn on_reserve_plugin_respects_allowed_marketplaces_and_time_lock() {
         .unwrap();
 
     assert!(result);
-    assert_eq!(ctx.data.reservation.unwrap().reserver.unwrap(), Some(reserver.to_string()).unwrap());
+    assert_eq!(
+        ctx.data.reservation.unwrap().reserver.unwrap(),
+        Some(reserver.to_string()).unwrap()
+    );
     assert_eq!(ctx.data.time_lock, Some(Duration::from_secs(2_000)));
 }
 

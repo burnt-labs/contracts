@@ -80,12 +80,10 @@ fn buy_flow() {
             .collect();
         assert_eq!(
             msgs,
-            vec![
-                CosmosMsg::Bank(BankMsg::Send {
-                    to_address: seller_addr.to_string(),
-                    amount: coins(90_u128, "uxion"),
-                })
-            ],
+            vec![CosmosMsg::Bank(BankMsg::Send {
+                to_address: seller_addr.to_string(),
+                amount: coins(90_u128, "uxion"),
+            })],
         );
 
         let stored_nft_info = expect_ok(
@@ -238,21 +236,16 @@ fn buy_flow() {
             ],
         );
         // reset ownership back to seller for subsequent scenario
-        expect_ok(
-            AssetConfig::<Empty>::default()
-                .cw721_config
-                .nft_info
-                .save(
-                    deps.as_mut().storage,
-                    "token-4",
-                    &NftInfo {
-                        owner: seller_addr.clone(),
-                        approvals: vec![],
-                        token_uri: None,
-                        extension: Empty {},
-                    },
-                ),
-        );
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-4",
+            &NftInfo {
+                owner: seller_addr.clone(),
+                approvals: vec![],
+                token_uri: None,
+                extension: Empty {},
+            },
+        ));
         // successful buy on behalf of reserver
         expect_ok(AssetConfig::<Empty>::default().listings.save(
             deps.as_mut().storage,

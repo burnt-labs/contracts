@@ -1,5 +1,3 @@
-use std::env;
-
 use crate::error::ContractError;
 use crate::events::{
     cancel_listing_event, create_listing_event, item_sold_event, pending_sale_created_event,
@@ -9,18 +7,18 @@ use crate::helpers::{
     asset_buy_msg, asset_delist_msg, asset_list_msg, asset_reserve_msg, generate_id, not_listed,
     only_manager, only_owner, query_listing, valid_payment,
 };
-use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
+use crate::msg::ExecuteMsg;
 use crate::offers::{
     execute_accept_collection_offer, execute_accept_offer, execute_cancel_collection_offer,
     execute_cancel_offer, execute_create_collection_offer, execute_create_offer,
 };
-use crate::state::init_auto_increment;
+
+use crate::helpers::calculate_asset_price;
 use crate::state::{listings, pending_sales, Listing, ListingStatus, PendingSale, SaleType};
 use crate::state::{Config, CONFIG};
 use cosmwasm_std::{
     ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, WasmMsg,
 };
-use cw2::set_contract_version;
 
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn execute(
@@ -38,14 +36,15 @@ pub fn execute(
         } => execute_create_listing(deps, info, api.addr_validate(&collection)?, price, token_id),
         ExecuteMsg::CancelListing { listing_id } => execute_cancel_listing(deps, info, listing_id),
         ExecuteMsg::BuyItem { listing_id, price } => {
-            execute_buy_item(deps, env, info, listing_id, price, info.sender.clone())
+            execute_buy_item(deps, env, info.clone(), listing_id, price, info.sender)
         }
         ExecuteMsg::FinalizeFor {
             listing_id,
             price,
             recipient,
-        } => execute_finalize_for(
+        } => execute_buy_item(
             deps,
+            env,
             info,
             listing_id,
             price,
@@ -132,16 +131,17 @@ pub fn execute_create_listing(
         }
     );
 
+    let config = CONFIG.load(deps.storage)?;
     // generate consistent id even across relisting helps single lookup
     let id = generate_id(vec![&collection.as_bytes(), &token_id.as_bytes()]);
-    let asset_price = price.clone() - (price.clone() * config.fee_bps as u128 / 10_000);
+    let asset_price = calculate_asset_price(price.clone(), config.fee_bps)?;
     let listing = Listing {
         id: id.clone(),
         seller: info.sender.clone(),
         collection: collection.clone(),
         token_id: token_id.clone(),
         price: price.clone(),
-        asset_price: price.clone(),
+        asset_price: asset_price.clone(),
         status: ListingStatus::Active,
     };
     // reject if listing already exists
@@ -149,12 +149,7 @@ pub fn execute_create_listing(
         Some(_) => Err(ContractError::AlreadyListed {}),
         None => Ok(listing),
     })?;
-    let list_msg = asset_list_msg(
-        token_id.clone(),
-        price.clone(),
-        Some(config.fee_bps as u16),
-        Some(config.fee_recipient.to_string()),
-    );
+    let list_msg = asset_list_msg(token_id.clone(), asset_price);
     Ok(Response::new()
         .add_event(create_listing_event(
             id,
@@ -245,7 +240,7 @@ pub fn execute_buy_item(
     }
 
     // Check payment and funds are valid
-    valid_payment(&info, price.clone(), listing.price.denom.clone())?;
+    let payment = valid_payment(&info, price.clone(), listing.price.denom.clone())?;
 
     // if approvals are enabled, create pending sale.
     if config.sale_approvals {
@@ -257,6 +252,10 @@ pub fn execute_buy_item(
 
     let buy_msg = asset_buy_msg(recipient, listing.token_id.clone());
     let asset_price = listing.asset_price.clone();
+    let marketplace_fee = payment
+        .amount
+        .checked_sub(asset_price.amount)
+        .map_err(|_| ContractError::InsuficientFunds {})?;
     Ok(Response::new()
         .add_event(item_sold_event(
             listing.id,
@@ -272,6 +271,13 @@ pub fn execute_buy_item(
             contract_addr: listing.collection.clone().to_string(),
             msg: to_json_binary(&buy_msg)?,
             funds: vec![asset_price],
+        })
+        .add_message(BankMsg::Send {
+            to_address: config.manager.to_string(),
+            amount: vec![Coin {
+                denom: payment.denom,
+                amount: marketplace_fee,
+            }],
         }))
 }
 

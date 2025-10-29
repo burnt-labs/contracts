@@ -5,7 +5,6 @@ use cw721::{state::Cw721Config, traits::Cw721State};
 
 use crate::plugin::Plugin;
 
-
 #[cw_serde]
 pub struct ListingInfo {
     pub id: String,

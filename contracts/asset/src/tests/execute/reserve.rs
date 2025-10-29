@@ -5,7 +5,10 @@ use cosmwasm_std::{
 use cw721::state::NftInfo;
 
 use crate::{
-    error::ContractError, execute::reserve, msg::ReserveMsg, state::{AssetConfig, ListingInfo}
+    error::ContractError,
+    execute::reserve,
+    msg::ReserveMsg,
+    state::{AssetConfig, ListingInfo},
 };
 
 use super::helpers::{expect_err, expect_ok, expect_some};
