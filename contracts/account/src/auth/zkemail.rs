@@ -43,7 +43,7 @@ pub fn verify(
     };
     let verification_request_byte = verification_request.to_bytes()?;
     let verification_response: Binary = deps.querier.query_grpc(
-        "/xion.dkim.v1.Query/ProofVerify".to_string(),
+        "/xion.dkim.v1.Query/Authenticate".to_string(),
         Binary::from(verification_request_byte),
     )?;
 
