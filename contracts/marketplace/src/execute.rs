@@ -351,6 +351,7 @@ pub fn execute_approve_sale(
     // Only manager can approve
     only_manager(&info, &deps)?;
 
+    let config = CONFIG.load(deps.storage)?;
     let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
 
     // Generate listing_id to find the listing
@@ -362,13 +363,22 @@ pub fn execute_approve_sale(
     // Execute the buy on asset contract
     let buy_msg = asset_buy_msg(pending_sale.buyer.clone(), pending_sale.token_id.clone());
 
+    // Calculate asset price (seller proceeds) and marketplace fee
+    // This ensures the approvals path matches the immediate buy path
+    let asset_price = calculate_asset_price(pending_sale.price.clone(), config.fee_bps)?;
+    let marketplace_fee_amount = pending_sale
+        .price
+        .amount
+        .checked_sub(asset_price.amount)
+        .map_err(|_| ContractError::InsuficientFunds {})?;
+
     // delete original listing
     listings().remove(deps.storage, listing_id.clone())?;
 
     // remove from queue
     pending_sales().remove(deps.storage, pending_sale_id.clone())?;
 
-    Ok(Response::new()
+    let mut response = Response::new()
         .add_event(sale_approved_event(
             pending_sale_id,
             pending_sale.collection.clone(),
@@ -387,11 +397,26 @@ pub fn execute_approve_sale(
             None,
             None,
         ))
+        // Send asset_price to asset contract (seller proceeds)
         .add_message(WasmMsg::Execute {
             contract_addr: pending_sale.collection.to_string(),
             msg: to_json_binary(&buy_msg)?,
-            funds: vec![pending_sale.price],
-        }))
+            funds: vec![asset_price],
+        });
+
+    // Only send marketplace fee if it's greater than zero
+    // CosmWasm doesn't allow sending empty coin amounts
+    if !marketplace_fee_amount.is_zero() {
+        response = response.add_message(BankMsg::Send {
+            to_address: config.manager.to_string(),
+            amount: vec![Coin {
+                denom: pending_sale.price.denom,
+                amount: marketplace_fee_amount,
+            }],
+        });
+    }
+
+    Ok(response)
 }
 
 pub fn execute_reject_sale(
