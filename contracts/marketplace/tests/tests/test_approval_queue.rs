@@ -960,8 +960,7 @@ fn test_approve_sale_fee_routing_with_royalties() {
 
     // Verify buyer balance hasn't changed since they already paid
     assert_eq!(
-        buyer_balance_after,
-        buyer_balance_after_buy,
+        buyer_balance_after, buyer_balance_after_buy,
         "Buyer balance should not change during approval"
     );
 
@@ -981,7 +980,10 @@ fn test_approve_sale_fee_routing_with_royalties() {
         marketplace_contract.clone(),
         &QueryMsg::Listing { listing_id },
     );
-    assert!(listing_query.is_err(), "Listing should be deleted after approval");
+    assert!(
+        listing_query.is_err(),
+        "Listing should be deleted after approval"
+    );
 
     let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(
         marketplace_contract.clone(),
@@ -989,5 +991,8 @@ fn test_approve_sale_fee_routing_with_royalties() {
             id: pending_sale_id,
         },
     );
-    assert!(pending_sale_query.is_err(), "Pending sale should be deleted after approval");
+    assert!(
+        pending_sale_query.is_err(),
+        "Pending sale should be deleted after approval"
+    );
 }

@@ -836,3 +836,283 @@ fn test_accept_collection_offer_fee_routing_with_royalties() {
         .unwrap();
     assert_eq!(owner_resp.owner, buyer.to_string());
 }
+
+#[test]
+fn test_create_offer_disabled_with_approvals() {
+    // This test verifies that creating offers is disabled when sale approvals are enabled
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let offer_price = coin(1000, "uxion");
+
+    // Try to create offer - should fail
+    let create_offer_msg = ExecuteMsg::CreateOffer {
+        collection: asset_contract.to_string(),
+        token_id: "token1".to_string(),
+        price: offer_price.clone(),
+    };
+
+    let result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &create_offer_msg,
+        std::slice::from_ref(&offer_price),
+    );
+
+    // Should fail with OfferesDisabled error
+    assert!(result.is_err());
+    assert_error(
+        result,
+        xion_nft_marketplace::error::ContractError::OfferesDisabled {}.to_string(),
+    );
+}
+
+#[test]
+fn test_accept_offer_disabled_with_approvals() {
+    // This test verifies that accepting offers is disabled when sale approvals are enabled
+    // We need to:
+    // 1. Create marketplace without approvals
+    // 2. Create an offer
+    // 3. Enable approvals
+    // 4. Try to accept offer - should fail
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+
+    // Start without approvals to create offer
+    let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let offer_price = coin(1000, "uxion");
+
+    // Create offer (works without approvals)
+    let create_offer_msg = ExecuteMsg::CreateOffer {
+        collection: asset_contract.to_string(),
+        token_id: "token1".to_string(),
+        price: offer_price.clone(),
+    };
+
+    let create_result = app
+        .execute_contract(
+            buyer.clone(),
+            marketplace_contract.clone(),
+            &create_offer_msg,
+            std::slice::from_ref(&offer_price),
+        )
+        .unwrap();
+
+    // Extract offer ID from events
+    let offer_id = create_result
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/create-offer")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    // Enable approvals via UpdateConfig
+    let update_config_msg = ExecuteMsg::UpdateConfig {
+        config: xion_nft_marketplace::state::Config {
+            manager: manager.to_string(),
+            fee_recipient: manager.to_string(),
+            sale_approvals: true, // Enable approvals
+            fee_bps: 250,
+            listing_denom: "uxion".to_string(),
+        },
+    };
+
+    app.execute_contract(
+        manager.clone(),
+        marketplace_contract.clone(),
+        &update_config_msg,
+        &[],
+    )
+    .unwrap();
+
+    // Query the config to verify approvals are enabled
+    let query_msg = xion_nft_marketplace::msg::QueryMsg::Config {};
+    let config: xion_nft_marketplace::state::Config<cosmwasm_std::Addr> = app
+        .wrap()
+        .query_wasm_smart(marketplace_contract.clone(), &query_msg)
+        .unwrap();
+    assert!(config.sale_approvals, "Sale approvals should be enabled");
+
+    // Approve marketplace to manage NFT
+    let approve_msg = cw721_base::msg::ExecuteMsg::Approve {
+        spender: marketplace_contract.to_string(),
+        token_id: "token1".to_string(),
+        expires: None,
+    };
+    app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+        .unwrap();
+
+    // Try to accept offer - should fail
+    let accept_offer_msg = ExecuteMsg::AcceptOffer {
+        id: offer_id,
+        collection: asset_contract.to_string(),
+        token_id: "token1".to_string(),
+        price: offer_price.clone(),
+    };
+
+    let result = app.execute_contract(
+        seller.clone(),
+        marketplace_contract.clone(),
+        &accept_offer_msg,
+        &[],
+    );
+
+    // Should fail with OfferesDisabled error
+    assert!(result.is_err());
+    assert_error(
+        result,
+        xion_nft_marketplace::error::ContractError::OfferesDisabled {}.to_string(),
+    );
+}
+
+#[test]
+fn test_create_collection_offer_disabled_with_approvals() {
+    // This test verifies that creating collection offers is disabled when sale approvals are enabled
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    let offer_price = coin(1000, "uxion");
+
+    // Try to create collection offer - should fail
+    let create_collection_offer_msg = ExecuteMsg::CreateCollectionOffer {
+        collection: asset_contract.to_string(),
+        price: offer_price.clone(),
+    };
+
+    let result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &create_collection_offer_msg,
+        std::slice::from_ref(&offer_price),
+    );
+
+    // Should fail with OfferesDisabled error
+    assert!(result.is_err());
+    assert_error(
+        result,
+        xion_nft_marketplace::error::ContractError::OfferesDisabled {}.to_string(),
+    );
+}
+
+#[test]
+fn test_accept_collection_offer_disabled_with_approvals() {
+    // This test verifies that accepting collection offers is disabled when sale approvals are enabled
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+
+    // Start without approvals to create collection offer
+    let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let offer_price = coin(1000, "uxion");
+
+    // Create collection offer (works without approvals)
+    let create_collection_offer_msg = ExecuteMsg::CreateCollectionOffer {
+        collection: asset_contract.to_string(),
+        price: offer_price.clone(),
+    };
+
+    let create_result = app
+        .execute_contract(
+            buyer.clone(),
+            marketplace_contract.clone(),
+            &create_collection_offer_msg,
+            std::slice::from_ref(&offer_price),
+        )
+        .unwrap();
+
+    // Extract collection offer ID from events
+    let collection_offer_id = create_result
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/create-collection-offer")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    // Enable approvals via UpdateConfig
+    let update_config_msg = ExecuteMsg::UpdateConfig {
+        config: xion_nft_marketplace::state::Config {
+            manager: manager.to_string(),
+            fee_recipient: manager.to_string(),
+            sale_approvals: true, // Enable approvals
+            fee_bps: 250,
+            listing_denom: "uxion".to_string(),
+        },
+    };
+
+    app.execute_contract(
+        manager.clone(),
+        marketplace_contract.clone(),
+        &update_config_msg,
+        &[],
+    )
+    .unwrap();
+
+    // Approve marketplace to manage NFT
+    let approve_msg = cw721_base::msg::ExecuteMsg::Approve {
+        spender: marketplace_contract.to_string(),
+        token_id: "token1".to_string(),
+        expires: None,
+    };
+    app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+        .unwrap();
+
+    // Try to accept collection offer - should fail
+    let accept_collection_offer_msg = ExecuteMsg::AcceptCollectionOffer {
+        id: collection_offer_id,
+        collection: asset_contract.to_string(),
+        token_id: "token1".to_string(),
+        price: offer_price.clone(),
+    };
+
+    let result = app.execute_contract(
+        seller.clone(),
+        marketplace_contract.clone(),
+        &accept_collection_offer_msg,
+        &[],
+    );
+
+    // Should fail with OfferesDisabled error
+    assert!(result.is_err());
+    assert_error(
+        result,
+        xion_nft_marketplace::error::ContractError::OfferesDisabled {}.to_string(),
+    );
+}

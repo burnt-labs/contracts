@@ -23,6 +23,12 @@ pub fn execute_create_offer(
     token_id: String,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
+
+    // Disable offers when sale approvals are enabled
+    if config.sale_approvals {
+        return Err(ContractError::OfferesDisabled {});
+    }
+
     // ensure valid payment is sent for escrow
     valid_payment(&info, price.clone(), config.listing_denom)?;
     let auto_increment = next_auto_increment(deps.storage)?;
@@ -64,6 +70,12 @@ pub fn execute_accept_offer(
 ) -> Result<Response, ContractError> {
     only_owner(&deps.querier, &info, &collection, &token_id)?;
     let config = CONFIG.load(deps.storage)?;
+
+    // Disable offer acceptance when sale approvals are enabled
+    if config.sale_approvals {
+        return Err(ContractError::OfferesDisabled {});
+    }
+
     let offer = offers().load(deps.storage, offer_id.clone())?;
     ensure_eq!(
         offer.collection,
@@ -182,6 +194,12 @@ pub fn execute_create_collection_offer(
     price: Coin,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
+
+    // Disable collection offers when sale approvals are enabled
+    if config.sale_approvals {
+        return Err(ContractError::OfferesDisabled {});
+    }
+
     // ensure valid payment is sent for escrow
     valid_payment(&info, price.clone(), config.listing_denom)?;
     let auto_increment = next_auto_increment(deps.storage)?;
@@ -220,6 +238,12 @@ pub fn execute_accept_collection_offer(
 ) -> Result<Response, ContractError> {
     only_owner(&deps.querier, &info, &collection, &token_id)?;
     let config = CONFIG.load(deps.storage)?;
+
+    // Disable collection offer acceptance when sale approvals are enabled
+    if config.sale_approvals {
+        return Err(ContractError::OfferesDisabled {});
+    }
+
     let offer = collection_offers().load(deps.storage, offer_id.clone())?;
     ensure_eq!(
         offer.collection,

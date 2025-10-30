@@ -51,4 +51,7 @@ pub enum ContractError {
 
     #[error("Insufficient funds")]
     InsuficientFunds {},
+
+    #[error("Offers disabled")]
+    OfferesDisabled {},
 }
