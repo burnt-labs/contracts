@@ -1,6 +1,8 @@
 use crate::error::ContractError;
 use crate::events::item_sold_event;
-use crate::helpers::{asset_buy_msg, asset_list_msg, generate_id, only_owner, valid_payment};
+use crate::helpers::{
+    asset_buy_msg, asset_list_msg, calculate_asset_price, generate_id, only_owner, valid_payment,
+};
 use crate::state::{collection_offers, CollectionOffer, Offer, CONFIG};
 use cosmwasm_std::{
     ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, WasmMsg,
@@ -21,6 +23,12 @@ pub fn execute_create_offer(
     token_id: String,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
+
+    // Disable offers when sale approvals are enabled
+    if config.sale_approvals {
+        return Err(ContractError::OfferesDisabled {});
+    }
+
     // ensure valid payment is sent for escrow
     valid_payment(&info, price.clone(), config.listing_denom)?;
     let auto_increment = next_auto_increment(deps.storage)?;
@@ -61,6 +69,13 @@ pub fn execute_accept_offer(
     price: Coin,
 ) -> Result<Response, ContractError> {
     only_owner(&deps.querier, &info, &collection, &token_id)?;
+    let config = CONFIG.load(deps.storage)?;
+
+    // Disable offer acceptance when sale approvals are enabled
+    if config.sale_approvals {
+        return Err(ContractError::OfferesDisabled {});
+    }
+
     let offer = offers().load(deps.storage, offer_id.clone())?;
     ensure_eq!(
         offer.collection,
@@ -88,19 +103,29 @@ pub fn execute_accept_offer(
     if offer.buyer == info.sender {
         return Err(ContractError::InvalidSeller {});
     }
-    // list the item on the asset contract for the specific price
-    let list_msg = asset_list_msg(token_id.clone(), offer.price.clone());
+
+    // Calculate asset price (seller proceeds) and marketplace fee
+    // This ensures offer acceptance matches the immediate buy path
+    let asset_price = calculate_asset_price(offer.price.clone(), config.fee_bps)?;
+    let marketplace_fee_amount = offer
+        .price
+        .amount
+        .checked_sub(asset_price.amount)
+        .map_err(|_| ContractError::InsuficientFunds {})?;
+
+    // list the item on the asset contract with asset_price (not full price)
+    let list_msg = asset_list_msg(token_id.clone(), asset_price.clone());
     // do a buy on the asset contract for the specific price and buyer
-    let buy_msg = asset_buy_msg(info.sender.clone(), token_id.clone());
+    let buy_msg = asset_buy_msg(offer.buyer.clone(), token_id.clone());
 
     offers().remove(deps.storage, offer_id.clone())?;
 
-    Ok(Response::new()
+    let mut response = Response::new()
         .add_event(item_sold_event(
             "listing_id".to_string(),
             offer.collection.clone(),
             info.sender.clone(),
-            offer.buyer,
+            offer.buyer.clone(),
             token_id.clone(),
             offer.price.clone(),
             Some(offer.id),
@@ -111,11 +136,26 @@ pub fn execute_accept_offer(
             msg: to_json_binary(&list_msg)?,
             funds: vec![],
         })
+        // Send asset_price to asset contract (seller proceeds)
         .add_message(WasmMsg::Execute {
             contract_addr: offer.collection.clone().to_string(),
             msg: to_json_binary(&buy_msg)?,
-            funds: vec![price],
-        }))
+            funds: vec![asset_price],
+        });
+
+    // Only send marketplace fee if it's greater than zero
+    // CosmWasm doesn't allow sending empty coin amounts
+    if !marketplace_fee_amount.is_zero() {
+        response = response.add_message(BankMsg::Send {
+            to_address: config.manager.to_string(),
+            amount: vec![Coin {
+                denom: offer.price.denom,
+                amount: marketplace_fee_amount,
+            }],
+        });
+    }
+
+    Ok(response)
 }
 
 pub fn execute_cancel_offer(
@@ -154,6 +194,12 @@ pub fn execute_create_collection_offer(
     price: Coin,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
+
+    // Disable collection offers when sale approvals are enabled
+    if config.sale_approvals {
+        return Err(ContractError::OfferesDisabled {});
+    }
+
     // ensure valid payment is sent for escrow
     valid_payment(&info, price.clone(), config.listing_denom)?;
     let auto_increment = next_auto_increment(deps.storage)?;
@@ -191,6 +237,13 @@ pub fn execute_accept_collection_offer(
     price: Coin,
 ) -> Result<Response, ContractError> {
     only_owner(&deps.querier, &info, &collection, &token_id)?;
+    let config = CONFIG.load(deps.storage)?;
+
+    // Disable collection offer acceptance when sale approvals are enabled
+    if config.sale_approvals {
+        return Err(ContractError::OfferesDisabled {});
+    }
+
     let offer = collection_offers().load(deps.storage, offer_id.clone())?;
     ensure_eq!(
         offer.collection,
@@ -210,34 +263,59 @@ pub fn execute_accept_collection_offer(
     if offer.buyer == info.sender {
         return Err(ContractError::InvalidSeller {});
     }
-    // list the item on the asset contract for the specific price
-    let list_msg = asset_list_msg(token_id.clone(), offer.price.clone());
+
+    // Calculate asset price (seller proceeds) and marketplace fee
+    // This ensures collection offer acceptance matches the immediate buy path
+    let asset_price = calculate_asset_price(offer.price.clone(), config.fee_bps)?;
+    let marketplace_fee_amount = offer
+        .price
+        .amount
+        .checked_sub(asset_price.amount)
+        .map_err(|_| ContractError::InsuficientFunds {})?;
+
+    // list the item on the asset contract with asset_price (not full price)
+    let list_msg = asset_list_msg(token_id.clone(), asset_price.clone());
     // do a buy on the asset contract for the specific price and buyer
-    let buy_msg = asset_buy_msg(info.sender.clone(), token_id.clone());
+    let buy_msg = asset_buy_msg(offer.buyer.clone(), token_id.clone());
 
     collection_offers().remove(deps.storage, offer_id.clone())?;
 
-    Ok(Response::new()
+    let mut response = Response::new()
         .add_event(item_sold_event(
             "listing_id".to_string(),
             offer.collection.clone(),
             info.sender.clone(),
-            offer.buyer,
+            offer.buyer.clone(),
             token_id.clone(),
             offer.price.clone(),
-            Some(offer.id),
             None,
+            Some(offer.id),
         ))
         .add_message(WasmMsg::Execute {
             contract_addr: offer.collection.clone().to_string(),
             msg: to_json_binary(&list_msg)?,
             funds: vec![],
         })
+        // Send asset_price to asset contract (seller proceeds)
         .add_message(WasmMsg::Execute {
             contract_addr: offer.collection.clone().to_string(),
             msg: to_json_binary(&buy_msg)?,
-            funds: vec![price],
-        }))
+            funds: vec![asset_price],
+        });
+
+    // Only send marketplace fee if it's greater than zero
+    // CosmWasm doesn't allow sending empty coin amounts
+    if !marketplace_fee_amount.is_zero() {
+        response = response.add_message(BankMsg::Send {
+            to_address: config.manager.to_string(),
+            amount: vec![Coin {
+                denom: offer.price.denom,
+                amount: marketplace_fee_amount,
+            }],
+        });
+    }
+
+    Ok(response)
 }
 
 pub fn execute_cancel_collection_offer(
