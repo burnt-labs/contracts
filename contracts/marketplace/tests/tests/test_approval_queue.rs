@@ -647,8 +647,7 @@ fn test_approve_sale_fee_routing() {
 
     // Verify buyer balance hasn't changed since they already paid
     assert_eq!(
-        buyer_balance_after,
-        buyer_balance_after_buy,
+        buyer_balance_after, buyer_balance_after_buy,
         "Buyer balance should not change during approval"
     );
 
@@ -668,7 +667,10 @@ fn test_approve_sale_fee_routing() {
         marketplace_contract.clone(),
         &QueryMsg::Listing { listing_id },
     );
-    assert!(listing_query.is_err(), "Listing should be deleted after approval");
+    assert!(
+        listing_query.is_err(),
+        "Listing should be deleted after approval"
+    );
 
     let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(
         marketplace_contract.clone(),
@@ -676,7 +678,10 @@ fn test_approve_sale_fee_routing() {
             id: pending_sale_id,
         },
     );
-    assert!(pending_sale_query.is_err(), "Pending sale should be deleted after approval");
+    assert!(
+        pending_sale_query.is_err(),
+        "Pending sale should be deleted after approval"
+    );
 }
 
 #[test]
@@ -702,14 +707,16 @@ fn test_approve_sale_fee_routing_with_zero_fee() {
     let instantiate_msg = InstantiateMsg {
         config: serde_json::from_value(config_json).unwrap(),
     };
-    let marketplace_contract = app.instantiate_contract(
-        marketplace_code_id,
-        manager.clone(),
-        &instantiate_msg,
-        &[],
-        "test-marketplace-zero-fee",
-        None,
-    ).unwrap();
+    let marketplace_contract = app
+        .instantiate_contract(
+            marketplace_code_id,
+            manager.clone(),
+            &instantiate_msg,
+            &[],
+            "test-marketplace-zero-fee",
+            None,
+        )
+        .unwrap();
 
     mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
 
@@ -782,8 +789,7 @@ fn test_approve_sale_fee_routing_with_zero_fee() {
 
     // Manager should receive zero fee (balance unchanged except for gas)
     assert_eq!(
-        manager_balance_after,
-        manager_balance_before,
+        manager_balance_after, manager_balance_before,
         "Manager should not receive any fee with zero fee_bps"
     );
 

@@ -1,6 +1,8 @@
 use crate::error::ContractError;
 use crate::events::item_sold_event;
-use crate::helpers::{asset_buy_msg, asset_list_msg, calculate_asset_price, generate_id, only_owner, valid_payment};
+use crate::helpers::{
+    asset_buy_msg, asset_list_msg, calculate_asset_price, generate_id, only_owner, valid_payment,
+};
 use crate::state::{collection_offers, CollectionOffer, Offer, CONFIG};
 use cosmwasm_std::{
     ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, WasmMsg,

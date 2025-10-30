@@ -123,8 +123,7 @@ fn test_accept_offer_fee_routing() {
 
     // Verify buyer balance hasn't changed since they already paid
     assert_eq!(
-        buyer_balance_after,
-        buyer_balance_after_offer,
+        buyer_balance_after, buyer_balance_after_offer,
         "Buyer balance should not change during offer acceptance"
     );
 
@@ -248,8 +247,7 @@ fn test_accept_offer_fee_routing_with_zero_fee() {
 
     // Manager should receive zero fee (balance unchanged)
     assert_eq!(
-        manager_balance_after,
-        manager_balance_before,
+        manager_balance_after, manager_balance_before,
         "Manager should not receive any fee with zero fee_bps"
     );
 
@@ -376,8 +374,7 @@ fn test_accept_collection_offer_fee_routing() {
 
     // Verify buyer balance hasn't changed
     assert_eq!(
-        buyer_balance_after,
-        buyer_balance_after_offer,
+        buyer_balance_after, buyer_balance_after_offer,
         "Buyer balance should not change during offer acceptance"
     );
 
@@ -500,8 +497,7 @@ fn test_accept_collection_offer_fee_routing_with_zero_fee() {
 
     // Manager should receive zero fee
     assert_eq!(
-        manager_balance_after,
-        manager_balance_before,
+        manager_balance_after, manager_balance_before,
         "Manager should not receive any fee with zero fee_bps"
     );
 
