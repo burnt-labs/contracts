@@ -39,16 +39,22 @@ where
     if old_listing.is_some() {
         return Err(ContractError::ListingAlreadyExists { id });
     }
-    // todo convert reservation msg to state reservation
     let reservation = match reservation {
-        Some(reserve_msg) => Some(Reserve {
-            reserver: if let Some(reserver) = reserve_msg.reserver {
-                deps.api.addr_validate(&reserver)?
-            } else {
-                info.sender.clone()
-            },
-            reserved_until: reserve_msg.reserved_until,
-        }),
+        Some(reserve_msg) => {
+            if reserve_msg.reserved_until <= env.block.time {
+                return Err(ContractError::InvalidReservationExpiration {
+                    reserved_until: reserve_msg.reserved_until.seconds(),
+                });
+            }
+            Some(Reserve {
+                reserver: if let Some(reserver) = reserve_msg.reserver {
+                    deps.api.addr_validate(&reserver)?
+                } else {
+                    info.sender.clone()
+                },
+                reserved_until: reserve_msg.reserved_until,
+            })
+        }
         None => None,
     };
     // Save the listing
@@ -93,6 +99,9 @@ where
     // only the ones who can list can delist
     let nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
     check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;
+    if listing.seller != nft_info.owner {
+        return Err(ContractError::StaleListing {});
+    }
 
     asset_config.listings.remove(deps.storage, &id)?;
 

@@ -1,11 +1,11 @@
 use cosmwasm_std::{BankMsg, Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
-use cw721::traits::Cw721State;
+use cw721::{traits::Cw721State, Expiration};
 
 use crate::{error::ContractError, state::AssetConfig};
 
 pub fn buy<TNftExtension, TCustomResponseMsg>(
     deps: DepsMut,
-    _env: &Env,
+    env: &Env,
     info: &MessageInfo,
     id: String,
     recipient: Option<String>,
@@ -17,7 +17,7 @@ where
 {
     let asset_config = AssetConfig::<TNftExtension>::default();
 
-    let listing = asset_config
+    let mut listing = asset_config
         .listings
         .may_load(deps.storage, &id)?
         .ok_or(ContractError::ListingNotFound { id: id.clone() })?;
@@ -72,7 +72,13 @@ where
     };
 
     if let Some(reserved) = listing.reserved {
-        if reserved.reserver != info.sender && reserved.reserver != buyer {
+        let is_expired = Expiration::AtTime(reserved.reserved_until).is_expired(&env.block);
+        if is_expired {
+            listing.reserved = None;
+            asset_config
+                .listings
+                .save(deps.storage, &id, &listing)?;
+        } else if reserved.reserver != info.sender && reserved.reserver != buyer {
             return Err(ContractError::Unauthorized {});
         }
     }

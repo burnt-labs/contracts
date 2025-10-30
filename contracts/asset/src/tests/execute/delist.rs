@@ -128,4 +128,50 @@ fn delist_flow() {
             }
         );
     }
+    // stale listings cannot be delisted
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let original_owner = deps.api.addr_make("original");
+        let new_owner = deps.api.addr_make("new_owner");
+        let nft_info = NftInfo {
+            owner: original_owner.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-4",
+            &nft_info,
+        ));
+        expect_ok(AssetConfig::<Empty>::default().listings.save(
+            deps.as_mut().storage,
+            "token-4",
+            &ListingInfo {
+                id: "token-4".to_string(),
+                seller: original_owner.clone(),
+                price: Coin::new(100_u128, "uxion"),
+                reserved: None,
+            },
+        ));
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-4",
+            &NftInfo {
+                owner: new_owner.clone(),
+                approvals: vec![],
+                token_uri: None,
+                extension: Empty {},
+            },
+        ));
+
+        let err = expect_err(delist::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&new_owner, &[]),
+            "token-4".to_string(),
+        ));
+        assert_eq!(err, ContractError::StaleListing {});
+    }
 }

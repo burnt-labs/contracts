@@ -19,6 +19,9 @@ pub enum ContractError {
     #[error("Reservation not found: {id}")]
     ReservationNotFound { id: String },
 
+    #[error("Invalid reservation expiration: {reserved_until}")]
+    InvalidReservationExpiration { reserved_until: u64 },
+
     #[error("Invalid listing price: {price}")]
     InvalidListingPrice { price: u128 },
 
