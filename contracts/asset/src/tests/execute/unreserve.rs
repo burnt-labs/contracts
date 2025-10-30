@@ -230,4 +230,55 @@ fn unreserve_flow() {
             }
         );
     }
+    // stale listings cannot be unreserved
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let original_owner = deps.api.addr_make("original");
+        let new_owner = deps.api.addr_make("new_owner");
+        let reserver_addr = deps.api.addr_make("reserver");
+        let nft_info = NftInfo {
+            owner: original_owner.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-5",
+            &nft_info,
+        ));
+        expect_ok(AssetConfig::<Empty>::default().listings.save(
+            deps.as_mut().storage,
+            "token-5",
+            &ListingInfo {
+                id: "token-5".to_string(),
+                seller: original_owner.clone(),
+                price: Coin::new(200_u128, "uxion"),
+                reserved: Some(Reserve {
+                    reserver: reserver_addr.clone(),
+                    reserved_until: env.block.time.plus_seconds(600),
+                }),
+            },
+        ));
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-5",
+            &NftInfo {
+                owner: new_owner.clone(),
+                approvals: vec![],
+                token_uri: None,
+                extension: Empty {},
+            },
+        ));
+
+        let err = expect_err(unreserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&reserver_addr, &[]),
+            "token-5".to_string(),
+            false,
+        ));
+        assert_eq!(err, ContractError::StaleListing {});
+    }
 }

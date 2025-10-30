@@ -286,4 +286,82 @@ fn buy_flow() {
             ],
         );
     }
+    // expired reservation is cleared and purchase is allowed
+    {
+        let mut deps = mock_dependencies();
+        let mut env = mock_env();
+        let seller_addr = deps.api.addr_make("seller");
+        let reserver_addr = deps.api.addr_make("reserver");
+        let outsider_addr = deps.api.addr_make("outsider");
+        let nft_info = NftInfo {
+            owner: seller_addr.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-5",
+            &nft_info,
+        ));
+        let price = coin(200_u128, "uxion");
+        let reserved_until = env.block.time.plus_seconds(10);
+        expect_ok(AssetConfig::<Empty>::default().listings.save(
+            deps.as_mut().storage,
+            "token-5",
+            &ListingInfo {
+                id: "token-5".to_string(),
+                seller: seller_addr.clone(),
+                price: price.clone(),
+                reserved: Some(Reserve {
+                    reserver: reserver_addr.clone(),
+                    reserved_until,
+                }),
+            },
+        ));
+
+        let err = expect_err(buy::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&outsider_addr, &[price.clone()]),
+            "token-5".to_string(),
+            None,
+            vec![],
+        ));
+        assert_eq!(err, ContractError::Unauthorized {});
+
+        env.block.time = reserved_until.plus_seconds(1);
+        let response = expect_ok(buy::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&outsider_addr, &[price.clone()]),
+            "token-5".to_string(),
+            None,
+            vec![],
+        ));
+        let attrs: Vec<(String, String)> = response
+            .attributes
+            .iter()
+            .map(|attr| (attr.key.clone(), attr.value.clone()))
+            .collect();
+        assert_eq!(
+            attrs,
+            vec![
+                ("action".to_string(), "buy".to_string()),
+                ("id".to_string(), "token-5".to_string()),
+                ("price".to_string(), price.amount.to_string()),
+                ("denom".to_string(), price.denom.to_string()),
+                ("seller".to_string(), seller_addr.to_string()),
+                ("buyer".to_string(), outsider_addr.to_string()),
+            ],
+        );
+        assert!(
+            expect_ok(
+                AssetConfig::<Empty>::default()
+                    .listings
+                    .may_load(deps.as_ref().storage, "token-5")
+            )
+            .is_none()
+        );
+    }
 }

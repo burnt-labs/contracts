@@ -30,6 +30,15 @@ where
     // only the ones who can list can reserve
     let nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
     check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;
+    if listing.seller != nft_info.owner {
+        return Err(ContractError::StaleListing {});
+    }
+
+    if reservation.reserved_until <= env.block.time {
+        return Err(ContractError::InvalidReservationExpiration {
+            reserved_until: reservation.reserved_until.seconds(),
+        });
+    }
 
     if let Some(reserved) = &listing.reserved {
         if !Expiration::AtTime(reserved.reserved_until).is_expired(&env.block) {
@@ -80,6 +89,9 @@ where
         .ok_or_else(|| ContractError::ReservationNotFound { id: id.clone() })?;
 
     let nft_info = asset_config.cw721_config.nft_info.load(deps.storage, &id)?;
+    if listing.seller != nft_info.owner {
+        return Err(ContractError::StaleListing {});
+    }
 
     if reserved.reserver != info.sender {
         check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;

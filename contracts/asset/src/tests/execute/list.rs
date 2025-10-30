@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 use cw721::{Approval, Expiration, state::NftInfo};
 
-use crate::{error::ContractError, execute::list, state::AssetConfig};
+use crate::{error::ContractError, execute::list, msg::ReserveMsg, state::AssetConfig};
 
 use super::helpers::{expect_err, expect_ok};
 
@@ -293,6 +293,43 @@ fn list_flow() {
             None,
         ));
         assert_eq!(err, ContractError::InvalidListingPrice { price: 0 });
+    }
+    // reservation must be in the future
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let owner_addr = deps.api.addr_make("owner");
+        let nft_info = NftInfo {
+            owner: owner_addr.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-6",
+            &nft_info,
+        ));
+
+        let reservation = ReserveMsg {
+            reserver: None,
+            reserved_until: env.block.time,
+        };
+
+        let err = expect_err(list::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&owner_addr, &[]),
+            "token-6".to_string(),
+            Coin::new(100_u128, "uxion"),
+            Some(reservation),
+        ));
+        assert_eq!(
+            err,
+            ContractError::InvalidReservationExpiration {
+                reserved_until: env.block.time.seconds()
+            }
+        );
     }
     // non-existent item cannot be listed
     {
