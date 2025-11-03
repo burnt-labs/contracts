@@ -266,7 +266,7 @@ fn on_buy_plugin_runs_allowed_marketplace_and_royalty_plugins() {
     let mut ctx = build_ctx(deps.as_ref(), env, info);
 
     let result = contract
-        .on_buy_plugin(&"token-1".to_string(), &None, &mut ctx)
+        .on_buy_plugin("token-1", &None, &mut ctx)
         .unwrap();
 
     assert!(result);
@@ -340,7 +340,7 @@ fn on_buy_plugin_errors_when_currency_not_allowed() {
     let info = message_info(&buyer, &[Coin::new(100u128, "uxion")]);
     let mut ctx = build_ctx(deps.as_ref(), env, info);
 
-    let result = contract.on_buy_plugin(&"token-1".to_string(), &None, &mut ctx);
+    let result = contract.on_buy_plugin("token-1", &None, &mut ctx);
 
     assert_eq!(
         result
@@ -402,7 +402,7 @@ fn on_buy_plugin_errors_when_marketplace_not_allowed() {
     let info = message_info(&buyer, &[Coin::new(100u128, "uxion")]);
     let mut ctx = build_ctx(deps.as_ref(), env, info);
 
-    let result = contract.on_buy_plugin(&"token-1".to_string(), &None, &mut ctx);
+    let result = contract.on_buy_plugin("token-1", &None, &mut ctx);
 
     assert_eq!(
         result
@@ -447,7 +447,7 @@ fn on_transfer_plugin_blocks_listed_tokens() {
     let mut ctx = build_ctx(deps.as_ref(), env, info);
 
     let err = contract
-        .on_transfer_plugin(&"buyer".to_string(), &"token-1".to_string(), &mut ctx)
+        .on_transfer_plugin("buyer", "token-1", &mut ctx)
         .expect_err("expected transfer block");
 
     assert_eq!(
@@ -468,7 +468,7 @@ fn on_transfer_plugin_allows_when_not_listed() {
 
     assert!(
         contract
-            .on_transfer_plugin(&"buyer".to_string(), &"token-1".to_string(), &mut ctx)
+            .on_transfer_plugin("buyer", "token-1", &mut ctx)
             .is_ok()
     );
 }
@@ -512,13 +512,13 @@ fn on_reserve_plugin_respects_allowed_marketplaces_and_time_lock() {
     };
 
     let result = contract
-        .on_reserve_plugin(&"token-1".to_string(), &reservation, &mut ctx)
+        .on_reserve_plugin("token-1", &reservation, &mut ctx)
         .unwrap();
 
     assert!(result);
     assert_eq!(
         ctx.data.reservation.unwrap().reserver.unwrap(),
-        Some(reserver.to_string()).unwrap()
+        reserver.to_string()
     );
     assert_eq!(ctx.data.time_lock, Some(Duration::from_secs(2_000)));
 }
@@ -550,7 +550,7 @@ fn on_reserve_plugin_errors_for_disallowed_marketplace() {
         reserved_until: env.block.time.plus_seconds(1_200),
     };
 
-    let result = contract.on_reserve_plugin(&"token-1".to_string(), &reservation, &mut ctx);
+    let result = contract.on_reserve_plugin("token-1", &reservation, &mut ctx);
 
     assert_eq!(
         result
@@ -598,7 +598,7 @@ fn on_reserve_plugin_errors_when_time_lock_exceeded() {
         reserved_until: env.block.time.plus_seconds(3_000),
     };
 
-    let result = contract.on_reserve_plugin(&"token-1".to_string(), &reservation, &mut ctx);
+    let result = contract.on_reserve_plugin("token-1", &reservation, &mut ctx);
 
     assert_eq!(
         result.expect_err("expected time lock exceeded").to_string(),
@@ -702,7 +702,7 @@ fn remove_plugin_removes_specified_plugin() {
         .unwrap();
 
     contract
-        .remove_plugin(deps.as_mut(), &env, &info, &["NotAfter".to_string()].into())
+        .remove_plugin(deps.as_mut(), &env, &info, &["NotAfter".to_string()])
         .unwrap();
 
     let stored_plugins: Vec<Plugin> = contract

@@ -252,20 +252,17 @@ where
             plugin_ctx_deductions = plugin_ctx.deductions.clone();
         };
         let mut response = match &msg {
-            Cw721ExecuteMsg::UpdateExtension { msg: extension_msg } => match extension_msg {
-                AssetExtensionExecuteMsg::Buy {
-                    token_id,
-                    recipient,
-                } => self.buy(
-                    deps,
-                    env,
-                    info,
-                    (*token_id).clone(),
-                    (*recipient).clone(),
-                    plugin_ctx_deductions,
-                )?,
-                _ => self.execute(deps, env, info, msg)?,
-            },
+            Cw721ExecuteMsg::UpdateExtension { msg: AssetExtensionExecuteMsg::Buy {
+                token_id,
+                recipient,
+            } } => self.buy(
+                deps,
+                env,
+                info,
+                (*token_id).clone(),
+                (*recipient).clone(),
+                plugin_ctx_deductions,
+            )?,
             _ => self.execute(deps, env, info, msg)?,
         };
 
@@ -315,7 +312,7 @@ where
 
     fn on_list_plugin(
         &self,
-        token_id: &String,
+        token_id: &str,
         price: &Coin,
         reservation: &Option<ReserveMsg>,
         ctx: &mut DefaultPluginCtx,
@@ -367,13 +364,13 @@ where
         Ok(true)
     }
 
-    fn on_delist_plugin(&self, _token_id: &String, _ctx: &mut DefaultPluginCtx) -> StdResult<bool> {
+    fn on_delist_plugin(&self, _token_id: &str, _ctx: &mut DefaultPluginCtx) -> StdResult<bool> {
         Ok(true)
     }
 
     fn on_buy_plugin(
         &self,
-        token_id: &String,
+        token_id: &str,
         _recipient: &Option<String>,
         ctx: &mut DefaultPluginCtx,
     ) -> StdResult<bool> {
@@ -407,9 +404,9 @@ where
         let listing = self
             .config
             .listings
-            .load(ctx.deps.storage, token_id.as_str())
+            .load(ctx.deps.storage, token_id)
             .map_err(|_| ContractError::ListingNotFound {
-                id: token_id.clone(),
+                id: token_id.to_string(),
             })?;
         ctx.data.ask_price = Some(listing.price.clone());
         if let Some(plugin) = allowed_currencies_plugin {
@@ -430,7 +427,7 @@ where
 
     fn on_reserve_plugin(
         &self,
-        token_id: &String,
+        token_id: &str,
         reservation: &ReserveMsg,
         ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>,
     ) -> StdResult<bool> {
@@ -483,7 +480,7 @@ where
         deps: DepsMut,
         _env: &Env,
         info: &MessageInfo,
-        plugins: &Vec<Plugin>,
+        plugins: &[Plugin],
     ) -> StdResult<()> {
         CREATOR
             .assert_owner(deps.storage, &info.sender)
@@ -501,7 +498,7 @@ where
         deps: DepsMut,
         _env: &Env,
         info: &MessageInfo,
-        plugins: &Vec<String>,
+        plugins: &[String],
     ) -> StdResult<()> {
         CREATOR
             .assert_owner(deps.storage, &info.sender)

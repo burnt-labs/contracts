@@ -72,8 +72,7 @@ where
     };
 
     if let Some(reserved) = listing.reserved {
-        let is_expired = Expiration::AtTime(reserved.reserved_until).is_expired(&env.block);
-        if is_expired {
+        if Expiration::AtTime(reserved.reserved_until).is_expired(&env.block) {
             listing.reserved = None;
             asset_config.listings.save(deps.storage, &id, &listing)?;
         } else if reserved.reserver != info.sender && reserved.reserver != buyer {

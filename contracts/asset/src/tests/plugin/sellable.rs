@@ -62,7 +62,7 @@ fn buy_deducts_royalty_fees() {
         .unwrap();
 
     let env = mock_env();
-    let info = message_info(&buyer, &[price.clone()]);
+    let info = message_info(&buyer, std::slice::from_ref(&price));
 
     let res = contract
         .execute_pluggable(
