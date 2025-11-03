@@ -36,14 +36,14 @@ mod tests {
 
         assert!(verify(
             test_value,
-            signature_bytes.as_slice(),
+            &signature_bytes,
             &verifying_key_binary,
         )
         .unwrap());
 
         // test with invalid msg
         let bad_value = "invalid starting msg".as_bytes();
-        let result = verify(bad_value, signature_bytes.as_slice(), &verifying_key_binary);
+        let result = verify(bad_value, &signature_bytes, &verifying_key_binary);
         assert!(result.is_err())
     }
 }
