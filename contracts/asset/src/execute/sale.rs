@@ -1,5 +1,5 @@
 use cosmwasm_std::{BankMsg, Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
-use cw721::{traits::Cw721State, Expiration};
+use cw721::{Expiration, traits::Cw721State};
 
 use crate::{error::ContractError, state::AssetConfig};
 
@@ -72,12 +72,9 @@ where
     };
 
     if let Some(reserved) = listing.reserved {
-        let is_expired = Expiration::AtTime(reserved.reserved_until).is_expired(&env.block);
-        if is_expired {
+        if Expiration::AtTime(reserved.reserved_until).is_expired(&env.block) {
             listing.reserved = None;
-            asset_config
-                .listings
-                .save(deps.storage, &id, &listing)?;
+            asset_config.listings.save(deps.storage, &id, &listing)?;
         } else if reserved.reserver != info.sender && reserved.reserver != buyer {
             return Err(ContractError::Unauthorized {});
         }

@@ -47,7 +47,7 @@ fn buy_flow() {
         let response = expect_ok(buy::<Empty, Empty>(
             deps.as_mut(),
             &env,
-            &message_info(&buyer_addr, &[price.clone()]),
+            &message_info(&buyer_addr, std::slice::from_ref(&price)),
             "token-1".to_string(),
             None,
             vec![(
@@ -203,7 +203,7 @@ fn buy_flow() {
         let err = expect_err(buy::<Empty, Empty>(
             deps.as_mut(),
             &env,
-            &message_info(&seller_addr, &[price.clone()]),
+            &message_info(&seller_addr, std::slice::from_ref(&price)),
             "token-4".to_string(),
             None,
             vec![],
@@ -214,7 +214,7 @@ fn buy_flow() {
         let response = expect_ok(buy::<Empty, Empty>(
             deps.as_mut(),
             &env,
-            &message_info(&buyer_addr, &[price.clone()]),
+            &message_info(&buyer_addr, std::slice::from_ref(&price)),
             "token-4".to_string(),
             None,
             vec![],
@@ -264,7 +264,7 @@ fn buy_flow() {
         let response = expect_ok(buy::<Empty, Empty>(
             deps.as_mut(),
             &env,
-            &message_info(&seller_addr, &[price.clone()]),
+            &message_info(&seller_addr, std::slice::from_ref(&price)),
             "token-4".to_string(),
             Some(buyer_addr.to_string()), // buyer is the reserver
             vec![],
@@ -323,7 +323,7 @@ fn buy_flow() {
         let err = expect_err(buy::<Empty, Empty>(
             deps.as_mut(),
             &env,
-            &message_info(&outsider_addr, &[price.clone()]),
+            &message_info(&outsider_addr, std::slice::from_ref(&price)),
             "token-5".to_string(),
             None,
             vec![],
@@ -334,7 +334,7 @@ fn buy_flow() {
         let response = expect_ok(buy::<Empty, Empty>(
             deps.as_mut(),
             &env,
-            &message_info(&outsider_addr, &[price.clone()]),
+            &message_info(&outsider_addr, std::slice::from_ref(&price)),
             "token-5".to_string(),
             None,
             vec![],

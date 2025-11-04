@@ -458,8 +458,8 @@ pub trait PluggableAsset<
 
     fn on_transfer_plugin(
         &self,
-        _recipient: &String,
-        _token_id: &String,
+        _recipient: &str,
+        _token_id: &str,
         ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
         // for transfers we run the royalty plugin if set
@@ -472,7 +472,7 @@ pub trait PluggableAsset<
         }
         if AssetConfig::<TNftExtension>::default()
             .listings
-            .may_load(ctx.deps.storage, _token_id.as_str())?
+            .may_load(ctx.deps.storage, _token_id)?
             .is_some()
         {
             return Err(StdError::generic_err(
@@ -492,7 +492,7 @@ pub trait PluggableAsset<
 
     fn on_list_plugin(
         &self,
-        _token_id: &String,
+        _token_id: &str,
         _price: &Coin,
         _reservation: &Option<ReserveMsg>,
         _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
@@ -502,7 +502,7 @@ pub trait PluggableAsset<
 
     fn on_delist_plugin(
         &self,
-        _token_id: &String,
+        _token_id: &str,
         _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
         Ok(true)
@@ -510,7 +510,7 @@ pub trait PluggableAsset<
 
     fn on_buy_plugin(
         &self,
-        _token_id: &String,
+        _token_id: &str,
         _recipient: &Option<String>,
         _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
@@ -519,7 +519,7 @@ pub trait PluggableAsset<
 
     fn on_reserve_plugin(
         &self,
-        _token_id: &String,
+        _token_id: &str,
         _reserver: &ReserveMsg,
         _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
@@ -537,7 +537,7 @@ pub trait PluggableAsset<
         deps: DepsMut,
         env: &Env,
         info: &MessageInfo,
-        plugins: &Vec<Plugin>,
+        plugins: &[Plugin],
     ) -> StdResult<()>;
 
     fn remove_plugin(
@@ -545,6 +545,6 @@ pub trait PluggableAsset<
         deps: DepsMut,
         env: &Env,
         info: &MessageInfo,
-        plugins: &Vec<String>,
+        plugins: &[String],
     ) -> StdResult<()>;
 }
