@@ -34,12 +34,7 @@ mod tests {
         let verifying_key_binary = Binary::from(verifying_key_bytes.to_vec());
         println!("verifying key: {}", hex::encode(verifying_key_bytes));
 
-        assert!(verify(
-            test_value,
-            &signature_bytes,
-            &verifying_key_binary,
-        )
-        .unwrap());
+        assert!(verify(test_value, &signature_bytes, &verifying_key_binary,).unwrap());
 
         // test with invalid msg
         let bad_value = "invalid starting msg".as_bytes();

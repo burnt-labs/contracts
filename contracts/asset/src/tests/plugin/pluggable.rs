@@ -265,9 +265,7 @@ fn on_buy_plugin_runs_allowed_marketplace_and_royalty_plugins() {
     let info = message_info(&buyer, &[Coin::new(100u128, "uxion")]);
     let mut ctx = build_ctx(deps.as_ref(), env, info);
 
-    let result = contract
-        .on_buy_plugin("token-1", &None, &mut ctx)
-        .unwrap();
+    let result = contract.on_buy_plugin("token-1", &None, &mut ctx).unwrap();
 
     assert!(result);
     assert_eq!(ctx.data.buyer, Some(Addr::unchecked(buyer.to_string())));

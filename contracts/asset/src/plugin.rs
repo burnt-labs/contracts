@@ -252,10 +252,13 @@ where
             plugin_ctx_deductions = plugin_ctx.deductions.clone();
         };
         let mut response = match &msg {
-            Cw721ExecuteMsg::UpdateExtension { msg: AssetExtensionExecuteMsg::Buy {
-                token_id,
-                recipient,
-            } } => self.buy(
+            Cw721ExecuteMsg::UpdateExtension {
+                msg:
+                    AssetExtensionExecuteMsg::Buy {
+                        token_id,
+                        recipient,
+                    },
+            } => self.buy(
                 deps,
                 env,
                 info,
