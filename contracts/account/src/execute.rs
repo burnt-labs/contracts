@@ -440,7 +440,7 @@ pub mod tests {
                 "pi_c": ["10", "11", "12"],
                 "protocol": "groth16"
             },
-            "publicOutputs": ["1", "2", "3"]
+            "publicInputs": ["1", "2", "3"]
         }"#;
 
         let signature_binary = Binary::from(invalid_signature_json.as_bytes());

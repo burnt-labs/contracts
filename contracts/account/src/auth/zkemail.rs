@@ -5,7 +5,6 @@ use cosmos_sdk_proto::{
     xion::v1::dkim::{QueryVerifyRequest, QueryVerifyResponse},
 };
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::Uint256;
 use cosmwasm_std::{from_json, Binary, Deps};
 
 #[cw_serde]
@@ -17,43 +16,39 @@ pub struct SnarkJsProof {
     #[serde(rename = "pi_c")]
     pi_c: [String; 3],
     protocol: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    curve: Option<String>,
 }
 
 #[cw_serde]
 pub struct ZKEmailSignature {
     proof: SnarkJsProof,
-    #[serde(rename = "publicOutputs")]
-    public_outputs: Vec<String>,
+    #[serde(rename = "publicInputs")]
+    public_inputs: Vec<String>,
 }
 
 pub fn verify(
     deps: Deps,
-    tx_bytes: &str,
+    tx_bytes: &[u8],
     sig_bytes: &[u8],
     email_salt: &str,
 ) -> ContractResult<bool> {
     // split the sig_bytes into 2 parts proof and publicOutputs
     let sig: ZKEmailSignature = from_json(sig_bytes.to_vec())?;
     let proof = sig.proof;
-    let public_outputs = sig.public_outputs;
-    //
-    // Parse as Uint256 and convert to little-endian bytes
-    let email_salt_uint = Uint256::from_str(email_salt)
-        .map_err(|_| ContractError::ParseError("Invalid email_salt".to_string()))?;
-
-    let email_hash_bytes = email_salt_uint.to_le_bytes().to_vec();
+    let public_inputs = sig.public_inputs;
 
     let verification_request = QueryVerifyRequest {
-        tx_bytes: tx_bytes.as_bytes().to_vec(),
+        tx_bytes: tx_bytes.to_vec(),
         proof: serde_json::to_vec(&proof)?,
-        public_inputs: public_outputs.clone(),
-        email_hash: email_hash_bytes,
+        public_inputs: public_inputs.clone(),
+        email_hash: email_salt.to_string(),
     };
 
-    verification_request_byte = verification_request.to_bytes()?;
+    let verification_request_bytes = verification_request.to_bytes()?;
     let verification_response: Binary = deps.querier.query_grpc(
         "/xion.dkim.v1.Query/Authenticate".to_string(),
-        Binary::from(verification_request_byte),
+        Binary::from(verification_request_bytes),
     )?;
 
     let res: QueryVerifyResponse = QueryVerifyResponse::decode(verification_response.as_slice())?;
@@ -94,8 +89,9 @@ mod tests {
                     "1".to_string(),
                 ],
                 protocol: "groth16".to_string(),
+                curve: None,
             },
-            public_outputs: vec![
+            public_inputs: vec![
                 "2018721414038404820327".to_string(),
                 "0".to_string(),
                 "0".to_string(),
@@ -163,7 +159,7 @@ mod tests {
                 ],
                 "protocol": "groth16"
             },
-            "publicOutputs": [
+            "publicInputs": [
                 "2018721414038404820327",
                 "0",
                 "0",
@@ -213,6 +209,7 @@ mod tests {
             ],
             pi_c: ["10".to_string(), "11".to_string(), "12".to_string()],
             protocol: "groth16".to_string(),
+            curve: None,
         };
 
         let serialized = serde_json::to_string(&proof).unwrap();
@@ -235,12 +232,12 @@ mod tests {
         assert_eq!(signature.proof.pi_b, deserialized.proof.pi_b);
         assert_eq!(signature.proof.pi_c, deserialized.proof.pi_c);
         assert_eq!(signature.proof.protocol, deserialized.proof.protocol);
-        assert_eq!(signature.public_outputs, deserialized.public_outputs);
+        assert_eq!(signature.public_inputs, deserialized.public_inputs);
 
         // Test round-trip serialization
         let serialized = serde_json::to_string(&signature).unwrap();
         let round_trip: ZKEmailSignature = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(signature.public_outputs, round_trip.public_outputs);
+        assert_eq!(signature.public_inputs, round_trip.public_inputs);
     }
 
     #[test]
@@ -251,8 +248,7 @@ mod tests {
 
         // Verify the JSON structure has the expected field names
         assert!(parsed.get("proof").is_some());
-        assert!(parsed.get("publicOutputs").is_some());
-
+        assert!(parsed.get("publicInputs").is_some());
         let proof = parsed.get("proof").unwrap();
         assert!(proof.get("pi_a").is_some());
         assert!(proof.get("pi_b").is_some());
@@ -268,8 +264,8 @@ mod tests {
         assert_eq!(signature.proof.pi_a.len(), 3);
         assert_eq!(signature.proof.pi_b.len(), 3);
         assert_eq!(signature.proof.pi_c.len(), 3);
-        assert_eq!(signature.public_outputs.len(), 34);
-
+        assert_eq!(signature.public_inputs.len(), 34);
+        
         // Verify nested array structure
         for row in &signature.proof.pi_b {
             assert_eq!(row.len(), 2);
@@ -283,16 +279,14 @@ mod tests {
     fn test_public_outputs_boundary_cases() {
         // Test access to first element
         let signature = sample_zkemail_signature();
-        assert_eq!(signature.public_outputs[0], "2018721414038404820327");
 
+        assert_eq!(signature.public_inputs[0], "2018721414038404820327");
+        
         // Test access to last element (index 33)
-        assert_eq!(signature.public_outputs[33], "1");
-
+        assert_eq!(signature.public_inputs[33], "1");
+        
         // Test access to email salt element (index 32)
-        assert_eq!(
-            signature.public_outputs[32],
-            "8106355043968901587346579634598098765933160394002251948170420219958523220425"
-        );
+        assert_eq!(signature.public_inputs[32], "8106355043968901587346579634598098765933160394002251948170420219958523220425");
     }
 
     #[test]
@@ -306,6 +300,7 @@ mod tests {
             ],
             pi_c: ["".to_string(), "".to_string(), "".to_string()],
             protocol: "".to_string(),
+            curve: None,
         };
 
         let serialized = serde_json::to_string(&proof).unwrap();
@@ -336,6 +331,7 @@ mod tests {
                 "unicode✨".to_string(),
             ],
             protocol: "groth16-custom".to_string(),
+            curve: None,
         };
 
         let serialized = serde_json::to_string(&proof).unwrap();
@@ -359,15 +355,16 @@ mod tests {
                 ],
                 pi_c: ["10".to_string(), "11".to_string(), "12".to_string()],
                 protocol: "groth16".to_string(),
+                curve: None,
             },
-            public_outputs: vec![],
+            public_inputs: vec![],
         };
 
         let serialized = serde_json::to_string(&signature).unwrap();
         let deserialized: ZKEmailSignature = serde_json::from_str(&serialized).unwrap();
 
-        assert_eq!(signature.public_outputs, deserialized.public_outputs);
-        assert!(signature.public_outputs.is_empty());
+        assert_eq!(signature.public_inputs, deserialized.public_inputs);
+        assert!(signature.public_inputs.is_empty());
     }
 
     #[test]
@@ -387,17 +384,18 @@ mod tests {
                 ],
                 pi_c: ["10".to_string(), "11".to_string(), "12".to_string()],
                 protocol: "groth16".to_string(),
+                curve: None,
             },
-            public_outputs: large_outputs.clone(),
+            public_inputs: large_outputs.clone(),
         };
 
         let serialized = serde_json::to_string(&signature).unwrap();
         let deserialized: ZKEmailSignature = serde_json::from_str(&serialized).unwrap();
 
-        assert_eq!(signature.public_outputs.len(), 100);
-        assert_eq!(signature.public_outputs, deserialized.public_outputs);
-        assert_eq!(deserialized.public_outputs[0], "output_0");
-        assert_eq!(deserialized.public_outputs[99], "output_99");
+        assert_eq!(signature.public_inputs.len(), 100);
+        assert_eq!(signature.public_inputs, deserialized.public_inputs);
+        assert_eq!(deserialized.public_inputs[0], "output_0");
+        assert_eq!(deserialized.public_inputs[99], "output_99");
     }
 
     #[test]
@@ -414,6 +412,7 @@ mod tests {
                 ],
                 pi_c: ["10".to_string(), "11".to_string(), "12".to_string()],
                 protocol: protocol.to_string(),
+                curve: None,
             };
 
             let serialized = serde_json::to_string(&proof).unwrap();
@@ -434,7 +433,7 @@ mod tests {
                 "pi_c": ["10", "11", "12"],
                 "protocol": "groth16"
             },
-            "publicOutputs": ["test_value"]
+            "publicInputs": ["test_value"]
         }"#;
 
         let signature: ZKEmailSignature = serde_json::from_str(json_with_camel_case).unwrap();
@@ -442,13 +441,13 @@ mod tests {
         // Verify the struct fields are populated correctly
         assert_eq!(signature.proof.pi_a, ["1", "2", "3"]);
         assert_eq!(signature.proof.protocol, "groth16");
-        assert_eq!(signature.public_outputs, vec!["test_value"]);
-
+        assert_eq!(signature.public_inputs, vec!["test_value"]);
+        
         // Verify serialization produces camelCase JSON
         let serialized = serde_json::to_string(&signature).unwrap();
         let parsed_back: serde_json::Value = serde_json::from_str(&serialized).unwrap();
-        assert!(parsed_back.get("publicOutputs").is_some());
-        assert!(parsed_back.get("public_outputs").is_none()); // Should not exist
+        assert!(parsed_back.get("publicInputs").is_some());
+        assert!(parsed_back.get("public_inputs").is_none()); // Should not exist
     }
 
     #[test]
@@ -461,9 +460,9 @@ mod tests {
 
         // Verify the parsed signature matches our sample
         assert_eq!(sig.proof.protocol, "groth16");
-        assert_eq!(sig.public_outputs.len(), 34);
-        assert_eq!(sig.public_outputs[0], "2018721414038404820327");
-        assert_eq!(sig.public_outputs[33], "1");
+        assert_eq!(sig.public_inputs.len(), 34);
+        assert_eq!(sig.public_inputs[0], "2018721414038404820327");
+        assert_eq!(sig.public_inputs[33], "1");
     }
 
     #[test]
@@ -476,15 +475,15 @@ mod tests {
         let verification_request = QueryVerifyRequest {
             tx_bytes: tx_bytes.as_bytes().to_vec(),
             proof: serde_json::to_vec(&signature.proof).unwrap(),
-            public_inputs: signature.public_outputs.clone(),
-            email_hash: email_salt.as_bytes().to_vec(),
+            public_inputs: signature.public_inputs.clone(),
+            email_hash: email_salt.to_string(),
         };
 
         // Verify the request is properly constructed
         assert_eq!(verification_request.tx_bytes, tx_bytes.as_bytes());
-        assert_eq!(verification_request.email_hash, email_salt.as_bytes());
-        assert_eq!(verification_request.public_inputs, signature.public_outputs);
-
+        assert_eq!(verification_request.email_hash, email_salt.to_string());
+        assert_eq!(verification_request.public_inputs, signature.public_inputs);
+        
         // Verify proof serialization
         let proof_bytes = serde_json::to_vec(&signature.proof).unwrap();
         assert_eq!(verification_request.proof, proof_bytes);
