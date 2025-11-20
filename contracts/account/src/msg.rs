@@ -12,6 +12,18 @@ pub enum ExecuteMsg {
     AddAuthMethod { add_authenticator: AddAuthenticator },
     RemoveAuthMethod { id: u8 },
     Emit { data: String },
+    UpdateAllowedEmailHosts { 
+        id: u8, 
+        allowed_email_hosts: Vec<String> 
+    },
+    AddAllowedEmailHost { 
+        id: u8, 
+        email_host: String 
+    },
+    RemoveAllowedEmailHost { 
+        id: u8, 
+        email_host: String 
+    },
 }
 
 #[cw_serde]

@@ -4,7 +4,10 @@ use cosmwasm_std::{
 };
 
 use crate::error::ContractError;
-use crate::execute::{add_auth_method, assert_self, emit, remove_auth_method};
+use crate::execute::{
+    add_auth_method, add_allowed_email_host, assert_self, emit, remove_allowed_email_host,
+    remove_auth_method, update_allowed_email_hosts,
+};
 use crate::msg::{ExecuteMsg, MigrateMsg};
 use crate::{
     error::ContractResult,
@@ -91,6 +94,16 @@ pub fn execute(
         }
         ExecuteMsg::RemoveAuthMethod { id } => remove_auth_method(deps, env, *id),
         ExecuteMsg::Emit { data } => emit(env, data.to_string()),
+        ExecuteMsg::UpdateAllowedEmailHosts {
+            id,
+            allowed_email_hosts,
+        } => update_allowed_email_hosts(deps, env, *id, allowed_email_hosts.clone()),
+        ExecuteMsg::AddAllowedEmailHost { id, email_host } => {
+            add_allowed_email_host(deps, env, *id, email_host.clone())
+        }
+        ExecuteMsg::RemoveAllowedEmailHost { id, email_host } => {
+            remove_allowed_email_host(deps, env, *id, email_host.clone())
+        }
     }
 }
 
