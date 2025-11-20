@@ -148,7 +148,7 @@ pub fn execute_create_listing(
     // generate consistent id even across relisting helps single lookup
     let id = generate_id(vec![&collection.as_bytes(), &token_id.as_bytes()]);
     let asset_price = calculate_asset_price(price.clone(), config.fee_bps)?;
-    // if reserved is provided, use the contract address (the scrower) used to reserve in the asset contract
+    // if reserved is provided, use the contract address (the escrower) used to reserve in the asset contract
 
     let reservation = if reserved_for.clone().is_some() {
         Some(ReserveMsg {
