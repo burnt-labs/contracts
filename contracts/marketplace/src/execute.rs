@@ -16,10 +16,12 @@ use crate::offers::{
 use crate::helpers::calculate_asset_price;
 use crate::state::{listings, pending_sales, Listing, ListingStatus, PendingSale, SaleType};
 use crate::state::{Config, CONFIG};
+use asset::msg::ReserveMsg;
 use cosmwasm_std::{
-    ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, WasmMsg,
+    ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, Timestamp,
+    WasmMsg,
 };
-
+use cw_utils::maybe_addr;
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn execute(
     deps: DepsMut,
@@ -33,7 +35,16 @@ pub fn execute(
             collection,
             price,
             token_id,
-        } => execute_create_listing(deps, info, api.addr_validate(&collection)?, price, token_id),
+            reserved_for,
+        } => execute_create_listing(
+            deps,
+            env,
+            info,
+            api.addr_validate(&collection)?,
+            price,
+            token_id,
+            maybe_addr(api, reserved_for)?,
+        ),
         ExecuteMsg::CancelListing { listing_id } => execute_cancel_listing(deps, info, listing_id),
         ExecuteMsg::BuyItem { listing_id, price } => {
             execute_buy_item(deps, env, info.clone(), listing_id, price, info.sender)
@@ -114,10 +125,12 @@ pub fn execute_update_config(
 
 pub fn execute_create_listing(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     collection: Addr,
     price: Coin,
     token_id: String,
+    reserved_for: Option<Addr>,
 ) -> Result<Response, ContractError> {
     only_owner(&deps.querier, &info, &collection, &token_id)?;
     not_listed(&deps.querier, &collection, &token_id)?;
@@ -135,6 +148,16 @@ pub fn execute_create_listing(
     // generate consistent id even across relisting helps single lookup
     let id = generate_id(vec![&collection.as_bytes(), &token_id.as_bytes()]);
     let asset_price = calculate_asset_price(price.clone(), config.fee_bps)?;
+    // if reserved is provided, use the contract address (the scrower) used to reserve in the asset contract
+
+    let reservation = if let Some(_) = reserved_for.clone() {
+        Some(ReserveMsg {
+            reserver: Some(env.contract.address.to_string()),
+            reserved_until: Timestamp::from_seconds(env.block.time.seconds() + 365 * 24 * 60 * 60),
+        })
+    } else {
+        None
+    };
     let listing = Listing {
         id: id.clone(),
         seller: info.sender.clone(),
@@ -142,6 +165,7 @@ pub fn execute_create_listing(
         token_id: token_id.clone(),
         price: price.clone(),
         asset_price: asset_price.clone(),
+        reserved_for: reserved_for.clone(),
         status: ListingStatus::Active,
     };
     // reject if listing already exists
@@ -149,7 +173,7 @@ pub fn execute_create_listing(
         Some(_) => Err(ContractError::AlreadyListed {}),
         None => Ok(listing),
     })?;
-    let list_msg = asset_list_msg(token_id.clone(), asset_price);
+    let list_msg = asset_list_msg(token_id.clone(), asset_price, reservation);
     Ok(Response::new()
         .add_event(create_listing_event(
             id,
@@ -157,6 +181,7 @@ pub fn execute_create_listing(
             collection.clone(),
             token_id,
             price,
+            reserved_for.clone(),
         ))
         .add_message(WasmMsg::Execute {
             contract_addr: collection.to_string(),
@@ -231,6 +256,15 @@ pub fn execute_buy_item(
     let config = CONFIG.load(deps.storage)?;
     let listing = listings().load(deps.storage, listing_id.clone())?;
 
+    if let Some(reserved_for) = listing.reserved_for.clone() {
+        ensure_eq!(
+            reserved_for,
+            info.sender,
+            ContractError::Unauthorized {
+                message: "item is reserved for another address".to_string(),
+            }
+        );
+    }
     // Prevent price mismatch due to possible frontrunning
     if listing.price != price {
         return Err(ContractError::InvalidPrice {

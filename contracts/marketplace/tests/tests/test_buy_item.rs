@@ -31,6 +31,7 @@ fn test_buy_item_success() {
         collection: asset_contract.to_string(),
         price: price.clone(),
         token_id: "token1".to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
@@ -212,6 +213,7 @@ fn test_buy_item_wrong_denomination() {
         collection: asset_contract.to_string(),
         price: price.clone(),
         token_id: "token1".to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
@@ -442,6 +444,7 @@ fn test_buy_item_success_with_royalties() {
         collection: asset_contract.to_string(),
         price: price.clone(),
         token_id: "token1".to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);

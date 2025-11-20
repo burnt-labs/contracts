@@ -46,6 +46,7 @@ fn test_create_listing_success() {
         collection: asset_contract.to_string(),
         price: price.clone(),
         token_id: "token1".to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
@@ -103,6 +104,7 @@ fn test_create_listing_unauthorized() {
         collection: asset_contract.to_string(),
         price,
         token_id: "token1".to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(
@@ -142,6 +144,7 @@ fn test_create_listing_invalid_denom() {
         collection: asset_contract.to_string(),
         price,
         token_id: "token1".to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
@@ -186,6 +189,7 @@ fn test_create_listing_already_listed() {
         collection: asset_contract.to_string(),
         price: price.clone(),
         token_id: "token1".to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
@@ -195,6 +199,7 @@ fn test_create_listing_already_listed() {
         collection: asset_contract.to_string(),
         price,
         token_id: "token1".to_string(),
+        reserved_for: None,
     };
 
     let result2 = app.execute_contract(
@@ -228,6 +233,7 @@ fn test_create_listing_nonexistent_token() {
         collection: asset_contract.to_string(),
         price,
         token_id: "nonexistent".to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);

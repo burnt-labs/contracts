@@ -8,11 +8,16 @@ pub fn create_listing_event(
     collection: Addr,
     token_id: String,
     price: Coin,
+    reserved_for: Option<Addr>,
 ) -> Event {
+    let reserved_for = reserved_for
+        .map(|addr| addr.to_string())
+        .unwrap_or("".to_string());
     Event::new(format!("{}/list-item", env!("CARGO_PKG_NAME")))
         .add_attribute("id", id)
         .add_attribute("owner", owner.to_string())
         .add_attribute("collection", collection.to_string())
+        .add_attribute("reserved_for", reserved_for.to_string())
         .add_attribute("token_id", token_id)
         .add_attribute("price", price.to_string())
 }
