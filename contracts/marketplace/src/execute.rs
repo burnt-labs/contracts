@@ -150,7 +150,7 @@ pub fn execute_create_listing(
     let asset_price = calculate_asset_price(price.clone(), config.fee_bps)?;
     // if reserved is provided, use the contract address (the scrower) used to reserve in the asset contract
 
-    let reservation = if let Some(_) = reserved_for.clone() {
+    let reservation = if reserved_for.clone().is_some() {
         Some(ReserveMsg {
             reserver: Some(env.contract.address.to_string()),
             reserved_until: Timestamp::from_seconds(env.block.time.seconds() + 365 * 24 * 60 * 60),
