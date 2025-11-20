@@ -535,3 +535,118 @@ fn test_buy_item_success_with_royalties() {
         .unwrap();
     assert_eq!(owner_resp.owner, buyer.to_string());
 }
+#[test]
+fn test_buy_reserved_for() {
+    let mut app = setup_app();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let reserved_buyer = app.api().addr_make("reserved_buyer");
+    let uninterested_buyer = app.api().addr_make("uninterested_buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+    // Mint NFT to seller
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    // Approve marketplace contract
+    let approve_msg = Cw721ExecuteMsg::Approve {
+        spender: marketplace_contract.to_string(),
+        token_id: "token1".to_string(),
+        expires: None,
+    };
+    app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+        .unwrap();
+
+    // List with reserved_for for reserved_buyer
+    let price = coin(100, "uxion");
+    let list_msg = ExecuteMsg::ListItem {
+        collection: asset_contract.to_string(),
+        price: price.clone(),
+        token_id: "token1".to_string(),
+        reserved_for: Some(reserved_buyer.to_string()),
+    };
+
+    let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+    assert!(
+        result.is_ok(),
+        "Listing with reserved_for should succeed: {:?}",
+        result.err()
+    );
+
+    let events = result.unwrap().events;
+    let listing_id = extract_listing_id_from_events(&events);
+
+    // Fund both buyers
+    use cw_multi_test::{BankSudo, SudoMsg};
+    let funds = vec![coin(10000, "uxion")];
+    app.sudo(SudoMsg::Bank(BankSudo::Mint {
+        to_address: reserved_buyer.to_string(),
+        amount: funds.clone(),
+    }))
+    .unwrap();
+    app.sudo(SudoMsg::Bank(BankSudo::Mint {
+        to_address: uninterested_buyer.to_string(),
+        amount: funds,
+    }))
+    .unwrap();
+
+    // Buyer C (uninterested_buyer) tries to buy and should get error
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+    let result = app.execute_contract(
+        uninterested_buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(
+        result.is_err(),
+        "Unreserved buyer should not be able to purchase, but got Ok"
+    );
+    // Optionally check specific error message
+    assert_error(
+        result,
+        xion_nft_marketplace::error::ContractError::Unauthorized {
+            message: "item is reserved for another address".to_string(),
+        }
+        .to_string(),
+    );
+
+    // Buyer B (reserved_buyer) buys and should succeed
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id,
+        price: price.clone(),
+    };
+    let result = app.execute_contract(
+        reserved_buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(
+        result.is_ok(),
+        "Reserved buyer should be able to purchase: {:?}",
+        result.err()
+    );
+
+    let events = result.unwrap().events;
+    let sell_event = events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/item-sold");
+    assert!(sell_event.is_some());
+
+    // Confirm ownership transferred to reserved_buyer
+    let owner_query = cw721_base::msg::QueryMsg::OwnerOf {
+        token_id: "token1".to_string(),
+        include_expired: Some(false),
+    };
+    let owner_resp: cw721::msg::OwnerOfResponse = app
+        .wrap()
+        .query_wasm_smart(asset_contract.clone(), &owner_query)
+        .unwrap();
+    assert_eq!(owner_resp.owner, reserved_buyer.to_string());
+}
