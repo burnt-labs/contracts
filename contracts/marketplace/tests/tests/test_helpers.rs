@@ -156,6 +156,7 @@ pub fn create_listing(
         collection: asset_contract.to_string(),
         price,
         token_id: token_id.to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
@@ -211,6 +212,7 @@ pub fn create_listing_for_buy_test(
         collection: asset_contract.to_string(),
         price,
         token_id: token_id.to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
@@ -349,6 +351,7 @@ pub fn create_listing_helper(
         collection: asset_contract.to_string(),
         price,
         token_id: token_id.to_string(),
+        reserved_for: None,
     };
 
     let result = app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);

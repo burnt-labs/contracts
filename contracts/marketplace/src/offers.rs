@@ -114,7 +114,7 @@ pub fn execute_accept_offer(
         .map_err(|_| ContractError::InsuficientFunds {})?;
 
     // list the item on the asset contract with asset_price (not full price)
-    let list_msg = asset_list_msg(token_id.clone(), asset_price.clone());
+    let list_msg = asset_list_msg(token_id.clone(), asset_price.clone(), None);
     // do a buy on the asset contract for the specific price and buyer
     let buy_msg = asset_buy_msg(offer.buyer.clone(), token_id.clone());
 
@@ -274,7 +274,7 @@ pub fn execute_accept_collection_offer(
         .map_err(|_| ContractError::InsuficientFunds {})?;
 
     // list the item on the asset contract with asset_price (not full price)
-    let list_msg = asset_list_msg(token_id.clone(), asset_price.clone());
+    let list_msg = asset_list_msg(token_id.clone(), asset_price.clone(), None);
     // do a buy on the asset contract for the specific price and buyer
     let buy_msg = asset_buy_msg(offer.buyer.clone(), token_id.clone());
 

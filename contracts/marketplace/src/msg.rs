@@ -13,6 +13,7 @@ pub enum ExecuteMsg {
         price: Coin,
         collection: String,
         token_id: String,
+        reserved_for: Option<String>,
     },
     CancelListing {
         listing_id: String,

@@ -102,6 +102,7 @@ pub struct Listing {
     pub price: Coin,
     pub asset_price: Coin,
     pub seller: Addr,
+    pub reserved_for: Option<Addr>,
     pub status: ListingStatus,
 }
 

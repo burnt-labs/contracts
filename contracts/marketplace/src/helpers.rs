@@ -3,6 +3,7 @@ use crate::state::CONFIG;
 use asset::msg::AssetExtensionExecuteMsg as AssetExecuteMsg;
 use asset::msg::AssetExtensionQueryMsg;
 use asset::msg::QueryMsg as AssetQueryMsg;
+use asset::msg::ReserveMsg;
 use asset::state::ListingInfo;
 use blake2::{Blake2s256, Digest};
 use cosmwasm_std::StdError;
@@ -129,6 +130,7 @@ pub fn valid_payment(
 pub fn asset_list_msg(
     token_id: String,
     asset_price: Coin,
+    reservation: Option<ReserveMsg>,
 ) -> asset::msg::ExecuteMsg<
     cw721::DefaultOptionalNftExtensionMsg,
     cw721::DefaultOptionalCollectionExtensionMsg,
@@ -142,7 +144,7 @@ pub fn asset_list_msg(
         msg: AssetExecuteMsg::List {
             token_id: token_id.clone(),
             price: asset_price.clone(),
-            reservation: None,
+            reservation,
         },
     }
 }
