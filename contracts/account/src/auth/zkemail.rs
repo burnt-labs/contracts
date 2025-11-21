@@ -32,6 +32,7 @@ pub fn verify(
     tx_bytes: &[u8],
     sig_bytes: &[u8],
     email_salt: &str,
+    allowed_email_hosts: &[String],
 ) -> ContractResult<bool> {
     // split the sig_bytes into 2 parts proof and publicOutputs
     let sig: ZKEmailSignature = from_json(sig_bytes.to_vec())?;
@@ -43,6 +44,7 @@ pub fn verify(
         proof: serde_json::to_vec(&proof)?,
         public_inputs: public_inputs.clone(),
         email_hash: email_salt.to_string(),
+        allowed_email_hosts: allowed_email_hosts.to_vec(),
     };
 
     let verification_request_bytes = verification_request.to_bytes()?;
@@ -470,6 +472,7 @@ mod tests {
         let signature = sample_zkemail_signature();
         let tx_bytes = "test_transaction";
         let email_salt = "test_salt";
+        let allowed_email_hosts = vec!["example.com".to_string(), "test.com".to_string()];
 
         // Test creating QueryVerifyRequest from signature components
         let verification_request = QueryVerifyRequest {
@@ -477,12 +480,14 @@ mod tests {
             proof: serde_json::to_vec(&signature.proof).unwrap(),
             public_inputs: signature.public_inputs.clone(),
             email_hash: email_salt.to_string(),
+            allowed_email_hosts: allowed_email_hosts.clone(),
         };
 
         // Verify the request is properly constructed
         assert_eq!(verification_request.tx_bytes, tx_bytes.as_bytes());
         assert_eq!(verification_request.email_hash, email_salt.to_string());
         assert_eq!(verification_request.public_inputs, signature.public_inputs);
+        assert_eq!(verification_request.allowed_email_hosts, allowed_email_hosts);
         
         // Verify proof serialization
         let proof_bytes = serde_json::to_vec(&signature.proof).unwrap();

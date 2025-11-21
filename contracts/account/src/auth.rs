@@ -52,6 +52,7 @@ pub enum AddAuthenticator {
     ZKEmail {
         id: u8,
         email_salt: String,
+        allowed_email_hosts: Vec<String>,
         signature: Binary,
     },
 }
@@ -94,6 +95,7 @@ pub enum Authenticator {
     },
     ZKEmail {
         email_salt: String,
+        allowed_email_hosts: Vec<String>,
     },
 }
 
@@ -170,9 +172,10 @@ impl Authenticator {
             }
             Authenticator::ZKEmail {
                 email_salt,
+                allowed_email_hosts,
             } => {
                 let tx_bytes_hash = util::base64url_encode(tx_bytes);
-                let verification = zkemail::verify(deps, tx_bytes_hash.as_bytes(), sig_bytes, email_salt)?;
+                let verification = zkemail::verify(deps, tx_bytes_hash.as_bytes(), sig_bytes, email_salt, allowed_email_hosts)?;
                 Ok(verification)
             }
         }

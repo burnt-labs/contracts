@@ -230,11 +230,17 @@ pub fn add_auth_method(
         AddAuthenticator::ZKEmail {
             id,
             email_salt,
+            allowed_email_hosts,
             signature,
         } => {
-            // extract email salt from signature
+            // Validate that at least one email host is provided
+            if allowed_email_hosts.is_empty() {
+                return Err(ContractError::NoAllowedEmailHosts);
+            }
+
             let auth = Authenticator::ZKEmail {
-                email_salt: (*email_salt).clone()
+                email_salt: (*email_salt).clone(),
+                allowed_email_hosts: allowed_email_hosts.clone(),
             };
             if !auth.verify(
                 deps.as_ref(),
@@ -309,6 +315,138 @@ pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {
     }
 
     Ok(())
+}
+
+pub fn update_allowed_email_hosts(
+    deps: DepsMut,
+    env: Env,
+    id: u8,
+    allowed_email_hosts: Vec<String>,
+) -> ContractResult<Response> {
+    // Validate that at least one email host is provided
+    if allowed_email_hosts.is_empty() {
+        return Err(ContractError::NoAllowedEmailHosts);
+    }
+
+    // Load the authenticator
+    let authenticator = AUTHENTICATORS.load(deps.storage, id)?;
+
+    // Ensure it's a ZKEmail authenticator
+    match authenticator {
+        Authenticator::ZKEmail { email_salt, .. } => {
+            // Update the authenticator with new allowed_email_hosts
+            let updated_auth = Authenticator::ZKEmail {
+                email_salt,
+                allowed_email_hosts: allowed_email_hosts.clone(),
+            };
+            
+            AUTHENTICATORS.save(deps.storage, id, &updated_auth)?;
+
+            Ok(Response::new().add_event(
+                Event::new("update_allowed_email_hosts").add_attributes(vec![
+                    ("contract_address", env.contract.address.to_string()),
+                    ("authenticator_id", id.to_string()),
+                    ("allowed_email_hosts", serde_json::to_string(&allowed_email_hosts)?),
+                ]),
+            ))
+        }
+        _ => Err(ContractError::UnsupportedAuthenticatorOperation),
+    }
+}
+
+pub fn add_allowed_email_host(
+    deps: DepsMut,
+    env: Env,
+    id: u8,
+    email_host: String,
+) -> ContractResult<Response> {
+    // Load the authenticator
+    let authenticator = AUTHENTICATORS.load(deps.storage, id)?;
+
+    // Ensure it's a ZKEmail authenticator
+    match authenticator {
+        Authenticator::ZKEmail {
+            email_salt,
+            mut allowed_email_hosts,
+        } => {
+            // Check if the email host already exists
+            if allowed_email_hosts.contains(&email_host) {
+                return Ok(Response::new().add_event(
+                    Event::new("add_allowed_email_host").add_attributes(vec![
+                        ("contract_address", env.contract.address.to_string()),
+                        ("authenticator_id", id.to_string()),
+                        ("email_host", email_host),
+                        ("status", "already_exists".to_string()),
+                    ]),
+                ));
+            }
+
+            // Add the new email host
+            allowed_email_hosts.push(email_host.clone());
+
+            // Update the authenticator
+            let updated_auth = Authenticator::ZKEmail {
+                email_salt,
+                allowed_email_hosts,
+            };
+
+            AUTHENTICATORS.save(deps.storage, id, &updated_auth)?;
+
+            Ok(Response::new().add_event(
+                Event::new("add_allowed_email_host").add_attributes(vec![
+                    ("contract_address", env.contract.address.to_string()),
+                    ("authenticator_id", id.to_string()),
+                    ("email_host", email_host),
+                    ("status", "added".to_string()),
+                ]),
+            ))
+        }
+        _ => Err(ContractError::UnsupportedAuthenticatorOperation),
+    }
+}
+
+pub fn remove_allowed_email_host(
+    deps: DepsMut,
+    env: Env,
+    id: u8,
+    email_host: String,
+) -> ContractResult<Response> {
+    // Load the authenticator
+    let authenticator = AUTHENTICATORS.load(deps.storage, id)?;
+
+    // Ensure it's a ZKEmail authenticator
+    match authenticator {
+        Authenticator::ZKEmail {
+            email_salt,
+            mut allowed_email_hosts,
+        } => {
+            // Ensure at least one email host remains after removal
+            if allowed_email_hosts.len() <= 1 {
+                return Err(ContractError::NoAllowedEmailHosts);
+            }
+
+            // Remove the email host
+            allowed_email_hosts.retain(|host| host != &email_host);
+
+            // Update the authenticator
+            let updated_auth = Authenticator::ZKEmail {
+                email_salt,
+                allowed_email_hosts,
+            };
+
+            AUTHENTICATORS.save(deps.storage, id, &updated_auth)?;
+
+            Ok(Response::new().add_event(
+                Event::new("remove_allowed_email_host").add_attributes(vec![
+                    ("contract_address", env.contract.address.to_string()),
+                    ("authenticator_id", id.to_string()),
+                    ("email_host", email_host),
+                    ("status", "removed".to_string()),
+                ]),
+            ))
+        }
+        _ => Err(ContractError::UnsupportedAuthenticatorOperation),
+    }
 }
 
 #[cfg(test)]
@@ -448,6 +586,7 @@ pub mod tests {
         let mut add_authenticator = AddAuthenticator::ZKEmail {
             id: 1,
             email_salt: "test_email_salt".to_string(),
+            allowed_email_hosts: vec!["example.com".to_string()],
             signature: signature_binary,
         };
 
@@ -459,5 +598,288 @@ pub mod tests {
         
         // Verify the authenticator was not saved
         assert!(!AUTHENTICATORS.has(deps.as_ref().storage, 1));
+    }
+
+    #[test]
+    fn test_allowed_email_hosts_operations() {
+        use crate::auth::Authenticator;
+        use crate::error::ContractError;
+        use crate::execute::{add_allowed_email_host, remove_allowed_email_host, update_allowed_email_hosts};
+
+        let mut deps = OwnedDeps {
+            storage: MockStorage::default(),
+            api: MockApi::default().with_prefix("xion"),
+            querier: MockQuerier::<XionCustomQuery>::new(&[]),
+            custom_query_type: std::marker::PhantomData,
+        };
+        let env = mock_env();
+        let auth_id = 1u8;
+
+        // Setup: Create a ZKEmail authenticator with initial email hosts
+        let initial_authenticator = Authenticator::ZKEmail {
+            email_salt: "test_salt".to_string(),
+            allowed_email_hosts: vec!["example.com".to_string(), "test.com".to_string()],
+        };
+        AUTHENTICATORS
+            .save(deps.as_mut().storage, auth_id, &initial_authenticator)
+            .unwrap();
+
+        // Test 1: Add a new email host
+        let result = add_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            "newhost.com".to_string(),
+        );
+        assert!(result.is_ok());
+        
+        // Verify the host was added
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { allowed_email_hosts, .. } => {
+                assert_eq!(allowed_email_hosts.len(), 3);
+                assert!(allowed_email_hosts.contains(&"newhost.com".to_string()));
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // Test 2: Try to add a duplicate email host
+        let result = add_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            "newhost.com".to_string(),
+        );
+        assert!(result.is_ok()); // Should succeed but not add duplicate
+        
+        // Verify no duplicate was added
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { allowed_email_hosts, .. } => {
+                assert_eq!(allowed_email_hosts.len(), 3); // Still 3, not 4
+                assert_eq!(
+                    allowed_email_hosts.iter().filter(|h| *h == "newhost.com").count(),
+                    1
+                );
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // Test 3: Remove an email host
+        let result = remove_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            "newhost.com".to_string(),
+        );
+        assert!(result.is_ok());
+        
+        // Verify the host was removed
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { allowed_email_hosts, .. } => {
+                assert_eq!(allowed_email_hosts.len(), 2);
+                assert!(!allowed_email_hosts.contains(&"newhost.com".to_string()));
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // Test 4: Try to remove the second-to-last email host (should succeed)
+        let result = remove_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            "example.com".to_string(),
+        );
+        assert!(result.is_ok());
+        
+        // Verify only one host remains
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { allowed_email_hosts, .. } => {
+                assert_eq!(allowed_email_hosts.len(), 1);
+                assert_eq!(allowed_email_hosts[0], "test.com");
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // Test 5: Try to remove the last email host (should fail)
+        let result = remove_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            "test.com".to_string(),
+        );
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), ContractError::NoAllowedEmailHosts);
+        
+        // Verify the host was not removed
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { allowed_email_hosts, .. } => {
+                assert_eq!(allowed_email_hosts.len(), 1);
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // Test 6: Update allowed email hosts with a new list
+        let new_hosts = vec![
+            "updated1.com".to_string(),
+            "updated2.com".to_string(),
+            "updated3.com".to_string(),
+        ];
+        let result = update_allowed_email_hosts(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            new_hosts.clone(),
+        );
+        assert!(result.is_ok());
+        
+        // Verify the hosts were updated
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { allowed_email_hosts, .. } => {
+                assert_eq!(allowed_email_hosts, new_hosts);
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // Test 7: Try to update with an empty list (should fail)
+        let result = update_allowed_email_hosts(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            vec![],
+        );
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), ContractError::NoAllowedEmailHosts);
+        
+        // Verify hosts were not changed
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { allowed_email_hosts, .. } => {
+                assert_eq!(allowed_email_hosts, new_hosts);
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // Test 8: Try operations on a non-existent authenticator
+        let result = add_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            99u8, // Non-existent ID
+            "test.com".to_string(),
+        );
+        assert!(result.is_err());
+        
+        // Test 9: Try operations on a non-ZKEmail authenticator
+        let secp_auth = Authenticator::Secp256K1 {
+            pubkey: Binary::from(vec![1, 2, 3]),
+        };
+        AUTHENTICATORS
+            .save(deps.as_mut().storage, 2u8, &secp_auth)
+            .unwrap();
+        
+        let result = add_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            2u8,
+            "test.com".to_string(),
+        );
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), ContractError::UnsupportedAuthenticatorOperation);
+        
+        let result = remove_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            2u8,
+            "test.com".to_string(),
+        );
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), ContractError::UnsupportedAuthenticatorOperation);
+        
+        let result = update_allowed_email_hosts(
+            deps.as_mut(),
+            env.clone(),
+            2u8,
+            vec!["test.com".to_string()],
+        );
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), ContractError::UnsupportedAuthenticatorOperation);
+
+        // Test 10: Try to remove a host that doesn't exist
+        let result = remove_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            "nonexistent.com".to_string(),
+        );
+        // This should succeed but not change anything
+        assert!(result.is_ok());
+        
+        // Verify the hosts remain unchanged
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { allowed_email_hosts, .. } => {
+                assert_eq!(allowed_email_hosts, new_hosts);
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // Test 11: Update with a single host (edge case - minimum valid)
+        let result = update_allowed_email_hosts(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            vec!["single.com".to_string()],
+        );
+        assert!(result.is_ok());
+        
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { allowed_email_hosts, .. } => {
+                assert_eq!(allowed_email_hosts.len(), 1);
+                assert_eq!(allowed_email_hosts[0], "single.com");
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // Test 12: Add multiple hosts one by one
+        let result1 = add_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            "multi1.com".to_string(),
+        );
+        assert!(result1.is_ok());
+        
+        let result2 = add_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            "multi2.com".to_string(),
+        );
+        assert!(result2.is_ok());
+        
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { allowed_email_hosts, .. } => {
+                assert_eq!(allowed_email_hosts.len(), 3);
+                assert!(allowed_email_hosts.contains(&"single.com".to_string()));
+                assert!(allowed_email_hosts.contains(&"multi1.com".to_string()));
+                assert!(allowed_email_hosts.contains(&"multi2.com".to_string()));
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // Test 13: Verify email_salt is preserved through updates
+        let updated_auth = AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap();
+        match updated_auth {
+            Authenticator::ZKEmail { email_salt, .. } => {
+                assert_eq!(email_salt, "test_salt");
+            }
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
     }
 }
