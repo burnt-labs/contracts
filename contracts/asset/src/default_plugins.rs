@@ -105,9 +105,9 @@ pub fn not_after_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> 
 // can be made that exceeds 1 week from now
 // this is to prevent an indefinite reservation that exceeds the time lock
 pub fn time_lock_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> StdResult<bool> {
-    if let Some(time_lock) = &ctx.data.time_lock {
-        if let Some(reservation) = &ctx.data.reservation {
-            if Expiration::AtTime(reservation.reserved_until).gt(&Expiration::AtTime(
+    if let Some(time_lock) = &ctx.data.time_lock
+        && let Some(reservation) = &ctx.data.reservation
+            && Expiration::AtTime(reservation.reserved_until).gt(&Expiration::AtTime(
                 ctx.env.block.time.plus_seconds(time_lock.as_secs()),
             )) {
                 return Err(cosmwasm_std::StdError::generic_err(format!(
@@ -116,8 +116,6 @@ pub fn time_lock_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> 
                     Expiration::AtTime(ctx.env.block.time.plus_seconds(time_lock.as_secs()))
                 )));
             }
-        }
-    }
     Ok(true)
 }
 
@@ -222,23 +220,21 @@ pub fn allowed_currencies_plugin(
 
     let allowed_set: HashSet<&str> = allowed.iter().map(|d| d.denom.as_str()).collect();
 
-    if let Some(price) = &ctx.data.ask_price {
-        if !allowed_set.contains(price.denom.as_str()) {
+    if let Some(price) = &ctx.data.ask_price
+        && !allowed_set.contains(price.denom.as_str()) {
             return Err(cosmwasm_std::StdError::generic_err(
                 "ask price currency is not allowed",
             ));
         }
-    }
 
-    if let Some(min_price) = &ctx.data.min_price {
-        if !allowed_set.contains(min_price.denom.as_str()) {
+    if let Some(min_price) = &ctx.data.min_price
+        && !allowed_set.contains(min_price.denom.as_str()) {
             {
                 return Err(cosmwasm_std::StdError::generic_err(
                     "minimum price currency is not allowed",
                 ));
             }
         }
-    }
 
     for coin in &ctx.info.funds {
         if !allowed_set.contains(coin.denom.as_str()) {

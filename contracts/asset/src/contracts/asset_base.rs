@@ -7,7 +7,7 @@ use crate::{
     CONTRACT_NAME, CONTRACT_VERSION,
     error::ContractResult,
     msg::{AssetExtensionExecuteMsg, ExecuteMsg, InstantiateMsg},
-    traits::{AssetContract, DefaultAssetContract},
+    traits::DefaultAssetContract,
 };
 use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw721::{
