@@ -232,11 +232,9 @@ pub fn allowed_currencies_plugin(
 
     if let Some(min_price) = &ctx.data.min_price {
         if !allowed_set.contains(min_price.denom.as_str()) {
-            {
-                return Err(cosmwasm_std::StdError::generic_err(
-                    "minimum price currency is not allowed",
-                ));
-            }
+            return Err(cosmwasm_std::StdError::generic_err(
+                "minimum price currency is not allowed",
+            ));
         }
     }
 
