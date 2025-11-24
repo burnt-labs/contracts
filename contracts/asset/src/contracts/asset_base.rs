@@ -31,7 +31,7 @@ pub fn instantiate(
 ) -> ContractResult<Response> {
     use crate::error::ContractError;
 
-    let contract: AssetBaseContract<'static> = AssetContract::default();
+    let contract: AssetBaseContract<'static> = DefaultAssetContract::default();
 
     let response = contract
         .instantiate_with_version(deps, &env, &info, msg, CONTRACT_NAME, CONTRACT_VERSION)
@@ -52,7 +52,7 @@ pub fn execute(
         AssetExtensionExecuteMsg,
     >,
 ) -> ContractResult<Response> {
-    let contract: AssetBaseContract<'static> = AssetContract::default();
+    let contract: AssetBaseContract<'static> = DefaultAssetContract::default();
 
     contract
         .execute_pluggable(deps, &env, &info, msg)
@@ -74,7 +74,7 @@ pub fn query(
 
     use crate::error::ContractError;
 
-    let contract: AssetBaseContract<'static> = AssetContract::default();
+    let contract: AssetBaseContract<'static> = DefaultAssetContract::default();
 
     contract
         .query(deps, &env, msg)
