@@ -42,7 +42,7 @@ where
     }
 }
 
-impl<'a, TNftExtension> AssetConfig<'a, TNftExtension>
+impl<TNftExtension> AssetConfig<'_, TNftExtension>
 where
     TNftExtension: Cw721State,
 {
@@ -70,7 +70,7 @@ pub struct ListingIndexes<'a> {
     pub seller: MultiIndex<'a, Addr, ListingInfo, String>,
 }
 
-impl<'a> IndexList<ListingInfo> for ListingIndexes<'a> {
+impl IndexList<ListingInfo> for ListingIndexes<'_> {
     fn get_indexes(
         &'_ self,
     ) -> Box<dyn Iterator<Item = &'_ dyn cw_storage_plus::Index<ListingInfo>> + '_> {
