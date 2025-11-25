@@ -105,11 +105,8 @@ pub fn not_after_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> 
 // can be made that exceeds 1 week from now
 // this is to prevent an indefinite reservation that exceeds the time lock
 pub fn time_lock_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> StdResult<bool> {
-    if let (Some(time_lock), Some(reservation)) =
-        (&ctx.data.time_lock, &ctx.data.reservation)
-    {
-        let max_allowed =
-            Expiration::AtTime(ctx.env.block.time.plus_seconds(time_lock.as_secs()));
+    if let (Some(time_lock), Some(reservation)) = (&ctx.data.time_lock, &ctx.data.reservation) {
+        let max_allowed = Expiration::AtTime(ctx.env.block.time.plus_seconds(time_lock.as_secs()));
 
         if Expiration::AtTime(reservation.reserved_until).gt(&max_allowed) {
             return Err(cosmwasm_std::StdError::generic_err(format!(
