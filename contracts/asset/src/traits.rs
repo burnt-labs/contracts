@@ -223,7 +223,7 @@ where
 {
 }
 
-impl<'a, TNftExtension, TNftExtensionMsg, TCollectionExtension, TCollectionExtensionMsg>
+impl<TNftExtension, TNftExtensionMsg, TCollectionExtension, TCollectionExtensionMsg>
     Cw721Execute<
         TNftExtension,
         TNftExtensionMsg,
@@ -233,7 +233,7 @@ impl<'a, TNftExtension, TNftExtensionMsg, TCollectionExtension, TCollectionExten
         Empty,
     >
     for DefaultAssetContract<
-        'a,
+        '_,
         TNftExtension,
         TNftExtensionMsg,
         TCollectionExtension,
