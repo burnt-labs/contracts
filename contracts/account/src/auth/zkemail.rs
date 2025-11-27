@@ -2,7 +2,7 @@ use crate::error::ContractResult;
 use cosmos_sdk_proto::{
     prost::Message,
     traits::MessageExt,
-    xion::v1::dkim::{QueryVerifyRequest, QueryVerifyResponse},
+    xion::v1::dkim::{AuthenticateResponse, QueryAuthenticateRequest},
 };
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{from_json, Binary, Deps};
@@ -39,7 +39,7 @@ pub fn verify(
     let proof = sig.proof;
     let public_inputs = sig.public_inputs;
 
-    let verification_request = QueryVerifyRequest {
+    let verification_request = QueryAuthenticateRequest {
         tx_bytes: tx_bytes.to_vec(),
         proof: serde_json::to_vec(&proof)?,
         public_inputs: public_inputs.clone(),
@@ -53,7 +53,7 @@ pub fn verify(
         Binary::from(verification_request_bytes),
     )?;
 
-    let res: QueryVerifyResponse = QueryVerifyResponse::decode(verification_response.as_slice())?;
+    let res: AuthenticateResponse = AuthenticateResponse::decode(verification_response.as_slice())?;
 
     Ok(res.verified)
 }
@@ -475,7 +475,7 @@ mod tests {
         let allowed_email_hosts = vec!["example.com".to_string(), "test.com".to_string()];
 
         // Test creating QueryVerifyRequest from signature components
-        let verification_request = QueryVerifyRequest {
+        let verification_request = QueryAuthenticateRequest {
             tx_bytes: tx_bytes.as_bytes().to_vec(),
             proof: serde_json::to_vec(&signature.proof).unwrap(),
             public_inputs: signature.public_inputs.clone(),
