@@ -1,5 +1,7 @@
 /// These are default plugins that can be used out of the box.
-use cosmwasm_std::{Attribute, BankMsg, Coin, CosmosMsg, CustomMsg, Empty, StdResult, SubMsg};
+use cosmwasm_std::{
+    Attribute, BankMsg, Coin, CosmosMsg, CustomMsg, Decimal, Empty, StdResult, SubMsg, Uint128, Uint256
+};
 use cw721::Expiration;
 
 use crate::plugin::{DefaultXionAssetContext, PluginCtx};
@@ -135,7 +137,9 @@ pub fn royalty_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> St
 
     if let Some(ask_price) = &ctx.data.ask_price {
         if ask_price.amount.is_zero() {
-            return Ok(true);
+            return Err(cosmwasm_std::StdError::generic_err(
+                "Ask price is zero, cannot calculate royalty".to_string(),
+            ));
         }
     } else {
         Err(cosmwasm_std::StdError::generic_err(
@@ -153,7 +157,11 @@ pub fn royalty_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> St
         ))?;
     }
     let fund = fund.unwrap();
-    let royalty_amount = fund.amount.multiply_ratio(bps as u128, 10_000u128);
+    let numerator: Uint256 = fund.amount.full_mul(bps as u128);
+    let royalty_amount: Uint128 = (numerator.checked_div(Uint256::from(10_000u128)))
+        .map_err(|_| cosmwasm_std::StdError::generic_err("royalty amount overflow"))?
+        .try_into()
+        .map_err(|_| cosmwasm_std::StdError::generic_err("royalty amount overflow"))?;
 
     if royalty_amount.is_zero() {
         return Ok(true);
