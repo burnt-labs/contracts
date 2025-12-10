@@ -59,6 +59,12 @@ pub fn min_price_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> 
     // check if the minimum price is met
     if let Some(min_price) = &ctx.data.min_price {
         if let Some(ask_price) = ctx.data.ask_price.clone() {
+            if ask_price.denom != min_price.denom {
+                return Err(cosmwasm_std::StdError::generic_err(format!(
+                    "ask price denom {} does not match minimum price denom {}",
+                    ask_price.denom, min_price.denom
+                )));
+            }
             if ask_price.amount.u128() < min_price.amount.u128() {
                 return Err(cosmwasm_std::StdError::generic_err(format!(
                     "Minimum price not met: {} required, {} provided",
