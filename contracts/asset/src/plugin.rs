@@ -415,10 +415,6 @@ where
         if let Some(plugin) = allowed_currencies_plugin {
             plugin.run_asset_plugin(ctx)?;
         }
-        // Exact price plugin disabled for buys for now
-        if let Some(plugin) = exact_price_plugin {
-            plugin.run_asset_plugin(ctx)?;
-        }
         if let Some(plugin) = allowed_marketplaces_plugin {
             plugin.run_asset_plugin(ctx)?;
         }
