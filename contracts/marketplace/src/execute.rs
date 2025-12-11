@@ -278,7 +278,7 @@ pub fn execute_buy_item(
 
     // if approvals are enabled, create pending sale.
     if config.sale_approvals {
-        return execute_create_pending_sale(deps, env, info, listing_id, listing, price);
+        return execute_create_pending_sale(deps, env, info, listing_id, listing, price, recipient);
     }
 
     // remove listing
@@ -322,6 +322,7 @@ fn execute_create_pending_sale(
     listing_id: String,
     listing: Listing,
     price: Coin,
+    recipient:Addr,
 ) -> Result<Response, ContractError> {
     let pending_sale_id = generate_id(vec![
         listing_id.as_bytes(),
@@ -339,6 +340,7 @@ fn execute_create_pending_sale(
         sale_type: SaleType::BuyNow,
         time: env.block.time.seconds(),
         expiration: env.block.time.seconds() + 86400, // 24 hours
+        recipient,
     };
 
     pending_sales().save(deps.storage, pending_sale_id.clone(), &pending_sale)?;
@@ -355,7 +357,8 @@ fn execute_create_pending_sale(
     // Reserve the NFT in the asset contract
     let reserve_msg = asset_reserve_msg(
         listing.token_id.clone(),
-        info.sender.clone(),
+        // marketplace contract should be the reserver
+        env.contract.address.clone(),
         env.block.time.plus_seconds(86400),
     );
 
@@ -395,7 +398,7 @@ pub fn execute_approve_sale(
     ]);
 
     // Execute the buy on asset contract
-    let buy_msg = asset_buy_msg(pending_sale.buyer.clone(), pending_sale.token_id.clone());
+    let buy_msg = asset_buy_msg(pending_sale.recipient.clone(), pending_sale.token_id.clone());
 
     // Calculate asset price (seller proceeds) and marketplace fee
     // This ensures the approvals path matches the immediate buy path

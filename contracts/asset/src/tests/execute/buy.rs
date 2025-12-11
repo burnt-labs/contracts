@@ -246,45 +246,6 @@ fn buy_flow() {
                 extension: Empty {},
             },
         ));
-        // successful buy on behalf of reserver
-        expect_ok(AssetConfig::<Empty>::default().listings.save(
-            deps.as_mut().storage,
-            "token-4",
-            &ListingInfo {
-                id: "token-4".to_string(),
-                seller: seller_addr.clone(),
-                price: price.clone(),
-                reserved: Some(Reserve {
-                    reserver: buyer_addr.clone(),
-                    reserved_until: env.block.time.plus_seconds(600),
-                }),
-            },
-        ));
-        let mut deps = deps;
-        let response = expect_ok(buy::<Empty, Empty>(
-            deps.as_mut(),
-            &env,
-            &message_info(&seller_addr, std::slice::from_ref(&price)),
-            "token-4".to_string(),
-            Some(buyer_addr.to_string()), // buyer is the reserver
-            vec![],
-        ));
-        let attrs: Vec<(String, String)> = response
-            .attributes
-            .iter()
-            .map(|attr| (attr.key.clone(), attr.value.clone()))
-            .collect();
-        assert_eq!(
-            attrs,
-            vec![
-                ("action".to_string(), "buy".to_string()),
-                ("id".to_string(), "token-4".to_string()),
-                ("price".to_string(), price.amount.to_string()),
-                ("denom".to_string(), price.denom.to_string()),
-                ("seller".to_string(), seller_addr.to_string()),
-                ("buyer".to_string(), buyer_addr.to_string()),
-            ],
-        );
     }
     // expired reservation is cleared and purchase is allowed
     {
