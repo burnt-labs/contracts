@@ -307,7 +307,7 @@ pub fn execute_buy_item(
             funds: vec![asset_price],
         })
         .add_message(BankMsg::Send {
-            to_address: config.manager.to_string(),
+            to_address: config.fee_recipient.to_string(),
             amount: vec![Coin {
                 denom: payment.denom,
                 amount: marketplace_fee,
@@ -442,7 +442,7 @@ pub fn execute_approve_sale(
     // CosmWasm doesn't allow sending empty coin amounts
     if !marketplace_fee_amount.is_zero() {
         response = response.add_message(BankMsg::Send {
-            to_address: config.manager.to_string(),
+            to_address: config.fee_recipient.to_string(),
             amount: vec![Coin {
                 denom: pending_sale.price.denom,
                 amount: marketplace_fee_amount,
