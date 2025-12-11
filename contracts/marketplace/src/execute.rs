@@ -143,8 +143,6 @@ pub fn execute_create_listing(
             actual: price.denom,
         }
     );
-
-    let config = CONFIG.load(deps.storage)?;
     // generate consistent id even across relisting helps single lookup
     let id = generate_id(vec![&collection.as_bytes(), &token_id.as_bytes()]);
     let asset_price = calculate_asset_price(price.clone(), config.fee_bps)?;
