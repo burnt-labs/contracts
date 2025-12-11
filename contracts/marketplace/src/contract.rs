@@ -17,6 +17,7 @@ pub fn instantiate(
     _: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    msg.config.validate()?;
     let config = Config::from_str(msg.config, deps.api)?;
     config.save(deps.storage)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
