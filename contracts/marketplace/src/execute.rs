@@ -475,7 +475,7 @@ pub fn execute_reject_sale(
     let asset_listing = query_listing(
         &deps.querier,
         &pending_sale.collection,
-        &&pending_sale.token_id,
+        &pending_sale.token_id,
     );
 
     let mut sub_msgs = vec![];
