@@ -3,7 +3,7 @@ use cosmwasm_schema::cw_serde;
 use crate::error::ContractError;
 use cosmwasm_std::{ensure, Addr, Api, Coin, Storage};
 use cw_address_like::AddressLike;
-use cw_storage_plus::{index_list, IndexedMap, Item, MultiIndex};
+use cw_storage_plus::{index_list, IndexedMap, Item, MultiIndex, UniqueIndex};
 
 #[cw_serde]
 pub struct Config<T: AddressLike> {
@@ -228,6 +228,7 @@ pub struct PendingSale {
 pub struct PendingSaleIndices<'a> {
     pub by_seller: MultiIndex<'a, Addr, PendingSale, PendingSaleId>,
     pub by_buyer: MultiIndex<'a, Addr, PendingSale, PendingSaleId>,
+    pub by_collection_and_token_id: UniqueIndex<'a, (Addr, String), PendingSale, PendingSaleId>,
     pub by_expiration: MultiIndex<'a, u64, PendingSale, PendingSaleId>,
 }
 
@@ -243,6 +244,10 @@ pub fn pending_sales<'a>() -> IndexedMap<PendingSaleId, PendingSale, PendingSale
             |_id, pending_sale: &PendingSale| pending_sale.buyer.clone(),
             PENDING_SALES_NAMESPACE,
             "psb", // pending sale buyer index namespace
+        ),
+        by_collection_and_token_id: UniqueIndex::new(
+            |pending_sale: &PendingSale| (pending_sale.collection.clone(), pending_sale.token_id.clone()),
+            "psct", // pending sale collection and token id index namespace
         ),
         by_expiration: MultiIndex::new(
             |_id, pending_sale: &PendingSale| pending_sale.expiration,
