@@ -322,7 +322,7 @@ fn execute_create_pending_sale(
     listing_id: String,
     listing: Listing,
     price: Coin,
-    recipient:Addr,
+    recipient: Addr,
 ) -> Result<Response, ContractError> {
     let pending_sale_id = generate_id(vec![
         listing_id.as_bytes(),
@@ -398,7 +398,10 @@ pub fn execute_approve_sale(
     ]);
 
     // Execute the buy on asset contract
-    let buy_msg = asset_buy_msg(pending_sale.recipient.clone(), pending_sale.token_id.clone());
+    let buy_msg = asset_buy_msg(
+        pending_sale.recipient.clone(),
+        pending_sale.token_id.clone(),
+    );
 
     // Calculate asset price (seller proceeds) and marketplace fee
     // This ensures the approvals path matches the immediate buy path

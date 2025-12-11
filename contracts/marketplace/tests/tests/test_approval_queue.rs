@@ -246,7 +246,6 @@ fn test_approve_sale_with_recipient() {
     let manager = app.api().addr_make("manager");
     let recipient = app.api().addr_make("recipient");
 
-
     let asset_contract = setup_asset_contract(&mut app, &minter);
     let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
 
@@ -300,7 +299,6 @@ fn test_approve_sale_with_recipient() {
     );
     assert!(result.is_ok());
 
-
     let events = result.unwrap().events;
     let approved_event = events
         .iter()
@@ -331,7 +329,6 @@ fn test_approve_sale_with_recipient() {
     );
     assert!(pending_sale_query.is_err());
 }
-
 
 #[test]
 fn test_approve_sale_unauthorized() {
