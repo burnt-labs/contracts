@@ -408,6 +408,147 @@ fn test_reject_sale_success() {
 }
 
 #[test]
+fn test_reject_sale_after_manual_unreserve() {
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    let buyer_balance_before = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+
+    // Buyer purchases, creating a pending sale
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+
+    assert!(buy_result.is_ok());
+
+    let pending_sale_id = buy_result
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    // Manually unreserve and delist
+    let unreserve_msg = asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        asset::msg::AssetExtensionExecuteMsg,
+    >::UpdateExtension {
+        msg: asset::msg::AssetExtensionExecuteMsg::UnReserve {
+            token_id: "token1".to_string(),
+            delist: Some(true),
+        },
+    };
+
+    let unreserve_result =
+        app.execute_contract(buyer.clone(), asset_contract.clone(), &unreserve_msg, &[]);
+
+    assert!(unreserve_result.is_ok(), "Unreserve should succeed");
+
+    // Now manager rejects the sale
+    let reject_msg = ExecuteMsg::RejectSale {
+        id: pending_sale_id.clone(),
+    };
+
+    let result = app.execute_contract(
+        manager.clone(),
+        marketplace_contract.clone(),
+        &reject_msg,
+        &[],
+    );
+
+    assert!(
+        result.is_ok(),
+        "Rejection should succeed even after manual unreserve"
+    );
+
+    let events = result.unwrap().events;
+    let rejected_event = events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/sale-rejected");
+    assert!(
+        rejected_event.is_some(),
+        "Sale rejected event should be emitted"
+    );
+
+    // Verify buyer gets refunded
+    let buyer_balance_after = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+    assert_eq!(
+        buyer_balance_before, buyer_balance_after,
+        "Buyer should receive full refund"
+    );
+
+    // Verify listing is deleted
+    let listing_query = app.wrap().query_wasm_smart::<Listing>(
+        marketplace_contract.clone(),
+        &QueryMsg::Listing { listing_id },
+    );
+    assert!(
+        listing_query.is_err(),
+        "Listing should be deleted after rejection"
+    );
+
+    // Verify NFT ownership is still with seller
+    let owner_query = OwnerQueryMsg::OwnerOf {
+        token_id: "token1".to_string(),
+        include_expired: Some(false),
+    };
+    let owner_resp: cw721::msg::OwnerOfResponse = app
+        .wrap()
+        .query_wasm_smart(asset_contract.clone(), &owner_query)
+        .unwrap();
+    assert_eq!(
+        owner_resp.owner,
+        seller.to_string(),
+        "NFT should still be owned by seller"
+    );
+
+    // Verify pending sale is removed
+    let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(
+        marketplace_contract.clone(),
+        &QueryMsg::PendingSale {
+            id: pending_sale_id,
+        },
+    );
+    assert!(
+        pending_sale_query.is_err(),
+        "Pending sale should be removed after rejection"
+    );
+}
+
+#[test]
 fn test_reject_sale_unauthorized() {
     let mut app = setup_app_with_balances();
     let minter = app.api().addr_make("minter");
