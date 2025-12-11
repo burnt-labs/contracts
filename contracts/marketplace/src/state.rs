@@ -246,7 +246,12 @@ pub fn pending_sales<'a>() -> IndexedMap<PendingSaleId, PendingSale, PendingSale
             "psb", // pending sale buyer index namespace
         ),
         by_collection_and_token_id: UniqueIndex::new(
-            |pending_sale: &PendingSale| (pending_sale.collection.clone(), pending_sale.token_id.clone()),
+            |pending_sale: &PendingSale| {
+                (
+                    pending_sale.collection.clone(),
+                    pending_sale.token_id.clone(),
+                )
+            },
             "psct", // pending sale collection and token id index namespace
         ),
         by_expiration: MultiIndex::new(

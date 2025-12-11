@@ -1055,7 +1055,11 @@ fn test_approve_sale_with_existing_pending_sale() {
         std::slice::from_ref(&price),
     );
 
-    assert!(buy_result1.is_ok(), "First buy should succeed: {:?}", buy_result1.as_ref().unwrap_err());
+    assert!(
+        buy_result1.is_ok(),
+        "First buy should succeed: {:?}",
+        buy_result1.as_ref().unwrap_err()
+    );
 
     let pending_sale_id1 = buy_result1
         .unwrap()
@@ -1118,13 +1122,19 @@ fn test_approve_sale_with_existing_pending_sale() {
         &[],
     );
 
-    assert!(approve_result.is_ok(), "Approval should succeed even with existing pending sale");
+    assert!(
+        approve_result.is_ok(),
+        "Approval should succeed even with existing pending sale"
+    );
 
     let events = approve_result.unwrap().events;
     let approved_event = events
         .iter()
         .find(|e| e.ty == "wasm-xion-nft-marketplace/sale-approved");
-    assert!(approved_event.is_some(), "Sale approved event should be emitted");
+    assert!(
+        approved_event.is_some(),
+        "Sale approved event should be emitted"
+    );
 
     // Verify the pending sale is removed after approval
     let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(

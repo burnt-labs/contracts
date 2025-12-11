@@ -324,7 +324,10 @@ fn execute_create_pending_sale(
     price: Coin,
 ) -> Result<Response, ContractError> {
     // query if there is a previous pending sale for this item
-    let existing_pending_sale = pending_sales().idx.by_collection_and_token_id.item(deps.storage, (listing.collection.clone(), listing.token_id.clone()));
+    let existing_pending_sale = pending_sales().idx.by_collection_and_token_id.item(
+        deps.storage,
+        (listing.collection.clone(), listing.token_id.clone()),
+    );
     if let Ok(Some(_)) = existing_pending_sale {
         return Err(ContractError::PendingSaleAlreadyExists {
             collection: listing.collection.clone().to_string(),
