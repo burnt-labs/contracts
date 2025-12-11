@@ -28,6 +28,7 @@ pub fn update_config_event(config: Config<String>) -> Event {
         .add_attribute("fee_recipient", config.fee_recipient.to_string())
         .add_attribute("fee_bps", config.fee_bps.to_string())
         .add_attribute("listing_denom", config.listing_denom.to_string())
+        .add_attribute("sale_approvals", config.sale_approvals.to_string())
 }
 pub fn cancel_listing_event(id: String, collection: Addr, owner: Addr, token_id: String) -> Event {
     Event::new(format!("{}/cancel-listing", env!("CARGO_PKG_NAME")))
