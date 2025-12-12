@@ -220,15 +220,7 @@ pub fn execute_cancel_listing(
     let mut sub_msgs = vec![];
 
     if asset_listing.is_ok() {
-        let cancel_listing = asset::msg::ExecuteMsg::<
-            cw721::DefaultOptionalNftExtensionMsg,
-            cw721::DefaultOptionalCollectionExtensionMsg,
-            asset::msg::AssetExtensionExecuteMsg,
-        >::UpdateExtension {
-            msg: asset::msg::AssetExtensionExecuteMsg::Delist {
-                token_id: listing.token_id.clone(),
-            },
-        };
+        let cancel_listing = asset_delist_msg(listing.token_id.clone());
         sub_msgs.push(WasmMsg::Execute {
             contract_addr: listing.collection.to_string(),
             msg: to_json_binary(&cancel_listing)?,
