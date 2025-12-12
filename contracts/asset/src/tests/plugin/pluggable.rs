@@ -215,9 +215,7 @@ fn on_list_plugin_returns_error_when_min_price_denom_mismatches() {
     let result = contract.on_list_plugin(&token_id, &price, &None, &mut ctx);
 
     assert_eq!(
-        result
-            .expect_err("expected denom mismatch")
-            .to_string(),
+        result.expect_err("expected denom mismatch").to_string(),
         cosmwasm_std::StdError::generic_err(
             "ask price denom uusdc does not match minimum price denom uxion"
         )
