@@ -1,7 +1,6 @@
 /// These are default plugins that can be used out of the box.
 use cosmwasm_std::{
-    Attribute, BankMsg, Coin, CosmosMsg, CustomMsg, Decimal, Empty, StdResult, SubMsg, Uint128,
-    Uint256,
+    Attribute, BankMsg, Coin, CosmosMsg, CustomMsg, Decimal, Empty, StdResult, SubMsg,
 };
 use cw721::Expiration;
 
@@ -159,7 +158,7 @@ pub fn royalty_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> St
     }
     let fund = fund.unwrap();
     let royalty_amount = Decimal::bps(bps as u64)
-        .checked_mul(Decimal::from_ratio(fund.amount, 1 as u128))
+        .checked_mul(Decimal::from_ratio(fund.amount, 1_u128))
         .map_err(|_| cosmwasm_std::StdError::generic_err("royalty amount overflow"))?;
     if royalty_amount.is_zero() {
         return Ok(true);
