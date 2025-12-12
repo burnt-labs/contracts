@@ -7,7 +7,6 @@ use cosmwasm_std::{
 use cw721::{
     Expiration,
     state::{CREATOR, NftInfo},
-    traits::Cw721Execute,
 };
 
 use crate::{
