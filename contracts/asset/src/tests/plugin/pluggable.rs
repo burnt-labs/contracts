@@ -1,11 +1,13 @@
 use std::time::Duration;
 
 use cosmwasm_std::{
-    Addr, Binary, Coin, Deps, Empty, Env, MessageInfo, Response, Timestamp, testing::{message_info, mock_dependencies, mock_env}
+    Addr, Binary, Coin, Deps, Empty, Env, MessageInfo, Response, Timestamp,
+    testing::{message_info, mock_dependencies, mock_env},
 };
 use cw721::{
     Expiration,
-    state::{CREATOR, NftInfo}, traits::Cw721Execute,
+    state::{CREATOR, NftInfo},
+    traits::Cw721Execute,
 };
 
 use crate::{
