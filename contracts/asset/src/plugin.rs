@@ -390,13 +390,6 @@ where
             ctx.deps.storage,
             Plugin::AllowedCurrencies { denoms: [].into() }.get_plugin_name(),
         )?;
-        let exact_price_plugin = config.collection_plugins.may_load(
-            ctx.deps.storage,
-            Plugin::ExactPrice {
-                amount: coin(0, ""),
-            }
-            .get_plugin_name(),
-        )?;
         let royalty_plugin = config
             .collection_plugins
             .may_load(ctx.deps.storage, "Royalty")?;
