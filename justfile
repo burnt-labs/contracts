@@ -12,6 +12,10 @@ lint:
     @echo "Linting with clippy..."
     cargo clippy --all-targets --all-features -- -D warnings
 
+lint-asset:
+    @echo "Linting asset with clippy..."
+    cargo clippy -p asset --all-targets --all-features --fix --no-deps -- -D warnings
+
 # Lint marketplace package only
 lint-marketplace:
     @echo "Linting marketplace with clippy..."
