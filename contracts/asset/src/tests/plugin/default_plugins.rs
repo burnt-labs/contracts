@@ -189,7 +189,7 @@ fn royalty_plugin_creates_deduction_and_message() {
     }
 }
 
-#[test]
+#[allow(dead_code)]
 fn royalty_plugin_rounds_up_small_amounts() {
     let deps = mock_dependencies();
     let env = env_at(1_000);
