@@ -1,7 +1,5 @@
 /// These are default plugins that can be used out of the box.
-use cosmwasm_std::{
-    Attribute, BankMsg, Coin, CosmosMsg, CustomMsg, Empty, StdResult, SubMsg,
-};
+use cosmwasm_std::{Attribute, BankMsg, Coin, CosmosMsg, CustomMsg, Empty, StdResult, SubMsg};
 use cw721::Expiration;
 
 use crate::plugin::{DefaultXionAssetContext, PluginCtx};
