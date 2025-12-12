@@ -157,19 +157,15 @@ pub fn royalty_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> St
         ))?;
     }
     let fund = fund.unwrap();
-    let numerator: Uint256 = fund.amount.full_mul(bps as u128);
-    let royalty_amount: Uint128 = (numerator.checked_div(Uint256::from(10_000u128)))
-        .map_err(|_| cosmwasm_std::StdError::generic_err("royalty amount overflow"))?
-        .try_into()
+    let royalty_amount = Decimal::bps(bps as u64).checked_mul(Decimal::from_ratio(fund.amount,1 as u128))
         .map_err(|_| cosmwasm_std::StdError::generic_err("royalty amount overflow"))?;
-
     if royalty_amount.is_zero() {
         return Ok(true);
     }
 
     let royalty_coin = Coin {
         denom: fund.denom.clone(),
-        amount: royalty_amount,
+        amount: royalty_amount.to_uint_ceil(),
     };
 
     ctx.response.attributes.push(Attribute {
