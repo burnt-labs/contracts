@@ -167,7 +167,7 @@ pub fn royalty_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> St
 
     let royalty_coin = Coin {
         denom: fund.denom.clone(),
-        amount: royalty_amount.to_uint_ceil(),
+        amount: royalty_amount.to_uint_floor(),
     };
 
     ctx.response.attributes.push(Attribute {
