@@ -147,7 +147,7 @@ pub fn execute_accept_offer(
     // CosmWasm doesn't allow sending empty coin amounts
     if !marketplace_fee_amount.is_zero() {
         response = response.add_message(BankMsg::Send {
-            to_address: config.manager.to_string(),
+            to_address: config.fee_recipient.to_string(),
             amount: vec![Coin {
                 denom: offer.price.denom,
                 amount: marketplace_fee_amount,
@@ -307,7 +307,7 @@ pub fn execute_accept_collection_offer(
     // CosmWasm doesn't allow sending empty coin amounts
     if !marketplace_fee_amount.is_zero() {
         response = response.add_message(BankMsg::Send {
-            to_address: config.manager.to_string(),
+            to_address: config.fee_recipient.to_string(),
             amount: vec![Coin {
                 denom: offer.price.denom,
                 amount: marketplace_fee_amount,

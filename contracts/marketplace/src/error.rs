@@ -28,6 +28,9 @@ pub enum ContractError {
     #[error("Invalid listing denom: expected {expected}, got {actual}")]
     InvalidListingDenom { expected: String, actual: String },
 
+    #[error("Invalid fee recipient")]
+    InvalidFeeRecipient {},
+
     #[error("Invalid listing status: expected {expected}, got {actual}")]
     InvalidListingStatus { expected: String, actual: String },
 

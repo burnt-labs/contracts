@@ -143,8 +143,6 @@ pub fn execute_create_listing(
             actual: price.denom,
         }
     );
-
-    let config = CONFIG.load(deps.storage)?;
     // generate consistent id even across relisting helps single lookup
     let id = generate_id(vec![&collection.as_bytes(), &token_id.as_bytes()]);
     let asset_price = calculate_asset_price(price.clone(), config.fee_bps)?;
@@ -299,7 +297,7 @@ pub fn execute_buy_item(
             funds: vec![asset_price],
         })
         .add_message(BankMsg::Send {
-            to_address: config.manager.to_string(),
+            to_address: config.fee_recipient.to_string(),
             amount: vec![Coin {
                 denom: payment.denom,
                 amount: marketplace_fee,
@@ -469,7 +467,7 @@ pub fn execute_approve_sale(
     // CosmWasm doesn't allow sending empty coin amounts
     if !marketplace_fee_amount.is_zero() {
         response = response.add_message(BankMsg::Send {
-            to_address: config.manager.to_string(),
+            to_address: config.fee_recipient.to_string(),
             amount: vec![Coin {
                 denom: pending_sale.price.denom,
                 amount: marketplace_fee_amount,

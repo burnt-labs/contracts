@@ -42,6 +42,10 @@ impl Config<String> {
                 actual: self.listing_denom.clone(),
             }
         );
+        ensure!(
+            !self.fee_recipient.is_empty(),
+            ContractError::InvalidFeeRecipient {}
+        );
         Ok(())
     }
     pub fn to_addr(&self, api: &dyn Api) -> Result<Config<Addr>, ContractError> {
