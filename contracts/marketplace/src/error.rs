@@ -54,4 +54,10 @@ pub enum ContractError {
 
     #[error("Offers disabled")]
     OfferesDisabled {},
+
+    #[error("Pending sale already exists: {collection}, {token_id}")]
+    PendingSaleAlreadyExists {
+        collection: String,
+        token_id: String,
+    },
 }

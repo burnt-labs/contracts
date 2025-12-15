@@ -996,3 +996,176 @@ fn test_approve_sale_fee_routing_with_royalties() {
         "Pending sale should be deleted after approval"
     );
 }
+
+#[test]
+fn test_approve_sale_with_existing_pending_sale() {
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer1 = app.api().addr_make("buyer1");
+    let buyer2 = app.api().addr_make("buyer2");
+    let manager = app.api().addr_make("manager");
+
+    // Give funds to buyer1 and buyer2
+    use cw_multi_test::{BankSudo, SudoMsg};
+    let funds = vec![coin(10000, "uxion")];
+    app.sudo(SudoMsg::Bank(BankSudo::Mint {
+        to_address: buyer1.to_string(),
+        amount: funds.clone(),
+    }))
+    .unwrap();
+    app.sudo(SudoMsg::Bank(BankSudo::Mint {
+        to_address: buyer2.to_string(),
+        amount: funds.clone(),
+    }))
+    .unwrap();
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    // Use a unique token_id with timestamp to avoid any potential conflicts
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let token_id = format!("test_approve_existing_pending_{}", timestamp);
+    mint_nft(&mut app, &asset_contract, &minter, &seller, &token_id);
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        &token_id,
+        price.clone(),
+    );
+
+    // First buyer creates a pending sale
+    let buy_msg1 = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+
+    let buy_result1 = app.execute_contract(
+        buyer1.clone(),
+        marketplace_contract.clone(),
+        &buy_msg1,
+        std::slice::from_ref(&price),
+    );
+
+    assert!(
+        buy_result1.is_ok(),
+        "First buy should succeed: {:?}",
+        buy_result1.as_ref().unwrap_err()
+    );
+
+    let pending_sale_id1 = buy_result1
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    // Verify first pending sale exists
+    let pending_sale1: PendingSale = app
+        .wrap()
+        .query_wasm_smart(
+            marketplace_contract.clone(),
+            &QueryMsg::PendingSale {
+                id: pending_sale_id1.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(pending_sale1.buyer, buyer1);
+    assert_eq!(pending_sale1.token_id, token_id.clone());
+
+    // Second buyer tries to create another pending sale for the same item - should fail
+    let buy_msg2 = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+
+    let buy_result2 = app.execute_contract(
+        buyer2.clone(),
+        marketplace_contract.clone(),
+        &buy_msg2,
+        std::slice::from_ref(&price),
+    );
+
+    assert!(buy_result2.is_err());
+    assert_error(
+        buy_result2,
+        xion_nft_marketplace::error::ContractError::PendingSaleAlreadyExists {
+            collection: asset_contract.to_string(),
+            token_id: token_id.clone(),
+        }
+        .to_string(),
+    );
+
+    // Now approve the first pending sale
+    let approve_msg = ExecuteMsg::ApproveSale {
+        id: pending_sale_id1.clone(),
+    };
+
+    let approve_result = app.execute_contract(
+        manager.clone(),
+        marketplace_contract.clone(),
+        &approve_msg,
+        &[],
+    );
+
+    assert!(
+        approve_result.is_ok(),
+        "Approval should succeed even with existing pending sale"
+    );
+
+    let events = approve_result.unwrap().events;
+    let approved_event = events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/sale-approved");
+    assert!(
+        approved_event.is_some(),
+        "Sale approved event should be emitted"
+    );
+
+    // Verify the pending sale is removed after approval
+    let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(
+        marketplace_contract.clone(),
+        &QueryMsg::PendingSale {
+            id: pending_sale_id1,
+        },
+    );
+    assert!(
+        pending_sale_query.is_err(),
+        "Pending sale should be removed after approval"
+    );
+
+    // Verify the listing is removed
+    let listing_query = app.wrap().query_wasm_smart::<Listing>(
+        marketplace_contract.clone(),
+        &QueryMsg::Listing { listing_id },
+    );
+    assert!(
+        listing_query.is_err(),
+        "Listing should be deleted after approval"
+    );
+
+    // Verify NFT ownership transferred to buyer1
+    let owner_query = OwnerQueryMsg::OwnerOf {
+        token_id: token_id.clone(),
+        include_expired: Some(false),
+    };
+    let owner_resp: cw721::msg::OwnerOfResponse = app
+        .wrap()
+        .query_wasm_smart(asset_contract.clone(), &owner_query)
+        .unwrap();
+    assert_eq!(owner_resp.owner, buyer1.to_string());
+}
