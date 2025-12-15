@@ -4,8 +4,8 @@ use crate::events::{
     sale_approved_event, sale_rejected_event, update_config_event,
 };
 use crate::helpers::{
-    asset_buy_msg, asset_delist_msg, asset_list_msg, asset_reserve_msg, generate_id, not_listed,
-    only_manager, only_owner, query_listing, valid_payment,
+    asset_buy_msg, asset_delist_msg, asset_list_msg, asset_reserve_msg, asset_unreserve_msg,
+    generate_id, not_listed, only_manager, only_owner, query_listing, valid_payment,
 };
 use crate::msg::ExecuteMsg;
 use crate::offers::{
@@ -355,6 +355,21 @@ fn execute_create_pending_sale(
         }
         None => Err(ContractError::ListingNotFound { id: listing_id }),
     })?;
+    let mut sub_msgs = vec![];
+
+    // query if there is a listing in the asset contract (in case is out of sync)
+    let asset_listing_resp = query_listing(&deps.querier, &listing.collection, &listing.token_id);
+    // if there is a listing in the asset contract and has a previous reservation, unreserve it so we can reserve it again for approval queue
+    if let Ok(asset_listing) = asset_listing_resp {
+        if asset_listing.reserved.is_some() {
+            let unreserve_msg = asset_unreserve_msg(listing.token_id.clone(), false);
+            sub_msgs.push(WasmMsg::Execute {
+                contract_addr: listing.collection.to_string(),
+                msg: to_json_binary(&unreserve_msg)?,
+                funds: vec![],
+            });
+        }
+    }
 
     // Reserve the NFT in the asset contract
     let reserve_msg = asset_reserve_msg(
@@ -362,6 +377,11 @@ fn execute_create_pending_sale(
         info.sender.clone(),
         env.block.time.plus_seconds(86400),
     );
+    sub_msgs.push(WasmMsg::Execute {
+        contract_addr: listing.collection.to_string(),
+        msg: to_json_binary(&reserve_msg)?,
+        funds: vec![],
+    });
 
     // Funds are escrowed in contract (sent by buyer in info.funds)
     Ok(Response::new()
@@ -373,11 +393,7 @@ fn execute_create_pending_sale(
             listing.seller,
             price,
         ))
-        .add_message(WasmMsg::Execute {
-            contract_addr: listing.collection.to_string(),
-            msg: to_json_binary(&reserve_msg)?,
-            funds: vec![],
-        })
+        .add_messages(sub_msgs)
         .add_attribute("action", "pending_sale_created"))
 }
 
