@@ -190,6 +190,40 @@ fn on_list_plugin_returns_error_when_min_price_fails() {
 }
 
 #[test]
+fn on_list_plugin_returns_error_when_min_price_denom_mismatches() {
+    let mut deps = mock_dependencies();
+    let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
+
+    contract
+        .config
+        .collection_plugins
+        .save(
+            deps.as_mut().storage,
+            "MinimumPrice",
+            &Plugin::MinimumPrice {
+                amount: Coin::new(150u128, "uxion"),
+            },
+        )
+        .unwrap();
+
+    let env = env_at(1_000);
+    let info = message_info(&deps.api.addr_make("seller"), &[]);
+    let mut ctx = build_ctx(deps.as_ref(), env, info);
+    let token_id = "token-1".to_string();
+    let price = Coin::new(100u128, "uusdc");
+
+    let result = contract.on_list_plugin(&token_id, &price, &None, &mut ctx);
+
+    assert_eq!(
+        result.expect_err("expected denom mismatch").to_string(),
+        cosmwasm_std::StdError::generic_err(
+            "ask price denom uusdc does not match minimum price denom uxion"
+        )
+        .to_string()
+    );
+}
+
+#[test]
 fn on_buy_plugin_runs_allowed_marketplace_and_royalty_plugins() {
     let mut deps = mock_dependencies();
     let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
