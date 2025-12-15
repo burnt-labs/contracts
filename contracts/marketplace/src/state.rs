@@ -219,6 +219,7 @@ pub struct PendingSale {
     pub price: Coin,
     pub seller: Addr,
     pub buyer: Addr,
+    pub recipient: Addr,
     pub sale_type: SaleType,
     pub time: u64,
     pub expiration: u64,
