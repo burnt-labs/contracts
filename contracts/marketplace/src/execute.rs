@@ -497,9 +497,24 @@ pub fn execute_reject_sale(
     // delete the listing
     listings().remove(deps.storage, listing_id)?;
 
-    // delist from asset contract
-    let delist_msg = asset_delist_msg(pending_sale.token_id.clone());
+    // query if there is a listing in the asset contract
+    let asset_listing = query_listing(
+        &deps.querier,
+        &pending_sale.collection,
+        &pending_sale.token_id,
+    );
 
+    let mut sub_msgs = vec![];
+
+    // delist from asset contract only if it has a listing
+    if asset_listing.is_ok() {
+        let delist_msg = asset_delist_msg(pending_sale.token_id.clone());
+        sub_msgs.push(WasmMsg::Execute {
+            contract_addr: pending_sale.collection.to_string(),
+            msg: to_json_binary(&delist_msg)?,
+            funds: vec![],
+        });
+    }
     // refund buyer
     let refund_msg = BankMsg::Send {
         to_address: pending_sale.buyer.to_string(),
@@ -518,10 +533,6 @@ pub fn execute_reject_sale(
             pending_sale.seller,
             pending_sale.price,
         ))
-        .add_message(WasmMsg::Execute {
-            contract_addr: pending_sale.collection.to_string(),
-            msg: to_json_binary(&delist_msg)?,
-            funds: vec![],
-        })
-        .add_message(refund_msg))
+        .add_message(refund_msg)
+        .add_messages(sub_msgs))
 }
