@@ -416,6 +416,7 @@ pub fn execute_approve_sale(
         pending_sale.collection.as_bytes(),
         pending_sale.token_id.as_bytes(),
     ]);
+    let listing = listings().load(deps.storage, listing_id.clone())?;
 
     // Execute the buy on asset contract
     let buy_msg = asset_buy_msg(
@@ -423,10 +424,10 @@ pub fn execute_approve_sale(
         pending_sale.token_id.clone(),
     );
 
-    // Calculate asset price (seller proceeds) and marketplace fee
-    // This ensures the approvals path matches the immediate buy path
-    let asset_price = calculate_asset_price(pending_sale.price.clone(), config.fee_bps)?;
-    let marketplace_fee_amount = pending_sale
+    // Use the asset_price stored on the listing to avoid fee changes affecting pending sales
+    // Marketplace fee is the difference between the buyer price and the stored asset_price
+    let asset_price = listing.asset_price;
+    let marketplace_fee_amount = listing
         .price
         .amount
         .checked_sub(asset_price.amount)
