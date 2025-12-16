@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use cosmwasm_std::{
-    Addr, Coin, Deps, Empty, Env, MessageInfo, Response, Timestamp,
+    Addr, Binary, Coin, Deps, Empty, Env, MessageInfo, Response, Timestamp,
     testing::{message_info, mock_dependencies, mock_env},
 };
 use cw721::{
@@ -185,6 +185,40 @@ fn on_list_plugin_returns_error_when_min_price_fails() {
             ctx.data.min_price.expect("expect min price is set"),
             price,
         ))
+        .to_string()
+    );
+}
+
+#[test]
+fn on_list_plugin_returns_error_when_min_price_denom_mismatches() {
+    let mut deps = mock_dependencies();
+    let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
+
+    contract
+        .config
+        .collection_plugins
+        .save(
+            deps.as_mut().storage,
+            "MinimumPrice",
+            &Plugin::MinimumPrice {
+                amount: Coin::new(150u128, "uxion"),
+            },
+        )
+        .unwrap();
+
+    let env = env_at(1_000);
+    let info = message_info(&deps.api.addr_make("seller"), &[]);
+    let mut ctx = build_ctx(deps.as_ref(), env, info);
+    let token_id = "token-1".to_string();
+    let price = Coin::new(100u128, "uusdc");
+
+    let result = contract.on_list_plugin(&token_id, &price, &None, &mut ctx);
+
+    assert_eq!(
+        result.expect_err("expected denom mismatch").to_string(),
+        cosmwasm_std::StdError::generic_err(
+            "ask price denom uusdc does not match minimum price denom uxion"
+        )
         .to_string()
     );
 }
@@ -441,11 +475,30 @@ fn on_transfer_plugin_blocks_listed_tokens() {
         .unwrap();
 
     let env = env_at(1_000);
-    let info = message_info(&deps.api.addr_make("operator"), &[]);
-    let mut ctx = build_ctx(deps.as_ref(), env, info);
+    let info = message_info(&seller, &[]);
+    // let ctx = build_ctx(deps.as_ref(), env.clone(), info.clone());
+    let mut msg = cw721::msg::Cw721ExecuteMsg::TransferNft {
+        recipient: deps.api.addr_make("buyer").to_string(),
+        token_id: "token-1".to_string(),
+    };
 
-    let err = contract
-        .on_transfer_plugin("buyer", "token-1", &mut ctx)
+    let mut err = contract
+        .execute_pluggable(deps.as_mut(), &env, &info, msg)
+        .expect_err("expected transfer block");
+
+    assert_eq!(
+        err.to_string(),
+        cosmwasm_std::StdError::generic_err("cannot transfer a token while it is listed")
+            .to_string()
+    );
+    msg = cw721::msg::Cw721ExecuteMsg::SendNft {
+        contract: deps.api.addr_make("marketplace").to_string(),
+        msg: Binary::default(),
+        token_id: "token-1".to_string(),
+    };
+
+    err = contract
+        .execute_pluggable(deps.as_mut(), &env, &info, msg)
         .expect_err("expected transfer block");
 
     assert_eq!(
@@ -746,6 +799,70 @@ fn save_plugin_rejects_non_owner() {
     assert_eq!(
         err.to_string(),
         cosmwasm_std::StdError::generic_err("Caller is not the contract's current owner")
+            .to_string()
+    );
+}
+
+#[test]
+fn transfer_and_send_disabled_while_listed() {
+    let mut deps = mock_dependencies();
+    let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
+
+    let seller = deps.api.addr_make("seller");
+    let nft_info = NftInfo {
+        owner: seller.clone(),
+        approvals: vec![],
+        token_uri: None,
+        extension: Empty::default(),
+    };
+    let listing = ListingInfo {
+        id: "token-1".to_string(),
+        price: Coin::new(100u128, "uxion"),
+        seller: seller.clone(),
+        reserved: None,
+    };
+    contract
+        .config
+        .listings
+        .save(deps.as_mut().storage, "token-1", &listing)
+        .unwrap();
+    contract
+        .config
+        .cw721_config
+        .nft_info
+        .save(deps.as_mut().storage, "token-1", &nft_info)
+        .unwrap();
+
+    let env = env_at(1_000);
+    let info = message_info(&seller, &[]);
+    // let ctx = build_ctx(deps.as_ref(), env.clone(), info.clone());
+    let mut msg = cw721::msg::Cw721ExecuteMsg::TransferNft {
+        recipient: deps.api.addr_make("buyer").to_string(),
+        token_id: "token-1".to_string(),
+    };
+
+    let mut err = contract
+        .execute_pluggable(deps.as_mut(), &env, &info, msg)
+        .expect_err("expected transfer block");
+
+    assert_eq!(
+        err.to_string(),
+        cosmwasm_std::StdError::generic_err("cannot transfer a token while it is listed")
+            .to_string()
+    );
+    msg = cw721::msg::Cw721ExecuteMsg::SendNft {
+        contract: deps.api.addr_make("marketplace").to_string(),
+        msg: Binary::default(),
+        token_id: "token-1".to_string(),
+    };
+
+    err = contract
+        .execute_pluggable(deps.as_mut(), &env, &info, msg)
+        .expect_err("expected transfer block");
+
+    assert_eq!(
+        err.to_string(),
+        cosmwasm_std::StdError::generic_err("cannot transfer a token while it is listed")
             .to_string()
     );
 }

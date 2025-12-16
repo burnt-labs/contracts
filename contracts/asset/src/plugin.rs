@@ -390,13 +390,6 @@ where
             ctx.deps.storage,
             Plugin::AllowedCurrencies { denoms: [].into() }.get_plugin_name(),
         )?;
-        let exact_price_plugin = config.collection_plugins.may_load(
-            ctx.deps.storage,
-            Plugin::ExactPrice {
-                amount: coin(0, ""),
-            }
-            .get_plugin_name(),
-        )?;
         let royalty_plugin = config
             .collection_plugins
             .may_load(ctx.deps.storage, "Royalty")?;
@@ -413,10 +406,6 @@ where
             })?;
         ctx.data.ask_price = Some(listing.price.clone());
         if let Some(plugin) = allowed_currencies_plugin {
-            plugin.run_asset_plugin(ctx)?;
-        }
-        // Exact price plugin disabled for buys for now
-        if let Some(plugin) = exact_price_plugin {
             plugin.run_asset_plugin(ctx)?;
         }
         if let Some(plugin) = allowed_marketplaces_plugin {
