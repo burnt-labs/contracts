@@ -189,6 +189,32 @@ fn royalty_plugin_creates_deduction_and_message() {
     }
 }
 
+#[allow(dead_code)]
+fn royalty_plugin_rounds_up_small_amounts() {
+    let deps = mock_dependencies();
+    let env = env_at(1_000);
+    let info = message_info(&deps.api.addr_make("buyer"), &[Coin::new(1u128, "uxion")]);
+    let mut ctx = build_ctx(deps.as_ref(), env, info);
+
+    ctx.data.ask_price = Some(Coin::new(1u128, "uxion"));
+    ctx.royalty.collection_royalty_recipient = Some(Addr::unchecked("artist"));
+    ctx.royalty.collection_royalty_bps = Some(1); // 0.01%
+    ctx.royalty.primary_complete = true;
+
+    assert!(default_plugins::royalty_plugin(&mut ctx).is_ok());
+    let attr = &ctx.response.attributes[0];
+    assert_eq!(attr.key, "royalty_amount");
+    assert_eq!(attr.value, Coin::new(1u128, "uxion").to_string());
+
+    match &ctx.response.messages[0].msg {
+        CosmosMsg::Bank(BankMsg::Send { to_address, amount }) => {
+            assert_eq!(to_address, "artist");
+            assert_eq!(amount, &vec![Coin::new(1u128, "uxion")]);
+        }
+        other => panic!("unexpected message: {:?}", other),
+    }
+}
+
 #[test]
 fn royalty_plugin_errors_when_missing_funds() {
     let deps = mock_dependencies();

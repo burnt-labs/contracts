@@ -142,7 +142,9 @@ pub fn royalty_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> St
 
     if let Some(ask_price) = &ctx.data.ask_price {
         if ask_price.amount.is_zero() {
-            return Ok(true);
+            return Err(cosmwasm_std::StdError::generic_err(
+                "Ask price is zero, cannot calculate royalty".to_string(),
+            ));
         }
     } else {
         Err(cosmwasm_std::StdError::generic_err(
@@ -161,7 +163,6 @@ pub fn royalty_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> St
     }
     let fund = fund.unwrap();
     let royalty_amount = fund.amount.multiply_ratio(bps as u128, 10_000u128);
-
     if royalty_amount.is_zero() {
         return Ok(true);
     }

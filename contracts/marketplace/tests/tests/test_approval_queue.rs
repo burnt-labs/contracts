@@ -565,8 +565,9 @@ fn test_reject_sale_after_manual_unreserve() {
         },
     };
 
+    // Use seller (owner) to unreserve since they have list permissions
     let unreserve_result =
-        app.execute_contract(buyer.clone(), asset_contract.clone(), &unreserve_msg, &[]);
+        app.execute_contract(seller.clone(), asset_contract.clone(), &unreserve_msg, &[]);
 
     assert!(unreserve_result.is_ok(), "Unreserve should succeed");
 

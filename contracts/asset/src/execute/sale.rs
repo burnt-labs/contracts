@@ -74,7 +74,6 @@ where
     if let Some(reserved) = listing.reserved {
         if Expiration::AtTime(reserved.reserved_until).is_expired(&env.block) {
             listing.reserved = None;
-            asset_config.listings.save(deps.storage, &id, &listing)?;
         } else if reserved.reserver != info.sender {
             // if the reserver is not the sender, return an error
             return Err(ContractError::Unauthorized {});
