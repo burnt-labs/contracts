@@ -18,11 +18,11 @@ fn env_at(time: u64) -> Env {
     env
 }
 
-fn build_ctx<'a>(
-    deps: Deps<'a>,
+fn build_ctx(
+    deps: Deps<'_>,
     env: Env,
     info: MessageInfo,
-) -> PluginCtx<'a, DefaultXionAssetContext, Empty> {
+) -> PluginCtx<'_, DefaultXionAssetContext, Empty> {
     PluginCtx {
         deps,
         env,

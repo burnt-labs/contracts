@@ -192,6 +192,25 @@ pub fn asset_reserve_msg(
         },
     }
 }
+pub fn asset_unreserve_msg(
+    token_id: String,
+    delist: bool,
+) -> asset::msg::ExecuteMsg<
+    cw721::DefaultOptionalNftExtensionMsg,
+    cw721::DefaultOptionalCollectionExtensionMsg,
+    AssetExecuteMsg,
+> {
+    asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        AssetExecuteMsg,
+    >::UpdateExtension {
+        msg: AssetExecuteMsg::UnReserve {
+            token_id,
+            delist: Some(delist),
+        },
+    }
+}
 
 pub fn asset_delist_msg(
     token_id: String,
