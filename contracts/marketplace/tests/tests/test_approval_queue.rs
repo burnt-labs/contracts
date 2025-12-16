@@ -1,7 +1,7 @@
 use crate::tests::test_helpers::*;
 use cosmwasm_std::coin;
-use cw721_base::msg::QueryMsg as OwnerQueryMsg;
 use cw_multi_test::Executor;
+use cw721_base::msg::QueryMsg as OwnerQueryMsg;
 use xion_nft_marketplace::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use xion_nft_marketplace::state::{Listing, ListingStatus, PendingSale};
 
@@ -565,8 +565,9 @@ fn test_reject_sale_after_manual_unreserve() {
         },
     };
 
+    // Use seller (owner) to unreserve since they have list permissions
     let unreserve_result =
-        app.execute_contract(buyer.clone(), asset_contract.clone(), &unreserve_msg, &[]);
+        app.execute_contract(seller.clone(), asset_contract.clone(), &unreserve_msg, &[]);
 
     assert!(unreserve_result.is_ok(), "Unreserve should succeed");
 
