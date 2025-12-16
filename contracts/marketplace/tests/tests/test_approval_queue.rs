@@ -1,7 +1,7 @@
 use crate::tests::test_helpers::*;
 use cosmwasm_std::coin;
-use cw_multi_test::Executor;
 use cw721_base::msg::QueryMsg as OwnerQueryMsg;
+use cw_multi_test::Executor;
 use xion_nft_marketplace::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use xion_nft_marketplace::state::{Listing, ListingStatus, PendingSale};
 
