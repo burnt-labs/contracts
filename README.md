@@ -1,4 +1,4 @@
-# XION Contracts (Move)
+# XION Contracts
 
 Smart contract implementations for XION blockchain.
 
