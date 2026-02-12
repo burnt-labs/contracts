@@ -105,8 +105,9 @@ pub fn execute(
         ),
 
         ExecuteMsg::CancelCollectionOffer { id } => execute_cancel_collection_offer(deps, info, id),
-        ExecuteMsg::ApproveSale { id } => execute_approve_sale(deps, info, id),
+        ExecuteMsg::ApproveSale { id } => execute_approve_sale(deps, env, info, id),
         ExecuteMsg::RejectSale { id } => execute_reject_sale(deps, info, id),
+        ExecuteMsg::ReclaimExpiredSale { id } => execute_reclaim_expired_sale(deps, env, info, id),
         ExecuteMsg::UpdateConfig { config } => execute_update_config(deps, info, config),
     }
 }
@@ -400,6 +401,7 @@ fn execute_create_pending_sale(
 
 pub fn execute_approve_sale(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     pending_sale_id: String,
 ) -> Result<Response, ContractError> {
@@ -408,6 +410,12 @@ pub fn execute_approve_sale(
 
     let config = CONFIG.load(deps.storage)?;
     let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
+
+    if env.block.time.seconds() >= pending_sale.expiration {
+        return Err(ContractError::PendingSaleExpired {
+            id: pending_sale_id,
+        });
+    }
 
     // Generate listing_id to find the listing
     let listing_id = generate_id(vec![
@@ -478,16 +486,12 @@ pub fn execute_approve_sale(
     Ok(response)
 }
 
-pub fn execute_reject_sale(
+fn remove_pending_sale(
     deps: DepsMut,
-    info: MessageInfo,
     pending_sale_id: String,
+    pending_sale: PendingSale,
+    reason: &str,
 ) -> Result<Response, ContractError> {
-    // Only manager can reject
-    only_manager(&info, &deps)?;
-
-    let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
-
     let listing_id = generate_id(vec![
         pending_sale.collection.as_bytes(),
         pending_sale.token_id.as_bytes(),
@@ -514,6 +518,7 @@ pub fn execute_reject_sale(
             funds: vec![],
         });
     }
+
     // refund buyer
     let refund_msg = BankMsg::Send {
         to_address: pending_sale.buyer.to_string(),
@@ -531,7 +536,43 @@ pub fn execute_reject_sale(
             pending_sale.buyer.clone(),
             pending_sale.seller,
             pending_sale.price,
+            reason,
         ))
         .add_message(refund_msg)
         .add_messages(sub_msgs))
+}
+
+pub fn execute_reject_sale(
+    deps: DepsMut,
+    info: MessageInfo,
+    pending_sale_id: String,
+) -> Result<Response, ContractError> {
+    only_manager(&info, &deps)?;
+
+    let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
+
+    remove_pending_sale(deps, pending_sale_id, pending_sale, "rejected_by_manager")
+}
+
+pub fn execute_reclaim_expired_sale(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    pending_sale_id: String,
+) -> Result<Response, ContractError> {
+    let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
+
+    if env.block.time.seconds() < pending_sale.expiration {
+        return Err(ContractError::PendingSaleNotExpired {
+            id: pending_sale_id,
+        });
+    }
+
+    if info.sender != pending_sale.buyer {
+        return Err(ContractError::Unauthorized {
+            message: "only the buyer can reclaim an expired sale".to_string(),
+        });
+    }
+
+    remove_pending_sale(deps, pending_sale_id, pending_sale, "expired")
 }

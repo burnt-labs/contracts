@@ -63,4 +63,10 @@ pub enum ContractError {
         collection: String,
         token_id: String,
     },
+
+    #[error("Pending sale expired: {id}")]
+    PendingSaleExpired { id: String },
+
+    #[error("Pending sale not yet expired: {id}")]
+    PendingSaleNotExpired { id: String },
 }

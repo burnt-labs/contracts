@@ -1404,3 +1404,504 @@ fn test_approve_sale_with_existing_pending_sale() {
         .unwrap();
     assert_eq!(owner_resp.owner, buyer1.to_string());
 }
+
+#[test]
+fn test_approve_expired_pending_sale_fails() {
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    // Buyer creates pending sale
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(buy_result.is_ok());
+
+    let pending_sale_id = buy_result
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    // Advance block time past the 24-hour expiration
+    app.update_block(|block| {
+        block.time = block.time.plus_seconds(86401);
+    });
+
+    // Manager tries to approve the expired sale
+    let approve_msg = ExecuteMsg::ApproveSale {
+        id: pending_sale_id.clone(),
+    };
+
+    let result = app.execute_contract(
+        manager.clone(),
+        marketplace_contract.clone(),
+        &approve_msg,
+        &[],
+    );
+
+    assert!(result.is_err());
+    assert_error(
+        result,
+        xion_nft_marketplace::error::ContractError::PendingSaleExpired {
+            id: pending_sale_id,
+        }
+        .to_string(),
+    );
+
+    // Verify NFT is still owned by seller (sale was not executed)
+    let owner_query = OwnerQueryMsg::OwnerOf {
+        token_id: "token1".to_string(),
+        include_expired: Some(false),
+    };
+    let owner_resp: cw721::msg::OwnerOfResponse = app
+        .wrap()
+        .query_wasm_smart(asset_contract.clone(), &owner_query)
+        .unwrap();
+    assert_eq!(owner_resp.owner, seller.to_string());
+}
+
+#[test]
+fn test_reclaim_expired_sale_success() {
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    let buyer_balance_before = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(buy_result.is_ok());
+
+    let pending_sale_id = buy_result
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    // Advance block time past the 24-hour expiration
+    app.update_block(|block| {
+        block.time = block.time.plus_seconds(86401);
+    });
+
+    // Buyer reclaims the expired sale
+    let reclaim_msg = ExecuteMsg::ReclaimExpiredSale {
+        id: pending_sale_id.clone(),
+    };
+
+    let result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &reclaim_msg,
+        &[],
+    );
+    assert!(result.is_ok());
+
+    // Verify the event has reason "expired"
+    let events = result.unwrap().events;
+    let rejected_event = events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/sale-rejected")
+        .expect("sale-rejected event should be emitted");
+    let reason = rejected_event
+        .attributes
+        .iter()
+        .find(|a| a.key == "reason")
+        .unwrap();
+    assert_eq!(reason.value, "expired");
+
+    // Verify buyer is refunded
+    let buyer_balance_after = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+    assert_eq!(buyer_balance_before, buyer_balance_after);
+
+    // Verify pending sale is removed
+    let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(
+        marketplace_contract.clone(),
+        &QueryMsg::PendingSale {
+            id: pending_sale_id,
+        },
+    );
+    assert!(pending_sale_query.is_err());
+
+    // Verify NFT still owned by seller
+    let owner_query = OwnerQueryMsg::OwnerOf {
+        token_id: "token1".to_string(),
+        include_expired: Some(false),
+    };
+    let owner_resp: cw721::msg::OwnerOfResponse = app
+        .wrap()
+        .query_wasm_smart(asset_contract.clone(), &owner_query)
+        .unwrap();
+    assert_eq!(owner_resp.owner, seller.to_string());
+}
+
+#[test]
+fn test_reclaim_expired_sale_not_yet_expired() {
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(buy_result.is_ok());
+
+    let pending_sale_id = buy_result
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    // Do NOT advance time — sale is still active
+
+    let reclaim_msg = ExecuteMsg::ReclaimExpiredSale {
+        id: pending_sale_id.clone(),
+    };
+
+    let result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &reclaim_msg,
+        &[],
+    );
+
+    assert!(result.is_err());
+    assert_error(
+        result,
+        xion_nft_marketplace::error::ContractError::PendingSaleNotExpired {
+            id: pending_sale_id,
+        }
+        .to_string(),
+    );
+}
+
+#[test]
+fn test_reclaim_expired_sale_unauthorized() {
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+    let random = app.api().addr_make("random");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(buy_result.is_ok());
+
+    let pending_sale_id = buy_result
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    // Advance past expiry
+    app.update_block(|block| {
+        block.time = block.time.plus_seconds(86401);
+    });
+
+    // Random user tries to reclaim — should fail
+    let reclaim_msg = ExecuteMsg::ReclaimExpiredSale {
+        id: pending_sale_id,
+    };
+
+    let result = app.execute_contract(
+        random.clone(),
+        marketplace_contract.clone(),
+        &reclaim_msg,
+        &[],
+    );
+
+    assert!(result.is_err());
+    assert_error(
+        result,
+        xion_nft_marketplace::error::ContractError::Unauthorized {
+            message: "only the buyer can reclaim an expired sale".to_string(),
+        }
+        .to_string(),
+    );
+}
+
+#[test]
+fn test_reject_sale_emits_reason() {
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(buy_result.is_ok());
+
+    let pending_sale_id = buy_result
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    let reject_msg = ExecuteMsg::RejectSale {
+        id: pending_sale_id,
+    };
+
+    let result = app.execute_contract(
+        manager.clone(),
+        marketplace_contract.clone(),
+        &reject_msg,
+        &[],
+    );
+    assert!(result.is_ok());
+
+    let events = result.unwrap().events;
+    let rejected_event = events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/sale-rejected")
+        .expect("sale-rejected event should be emitted");
+    let reason = rejected_event
+        .attributes
+        .iter()
+        .find(|a| a.key == "reason")
+        .unwrap();
+    assert_eq!(reason.value, "rejected_by_manager");
+}
+
+#[test]
+fn test_manager_can_reject_expired_sale() {
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    let buyer_balance_before = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(buy_result.is_ok());
+
+    let pending_sale_id = buy_result
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    // Advance past expiry
+    app.update_block(|block| {
+        block.time = block.time.plus_seconds(86401);
+    });
+
+    // Manager can still reject even after expiry
+    let reject_msg = ExecuteMsg::RejectSale {
+        id: pending_sale_id.clone(),
+    };
+
+    let result = app.execute_contract(
+        manager.clone(),
+        marketplace_contract.clone(),
+        &reject_msg,
+        &[],
+    );
+    assert!(result.is_ok());
+
+    // Verify buyer is refunded
+    let buyer_balance_after = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+    assert_eq!(buyer_balance_before, buyer_balance_after);
+
+    // Verify pending sale is removed
+    let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(
+        marketplace_contract.clone(),
+        &QueryMsg::PendingSale {
+            id: pending_sale_id,
+        },
+    );
+    assert!(pending_sale_query.is_err());
+}
