@@ -713,7 +713,11 @@ fn test_buy_item_with_zero_marketplace_fee() {
         std::slice::from_ref(&price),
     );
 
-    assert!(result.is_ok(), "Direct buy with zero fee should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Direct buy with zero fee should succeed: {:?}",
+        result.err()
+    );
 
     // Seller receives full price (no fee deducted)
     let seller_balance_after = app.wrap().query_balance(&seller, "uxion").unwrap().amount;
