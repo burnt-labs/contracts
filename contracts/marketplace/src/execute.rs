@@ -136,6 +136,13 @@ pub fn execute_create_listing(
     only_owner(&deps.querier, &info, &collection, &token_id)?;
     not_listed(&deps.querier, &collection, &token_id)?;
     let config = CONFIG.load(deps.storage)?;
+    if price.amount.is_zero() {
+        return Err(ContractError::InvalidPrice {
+            expected: price.clone(),
+            actual: price,
+        });
+    }
+
     ensure_eq!(
         price.denom,
         CONFIG.load(deps.storage)?.listing_denom,
@@ -281,7 +288,7 @@ pub fn execute_buy_item(
         .amount
         .checked_sub(asset_price.amount)
         .map_err(|_| ContractError::InsuficientFunds {})?;
-    Ok(Response::new()
+    let mut response = Response::new()
         .add_event(item_sold_event(
             listing.id,
             listing.collection.clone(),
@@ -296,14 +303,19 @@ pub fn execute_buy_item(
             contract_addr: listing.collection.clone().to_string(),
             msg: to_json_binary(&buy_msg)?,
             funds: vec![asset_price],
-        })
-        .add_message(BankMsg::Send {
+        });
+
+    if !marketplace_fee.is_zero() {
+        response = response.add_message(BankMsg::Send {
             to_address: config.fee_recipient.to_string(),
             amount: vec![Coin {
                 denom: payment.denom,
                 amount: marketplace_fee,
             }],
-        }))
+        });
+    }
+
+    Ok(response)
 }
 
 fn execute_create_pending_sale(

@@ -3,7 +3,7 @@ use cosmwasm_std::{coin, Uint128};
 use cw721_base::msg::ExecuteMsg as Cw721ExecuteMsg;
 use cw_multi_test::Executor;
 use xion_nft_marketplace::helpers::query_listing;
-use xion_nft_marketplace::msg::ExecuteMsg;
+use xion_nft_marketplace::msg::{ExecuteMsg, InstantiateMsg};
 
 #[test]
 fn test_buy_item_success() {
@@ -649,4 +649,95 @@ fn test_buy_reserved_for() {
         .query_wasm_smart(asset_contract.clone(), &owner_query)
         .unwrap();
     assert_eq!(owner_resp.owner, reserved_buyer.to_string());
+}
+
+#[test]
+fn test_buy_item_with_zero_marketplace_fee() {
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+
+    // Create marketplace with zero fee and approvals disabled (direct buy path)
+    let marketplace_code_id = app.store_code(marketplace_contract());
+    let config_json = serde_json::json!({
+        "manager": manager.to_string(),
+        "fee_recipient": manager.to_string(),
+        "sale_approvals": false,
+        "fee_bps": 0,
+        "listing_denom": "uxion"
+    });
+    let instantiate_msg = InstantiateMsg {
+        config: serde_json::from_value(config_json).unwrap(),
+    };
+    let marketplace_addr = app
+        .instantiate_contract(
+            marketplace_code_id,
+            manager.clone(),
+            &instantiate_msg,
+            &[],
+            "test-marketplace-zero-fee",
+            None,
+        )
+        .unwrap();
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(1000, "uxion");
+
+    let seller_balance_before = app.wrap().query_balance(&seller, "uxion").unwrap().amount;
+    let manager_balance_before = app.wrap().query_balance(&manager, "uxion").unwrap().amount;
+
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_addr,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    // Direct buy (no approval flow)
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id,
+        price: price.clone(),
+    };
+
+    let result = app.execute_contract(
+        buyer.clone(),
+        marketplace_addr.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+
+    assert!(result.is_ok(), "Direct buy with zero fee should succeed: {:?}", result.err());
+
+    // Seller receives full price (no fee deducted)
+    let seller_balance_after = app.wrap().query_balance(&seller, "uxion").unwrap().amount;
+    assert_eq!(
+        seller_balance_after,
+        seller_balance_before + price.amount,
+        "Seller should receive full price with zero fee"
+    );
+
+    // Manager receives nothing
+    let manager_balance_after = app.wrap().query_balance(&manager, "uxion").unwrap().amount;
+    assert_eq!(
+        manager_balance_after, manager_balance_before,
+        "Manager should not receive any fee"
+    );
+
+    // NFT transferred to buyer
+    let owner_query = cw721_base::msg::QueryMsg::OwnerOf {
+        token_id: "token1".to_string(),
+        include_expired: Some(false),
+    };
+    let owner_resp: cw721::msg::OwnerOfResponse = app
+        .wrap()
+        .query_wasm_smart(asset_contract.clone(), &owner_query)
+        .unwrap();
+    assert_eq!(owner_resp.owner, buyer.to_string());
 }
