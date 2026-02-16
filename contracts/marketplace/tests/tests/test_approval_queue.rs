@@ -2,6 +2,7 @@ use crate::tests::test_helpers::*;
 use cosmwasm_std::coin;
 use cw721_base::msg::QueryMsg as OwnerQueryMsg;
 use cw_multi_test::Executor;
+use xion_nft_marketplace::helpers::query_listing;
 use xion_nft_marketplace::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use xion_nft_marketplace::state::{Listing, ListingStatus, PendingSale};
 
@@ -143,6 +144,70 @@ fn test_buy_with_approvals_enabled_creates_pending_sale() {
         .query_wasm_smart(asset_contract.clone(), &owner_query)
         .unwrap();
     assert_eq!(owner_resp.owner, seller.to_string());
+}
+
+#[test]
+fn test_pending_sale_reservation_blocks_direct_asset_buy() {
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id,
+        price: price.clone(),
+    };
+
+    let result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(result.is_ok());
+
+    let asset_listing = query_listing(&app.wrap(), &asset_contract, "token1").unwrap();
+    let reserved = asset_listing.reserved.expect("asset listing should be reserved");
+    assert_eq!(reserved.reserver, marketplace_contract);
+
+    let direct_buy_msg = asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        asset::msg::AssetExtensionExecuteMsg,
+    >::UpdateExtension {
+        msg: asset::msg::AssetExtensionExecuteMsg::Buy {
+            token_id: "token1".to_string(),
+            recipient: None,
+        },
+    };
+
+    let direct_buy_result = app.execute_contract(
+        buyer.clone(),
+        asset_contract.clone(),
+        &direct_buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(direct_buy_result.is_err());
+    assert_error(
+        direct_buy_result,
+        "Generic error: Generic error: Unauthorized".to_string(),
+    );
 }
 
 #[test]
