@@ -5,7 +5,7 @@ use cosmwasm_std::{
 
 use crate::error::ContractError;
 use crate::execute::{
-    add_auth_method, add_allowed_email_host, assert_self, emit, remove_allowed_email_host,
+    add_allowed_email_host, add_auth_method, assert_self, emit, remove_allowed_email_host,
     remove_auth_method, update_allowed_email_hosts,
 };
 use crate::msg::{ExecuteMsg, MigrateMsg};
