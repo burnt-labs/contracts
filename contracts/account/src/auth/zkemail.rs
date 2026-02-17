@@ -35,7 +35,7 @@ pub fn verify(
     allowed_email_hosts: &[String],
 ) -> ContractResult<bool> {
     // split the sig_bytes into 2 parts proof and publicOutputs
-    let sig: ZKEmailSignature = from_json(sig_bytes.to_vec())?;
+    let sig: ZKEmailSignature = from_json(sig_bytes)?;
     let proof = sig.proof;
     let public_inputs = sig.public_inputs;
 
@@ -267,7 +267,7 @@ mod tests {
         assert_eq!(signature.proof.pi_b.len(), 3);
         assert_eq!(signature.proof.pi_c.len(), 3);
         assert_eq!(signature.public_inputs.len(), 34);
-        
+
         // Verify nested array structure
         for row in &signature.proof.pi_b {
             assert_eq!(row.len(), 2);
@@ -283,12 +283,15 @@ mod tests {
         let signature = sample_zkemail_signature();
 
         assert_eq!(signature.public_inputs[0], "2018721414038404820327");
-        
+
         // Test access to last element (index 33)
         assert_eq!(signature.public_inputs[33], "1");
-        
+
         // Test access to email salt element (index 32)
-        assert_eq!(signature.public_inputs[32], "8106355043968901587346579634598098765933160394002251948170420219958523220425");
+        assert_eq!(
+            signature.public_inputs[32],
+            "8106355043968901587346579634598098765933160394002251948170420219958523220425"
+        );
     }
 
     #[test]
@@ -444,7 +447,7 @@ mod tests {
         assert_eq!(signature.proof.pi_a, ["1", "2", "3"]);
         assert_eq!(signature.proof.protocol, "groth16");
         assert_eq!(signature.public_inputs, vec!["test_value"]);
-        
+
         // Verify serialization produces camelCase JSON
         let serialized = serde_json::to_string(&signature).unwrap();
         let parsed_back: serde_json::Value = serde_json::from_str(&serialized).unwrap();
@@ -458,7 +461,7 @@ mod tests {
         let sig_bytes = json_str.as_bytes();
 
         // Test parsing signature from bytes using from_json
-        let sig: ZKEmailSignature = from_json(sig_bytes.to_vec()).unwrap();
+        let sig: ZKEmailSignature = from_json(sig_bytes).unwrap();
 
         // Verify the parsed signature matches our sample
         assert_eq!(sig.proof.protocol, "groth16");
@@ -487,8 +490,11 @@ mod tests {
         assert_eq!(verification_request.tx_bytes, tx_bytes.as_bytes());
         assert_eq!(verification_request.email_hash, email_salt.to_string());
         assert_eq!(verification_request.public_inputs, signature.public_inputs);
-        assert_eq!(verification_request.allowed_email_hosts, allowed_email_hosts);
-        
+        assert_eq!(
+            verification_request.allowed_email_hosts,
+            allowed_email_hosts
+        );
+
         // Verify proof serialization
         let proof_bytes = serde_json::to_vec(&signature.proof).unwrap();
         assert_eq!(verification_request.proof, proof_bytes);
