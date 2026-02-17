@@ -18,7 +18,7 @@ lint-asset:
 
 lint-account:
     @echo "Linting asset with clippy..."
-    cargo clippy -p xion_account --all-targets --all-features --fix --no-deps -- -D warnings
+    cargo clippy -p xion-account --all-targets --all-features --fix --no-deps -- -D warnings
 
 # Lint marketplace package only
 lint-marketplace:
