@@ -1403,9 +1403,9 @@ fn test_approve_sale_with_existing_pending_sale() {
     assert!(buy_result2.is_err());
     assert_error(
         buy_result2,
-        xion_nft_marketplace::error::ContractError::PendingSaleAlreadyExists {
-            collection: asset_contract.to_string(),
-            token_id: token_id.clone(),
+        xion_nft_marketplace::error::ContractError::InvalidListingStatus {
+            expected: "Active".to_string(),
+            actual: "Reserved".to_string(),
         }
         .to_string(),
     );

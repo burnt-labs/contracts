@@ -254,6 +254,13 @@ pub fn execute_buy_item(
     let config = CONFIG.load(deps.storage)?;
     let listing = listings().load(deps.storage, listing_id.clone())?;
 
+    if listing.status != ListingStatus::Active {
+        return Err(ContractError::InvalidListingStatus {
+            expected: ListingStatus::Active.to_string(),
+            actual: listing.status.to_string(),
+        });
+    }
+
     if let Some(reserved_for) = listing.reserved_for.clone() {
         ensure_eq!(
             reserved_for,
