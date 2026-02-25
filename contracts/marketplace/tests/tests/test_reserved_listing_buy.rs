@@ -4,7 +4,6 @@ use cw_multi_test::{BankSudo, Executor, SudoMsg};
 use xion_nft_marketplace::msg::{ExecuteMsg, QueryMsg};
 use xion_nft_marketplace::state::{Listing, ListingStatus};
 
-
 #[test]
 fn test_double_buy_blocked_when_approvals_stay_enabled() {
     let mut app = setup_app();
@@ -168,7 +167,6 @@ fn test_double_buy_blocked_when_approvals_stay_enabled() {
         "Buyer B should have all funds back after rejected purchase"
     );
 }
-
 
 #[test]
 fn test_double_buy_blocked_when_approvals_toggled_off() {

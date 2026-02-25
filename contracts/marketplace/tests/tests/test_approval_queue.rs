@@ -183,7 +183,9 @@ fn test_pending_sale_reservation_blocks_direct_asset_buy() {
     assert!(result.is_ok());
 
     let asset_listing = query_listing(&app.wrap(), &asset_contract, "token1").unwrap();
-    let reserved = asset_listing.reserved.expect("asset listing should be reserved");
+    let reserved = asset_listing
+        .reserved
+        .expect("asset listing should be reserved");
     assert_eq!(reserved.reserver, marketplace_contract);
 
     let direct_buy_msg = asset::msg::ExecuteMsg::<
