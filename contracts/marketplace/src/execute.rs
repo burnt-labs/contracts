@@ -18,8 +18,8 @@ use crate::state::{listings, pending_sales, Listing, ListingStatus, PendingSale,
 use crate::state::{Config, CONFIG};
 use asset::msg::ReserveMsg;
 use cosmwasm_std::{
-    ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, Timestamp,
-    WasmMsg,
+    ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Reply, Response,
+    SubMsg, Timestamp, WasmMsg,
 };
 use cw_utils::maybe_addr;
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
@@ -505,6 +505,11 @@ pub fn execute_approve_sale(
     Ok(response)
 }
 
+/// Reply ID for best-effort asset delist during pending sale removal.
+/// If the delist SubMsg fails (e.g. ownership changed, marketplace lost
+/// operator rights), we still want the refund to proceed.
+pub const REPLY_DELIST_BEST_EFFORT: u64 = 1;
+
 fn remove_pending_sale(
     deps: DepsMut,
     pending_sale_id: String,
@@ -516,8 +521,14 @@ fn remove_pending_sale(
         pending_sale.token_id.as_bytes(),
     ]);
 
-    // delete the listing
-    listings().remove(deps.storage, listing_id)?;
+    // Restore the marketplace listing to Active instead of deleting it.
+    // This lets the seller keep their listing without having to re-list
+    // and pay gas again after a rejected or expired pending sale.
+    let listing_result = listings().may_load(deps.storage, listing_id.clone())?;
+    if let Some(mut listing) = listing_result {
+        listing.status = ListingStatus::Active;
+        listings().save(deps.storage, listing_id, &listing)?;
+    }
 
     // query if there is a listing in the asset contract
     let asset_listing = query_listing(
@@ -526,19 +537,27 @@ fn remove_pending_sale(
         &pending_sale.token_id,
     );
 
-    let mut sub_msgs = vec![];
+    let mut sub_msgs: Vec<SubMsg> = vec![];
 
-    // delist from asset contract only if it has a listing
+    // Delist from asset contract using reply_on_error so that if the
+    // delist fails (seller transferred NFT, revoked operator, etc.),
+    // the buyer refund still executes. The asset-side listing becomes
+    // stale but the marketplace listing is already restored to Active
+    // and can be cleaned up by the seller or on next interaction.
     if asset_listing.is_ok() {
         let delist_msg = asset_delist_msg(pending_sale.token_id.clone());
-        sub_msgs.push(WasmMsg::Execute {
-            contract_addr: pending_sale.collection.to_string(),
-            msg: to_json_binary(&delist_msg)?,
-            funds: vec![],
-        });
+        sub_msgs.push(SubMsg::reply_on_error(
+            WasmMsg::Execute {
+                contract_addr: pending_sale.collection.to_string(),
+                msg: to_json_binary(&delist_msg)?,
+                funds: vec![],
+            },
+            REPLY_DELIST_BEST_EFFORT,
+        ));
     }
 
-    // refund buyer
+    // refund buyer — this is a top-level message so it always executes
+    // regardless of whether the delist SubMsg succeeds or fails
     let refund_msg = BankMsg::Send {
         to_address: pending_sale.buyer.to_string(),
         amount: vec![pending_sale.price.clone()],
@@ -558,7 +577,16 @@ fn remove_pending_sale(
             reason,
         ))
         .add_message(refund_msg)
-        .add_messages(sub_msgs))
+        .add_submessages(sub_msgs))
+}
+
+/// Handle reply from best-effort delist SubMsg. We intentionally swallow
+/// errors here — the delist was best-effort and the refund has already
+/// been dispatched as a top-level message.
+pub fn reply_delist_best_effort(_deps: DepsMut, _msg: Reply) -> Result<Response, ContractError> {
+    // Delist on asset contract failed (ownership changed, operator revoked, etc.)
+    // This is expected in adversarial scenarios. The buyer refund proceeds regardless.
+    Ok(Response::new().add_attribute("delist_status", "failed_best_effort"))
 }
 
 pub fn execute_reject_sale(

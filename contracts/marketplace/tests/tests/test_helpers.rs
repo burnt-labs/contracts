@@ -19,11 +19,14 @@ pub fn asset_contract() -> Box<dyn Contract<Empty>> {
 }
 
 pub fn marketplace_contract() -> Box<dyn Contract<Empty>> {
-    Box::new(ContractWrapper::new_with_empty(
-        xion_nft_marketplace::execute::execute,
-        xion_nft_marketplace::contract::instantiate,
-        xion_nft_marketplace::query::query,
-    ))
+    Box::new(
+        ContractWrapper::new_with_empty(
+            xion_nft_marketplace::execute::execute,
+            xion_nft_marketplace::contract::instantiate,
+            xion_nft_marketplace::query::query,
+        )
+        .with_reply_empty(xion_nft_marketplace::contract::reply),
+    )
 }
 
 pub fn setup_app() -> App {

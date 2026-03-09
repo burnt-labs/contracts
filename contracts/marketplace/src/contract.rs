@@ -1,10 +1,11 @@
 use std::env;
 
 use crate::error::ContractError;
+use crate::execute::{reply_delist_best_effort, REPLY_DELIST_BEST_EFFORT};
 use crate::msg::{InstantiateMsg, MigrateMsg};
 use crate::state::init_auto_increment;
 use crate::state::Config;
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Reply, Response};
 use cw2::set_contract_version;
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
@@ -28,4 +29,14 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     Ok(Response::default())
+}
+
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
+pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+    match msg.id {
+        REPLY_DELIST_BEST_EFFORT => reply_delist_best_effort(deps, msg),
+        id => Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+            format!("unknown reply id: {}", id),
+        ))),
+    }
 }
