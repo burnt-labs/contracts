@@ -11,8 +11,8 @@ crate-type = ["cdylib", "rlib"]
 library = []
 
 [dependencies]
-cosmwasm-schema    = { workspace = true }
-cosmwasm-std       = { workspace = true }
+cosmwasm-schema    = "3.0.4"
+cosmwasm-std       = { version = "3.0.4", features = ["stargate", "cosmwasm_2_1"] }
 thiserror          = { workspace = true }
 serde              = { workspace = true }
 serde_json         = { workspace = true }
