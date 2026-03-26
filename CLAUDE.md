@@ -6,15 +6,15 @@ CosmWasm smart contracts for the Xion ecosystem.
 
 ### `Basic.yml`
 
-**Triggered by:** Push to `main`, PRs, tag push `v*.*.*`
+**Triggered by:** Push to `main`, tag push `v*.*.*`, PRs
 
-Runs build and tests for all contracts.
+Installs the pinned Rust toolchain with `wasm32-unknown-unknown` target and runs unit tests (`cargo test --locked`).
 
 ### `Release.yml`
 
 **Triggered by:** GitHub release created
 
-Compiles contracts to optimized WASM and uploads artifacts to the release.
+Compiles contracts to WASM using `cargo wasm --locked` (with `RUSTFLAGS="-C link-arg=-s"` for size optimization) and uploads the resulting `.wasm` artifacts to the release.
 
 ## Upstream Triggers
 
@@ -27,12 +27,12 @@ None.
 ## Development
 
 ```bash
-# Build
-cargo build
+# Run unit tests
+cargo test --locked
 
-# Test
-cargo test
+# Compile WASM (matches CI)
+RUSTFLAGS="-C link-arg=-s" cargo wasm --locked
 
-# Optimize (produces production WASM)
-docker run --rm -v "$(pwd)":/code cosmwasm/optimizer:latest
+# Optimize with cosmwasm-optimizer (if you have just installed)
+just optimize
 ```
