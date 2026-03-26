@@ -1,5 +1,5 @@
-* @burnt-labs/burnt-engineering/burnt-protocol
+* @burnt-labs/burnt-protocol
 
-.github/ @burnt-labs/burnt-engineering/burnt-devops
-vitest.config.ts @burnt-labs/burnt-engineering/burnt-devops
-eslint.config.* @burnt-labs/burnt-engineering/burnt-devops
+.github/ @burnt-labs/burnt-devops
+vitest.config.ts @burnt-labs/burnt-devops
+eslint.config.* @burnt-labs/burnt-devops
