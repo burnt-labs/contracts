@@ -47,8 +47,7 @@ where
         .ok_or_else(|| ContractError::NoPayment {})?
         .clone();
 
-    // check for underpayment but overpayment are absorbed if an exact price
-    // plugin is not set on the asset
+    // check for underpayment
     if payment.amount.lt(&price.amount) || payment.denom != price.denom {
         return Err(ContractError::InvalidPayment {
             price: payment.amount.u128(),
@@ -57,6 +56,23 @@ where
     }
 
     let mut response = Response::<TCustomResponseMsg>::default();
+
+    // defense-in-depth: cap payment to listing price and refund any excess
+    // to the buyer. The ExactPrice plugin rejects overpayment outright when
+    // configured; this ensures the seller never silently receives more than
+    // the listing price even when the plugin is absent.
+    if payment.amount.gt(&price.amount) {
+        let refund_amount = payment.amount.checked_sub(price.amount)
+            .map_err(|_| ContractError::InsufficientFunds {})?;
+        response = response.add_message(BankMsg::Send {
+            to_address: info.sender.to_string(),
+            amount: vec![Coin {
+                denom: payment.denom.clone(),
+                amount: refund_amount,
+            }],
+        });
+        payment.amount = price.amount;
+    }
 
     // remove all other deductions e.g. royalties from payment
     for (_, amount, _) in deductions {

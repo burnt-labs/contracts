@@ -379,6 +379,13 @@ where
     ) -> StdResult<bool> {
         // for buys we run the exact price, then allowed marketplaces and royalty plugins if set
         let config = AssetConfig::<TNftExtension>::default();
+        let exact_price_plugin = config.collection_plugins.may_load(
+            ctx.deps.storage,
+            Plugin::ExactPrice {
+                amount: cosmwasm_std::coin(0, ""),
+            }
+            .get_plugin_name(),
+        )?;
         let allowed_marketplaces_plugin = config.collection_plugins.may_load(
             ctx.deps.storage,
             Plugin::AllowedMarketplaces {
@@ -405,6 +412,9 @@ where
                 id: token_id.to_string(),
             })?;
         ctx.data.ask_price = Some(listing.price.clone());
+        if let Some(plugin) = exact_price_plugin {
+            plugin.run_asset_plugin(ctx)?;
+        }
         if let Some(plugin) = allowed_currencies_plugin {
             plugin.run_asset_plugin(ctx)?;
         }
