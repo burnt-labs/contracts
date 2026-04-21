@@ -91,8 +91,14 @@ pub enum ContractError {
     #[error("invalid ethereum address")]
     InvalidEthAddress,
 
-    #[error("authenticator {index} not found")]
-    AuthenticatorNotFound { index: u8 },
+    #[error("at least one allowed email host must be present")]
+    NoAllowedEmailHosts,
+
+    #[error("authenticator not found")]
+    AuthenticatorNotFound,
+
+    #[error("operation not supported for this authenticator type")]
+    UnsupportedAuthenticatorOperation,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;

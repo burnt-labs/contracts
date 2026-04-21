@@ -10,6 +10,7 @@ pub mod passkey;
 mod secp256r1;
 mod sign_arb;
 pub mod util;
+pub mod zkemail;
 
 pub mod testing {
     pub use super::sign_arb::wrap_message;
@@ -48,6 +49,12 @@ pub enum AddAuthenticator {
         url: String,
         credential: Binary,
     },
+    ZKEmail {
+        id: u8,
+        email_salt: String,
+        allowed_email_hosts: Vec<String>,
+        signature: Binary,
+    },
 }
 
 impl AddAuthenticator {
@@ -59,18 +66,37 @@ impl AddAuthenticator {
             AddAuthenticator::Jwt { id, .. } => *id,
             AddAuthenticator::Secp256R1 { id, .. } => *id,
             AddAuthenticator::Passkey { id, .. } => *id,
+            AddAuthenticator::ZKEmail { id, .. } => *id,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub enum Authenticator {
-    Secp256K1 { pubkey: Binary },
-    Ed25519 { pubkey: Binary },
-    EthWallet { address: String },
-    Jwt { aud: String, sub: String },
-    Secp256R1 { pubkey: Binary },
-    Passkey { url: String, passkey: Binary },
+    Secp256K1 {
+        pubkey: Binary,
+    },
+    Ed25519 {
+        pubkey: Binary,
+    },
+    EthWallet {
+        address: String,
+    },
+    Jwt {
+        aud: String,
+        sub: String,
+    },
+    Secp256R1 {
+        pubkey: Binary,
+    },
+    Passkey {
+        url: String,
+        passkey: Binary,
+    },
+    ZKEmail {
+        email_salt: String,
+        allowed_email_hosts: Vec<String>,
+    },
 }
 
 impl Authenticator {
@@ -143,6 +169,20 @@ impl Authenticator {
                 )?;
 
                 Ok(true)
+            }
+            Authenticator::ZKEmail {
+                email_salt,
+                allowed_email_hosts,
+            } => {
+                let tx_bytes_hash = util::base64url_encode(tx_bytes);
+                let verification = zkemail::verify(
+                    deps,
+                    tx_bytes_hash.as_bytes(),
+                    sig_bytes,
+                    email_salt,
+                    allowed_email_hosts,
+                )?;
+                Ok(verification)
             }
         }
     }
