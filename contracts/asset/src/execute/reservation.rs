@@ -93,7 +93,16 @@ where
         return Err(ContractError::StaleListing {});
     }
 
+    // If the reservation was made by a third party (e.g. the marketplace
+    // contract) and has not yet expired, only the reserver can unreserve.
+    // This prevents sellers from breaking pending sale escrows by
+    // unreserving + delisting + transferring the NFT while buyer funds
+    // are still locked in the marketplace.
     if reserved.reserver != info.sender {
+        if !Expiration::AtTime(reserved.reserved_until).is_expired(&env.block) {
+            return Err(ContractError::ReservedAsset { id: id.clone() });
+        }
+        // Reservation has expired — anyone with list permission can unreserve
         check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;
     }
 
