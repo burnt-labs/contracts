@@ -98,9 +98,9 @@ mod tests {
     use cosmwasm_std::from_json;
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
 
-    use crate::CONTRACT_NAME;
     use crate::error::ContractError;
     use crate::state::MAX_VALUE_LEN;
+    use crate::CONTRACT_NAME;
 
     #[test]
     fn instantiate_sets_contract_version() {
