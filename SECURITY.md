@@ -33,9 +33,11 @@ its original classification.
 | Account  | [`contracts/account`](https://github.com/burnt-labs/contracts/tree/main/contracts/account)   |
 | Treasury | [`contracts/treasury`](https://github.com/burnt-labs/contracts/tree/main/contracts/treasury) |
 
-**Scope is limited exclusively to the two contracts above.** All other contracts
-in this repository — `contracts/asset`, `contracts/marketplace`, and
-`contracts/user_map` — are not covered, along with example and demo contracts.
+**Scope under this contract-specific policy is limited exclusively to the two
+contracts above.** All other contracts in this repository — `contracts/asset`,
+`contracts/marketplace`, and `contracts/user_map` — fall back to the
+organization-wide policy, as do example and demo contracts; they are not part
+of this repository-specific bounty scope.
 
 Scope applies to contracts deployed on the current mainnet. Findings affecting
 only deprecated deployments, or already remediated in the currently deployed
