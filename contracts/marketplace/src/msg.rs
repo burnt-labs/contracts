@@ -60,6 +60,9 @@ pub enum ExecuteMsg {
     RejectSale {
         id: String,
     },
+    ReclaimExpiredSale {
+        id: String,
+    },
     UpdateConfig {
         config: Config<String>,
     },

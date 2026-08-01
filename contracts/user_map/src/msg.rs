@@ -13,11 +13,17 @@ pub enum ExecuteMsg {
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     #[returns(Vec<Addr>)]
-    GetUsers {},
+    GetUsers {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
     #[returns(String)]
     GetValueByUser { address: Addr },
     #[returns(Vec<(Addr, String)>)]
-    GetMap {},
+    GetMap {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
 }
 
 #[cw_serde]
