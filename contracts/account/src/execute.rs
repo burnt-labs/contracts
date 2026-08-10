@@ -13,7 +13,7 @@ pub fn init(
     env: Env,
     add_authenticator: &mut AddAuthenticator,
 ) -> ContractResult<Response> {
-    add_auth_method(deps, env.clone(), add_authenticator)?;
+    add_auth_method(deps, &env, add_authenticator)?;
 
     Ok(
         Response::new().add_event(Event::new("create_abstract_account").add_attributes(vec![
@@ -87,7 +87,7 @@ pub fn after_tx() -> ContractResult<Response> {
 
 pub fn add_auth_method(
     deps: DepsMut,
-    env: Env,
+    env: &Env,
     add_authenticator: &mut AddAuthenticator,
 ) -> ContractResult<Response> {
     match add_authenticator.borrow_mut() {
@@ -102,7 +102,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
@@ -123,7 +123,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
@@ -144,7 +144,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
@@ -187,13 +187,14 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
+
                 Ok(())
             }
         }
@@ -242,6 +243,7 @@ pub fn save_authenticator(
 }
 
 pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Response> {
+    // Ensure there is more than one authenticator before removing
     if AUTHENTICATORS
         .keys(deps.storage, None, None, Order::Ascending)
         .count()
@@ -250,13 +252,32 @@ pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Res
         return Err(ContractError::MinimumAuthenticatorCount);
     }
 
+    // Validate that the key exists
+    if !AUTHENTICATORS.has(deps.storage, id) {
+        return Err(ContractError::AuthenticatorNotFound { index: id });
+    }
+
+    // Remove the authenticator
     AUTHENTICATORS.remove(deps.storage, id);
+
     Ok(
         Response::new().add_event(Event::new("remove_auth_method").add_attributes(vec![
             ("contract_address", env.contract.address.to_string()),
             ("authenticator_id", id.to_string()),
         ])),
     )
+}
+
+const MAX_SIZE: usize = 1024;
+pub fn emit(env: Env, data: String) -> ContractResult<Response> {
+    if data.len() > MAX_SIZE {
+        Err(ContractError::EmissionSizeExceeded)
+    } else {
+        let emit_event = Event::new("account_emit")
+            .add_attribute("address", env.contract.address)
+            .add_attribute("data", data);
+        Ok(Response::new().add_event(emit_event))
+    }
 }
 
 pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {

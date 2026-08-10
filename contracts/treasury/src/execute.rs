@@ -1,21 +1,24 @@
+use crate::error::ContractError::{
+    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, GrantConfigNotFound,
+    Unauthorized,
+};
+use crate::error::ContractResult;
+use crate::grant::allowance::format_allowance;
+use crate::grant::{FeeConfig, GrantConfig};
+use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS, PENDING_ADMIN};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
 use cosmos_sdk_proto::prost::Message;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmos_sdk_proto::Timestamp;
+use cosmwasm_std::BankMsg::Send;
 use cosmwasm_std::{
-    Addr, AnyMsg, Binary, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
+    Addr, AnyMsg, Binary, Coin, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
+    WasmMsg,
 };
-
-use crate::error::ContractError::{
-    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, Unauthorized,
-};
-use crate::error::ContractResult;
-use crate::grant::allowance::format_allowance;
-use crate::grant::{FeeConfig, GrantConfig};
-use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS};
 use url::Url;
 
+#[allow(dead_code)]
 pub fn init(
     deps: DepsMut,
     info: MessageInfo,
@@ -23,6 +26,7 @@ pub fn init(
     type_urls: Vec<String>,
     grant_configs: Vec<GrantConfig>,
     fee_config: FeeConfig,
+    params: Params,
 ) -> ContractResult<Response> {
     let treasury_admin = match admin {
         None => info.sender,
@@ -40,28 +44,115 @@ pub fn init(
 
     FEE_CONFIG.save(deps.storage, &fee_config)?;
 
+    validate_params(&params)?;
+    PARAMS.save(deps.storage, &params)?;
+
     Ok(Response::new().add_event(
         Event::new("create_treasury_instance")
             .add_attributes(vec![("admin", treasury_admin.into_string())]),
     ))
 }
 
-pub fn update_admin(deps: DepsMut, info: MessageInfo, new_admin: Addr) -> ContractResult<Response> {
+#[allow(dead_code)]
+pub fn propose_admin(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_admin: String,
+) -> ContractResult<Response> {
+    // Load the current admin
     let admin = ADMIN.load(deps.storage)?;
+
+    // Check if the caller is the current admin
     if admin != info.sender {
         return Err(Unauthorized);
     }
 
-    ADMIN.save(deps.storage, &new_admin)?;
+    // Validate the new admin address
+    let validated_admin = deps.api.addr_validate(&new_admin)?;
+
+    // Save the proposed new admin to PENDING_ADMIN
+    PENDING_ADMIN.save(deps.storage, &validated_admin)?;
 
     Ok(
-        Response::new().add_event(Event::new("updated_treasury_admin").add_attributes(vec![
-            ("old admin", admin.into_string()),
-            ("new admin", new_admin.into_string()),
+        Response::new().add_event(Event::new("proposed_new_admin").add_attributes(vec![
+            ("proposed_admin", validated_admin.to_string()),
+            ("proposer", admin.to_string()),
         ])),
     )
 }
 
+#[allow(dead_code)]
+pub fn accept_admin(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
+    // Load the pending admin
+    let pending_admin = PENDING_ADMIN.load(deps.storage)?;
+
+    // Verify the sender is the pending admin
+    if pending_admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    // Update the ADMIN storage with the new admin
+    ADMIN.save(deps.storage, &pending_admin)?;
+
+    // Clear the PENDING_ADMIN
+    PENDING_ADMIN.remove(deps.storage);
+
+    Ok(Response::new().add_event(
+        Event::new("accepted_new_admin")
+            .add_attributes(vec![("new_admin", pending_admin.to_string())]),
+    ))
+}
+
+#[allow(dead_code)]
+pub fn cancel_proposed_admin(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
+    // Load the current admin
+    let admin = ADMIN.load(deps.storage)?;
+
+    // Check if the caller is the current admin
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    // Remove the pending admin
+    PENDING_ADMIN.remove(deps.storage);
+
+    Ok(Response::new().add_event(
+        Event::new("cancelled_proposed_admin").add_attribute("action", "cancel_proposed_admin"),
+    ))
+}
+
+#[allow(dead_code)]
+pub fn migrate(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    new_code_id: u64,
+    migrate_msg: Binary,
+) -> ContractResult<Response> {
+    // Load the current admin
+    let admin = ADMIN.load(deps.storage)?;
+
+    // Check if the caller is the current admin
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    // this assumes that the contract's wasmd admin is itself
+    let migrate_msg = CosmosMsg::Wasm(WasmMsg::Migrate {
+        contract_addr: env.contract.address.into_string(),
+        new_code_id,
+        msg: migrate_msg,
+    });
+
+    Ok(Response::new()
+        .add_event(Event::new("migrate_treasury_instance").add_attributes(vec![
+            ("new_code_id", new_code_id.to_string()),
+            ("admin", admin.to_string()),
+        ]))
+        .add_message(migrate_msg))
+}
+
+#[allow(dead_code)]
 pub fn update_grant_config(
     deps: DepsMut,
     info: MessageInfo,
@@ -85,16 +176,26 @@ pub fn update_grant_config(
     ))
 }
 
+#[allow(dead_code)]
 pub fn remove_grant_config(
     deps: DepsMut,
     info: MessageInfo,
     msg_type_url: String,
 ) -> ContractResult<Response> {
+    // Check if the sender is the admin
     let admin = ADMIN.load(deps.storage)?;
     if admin != info.sender {
         return Err(Unauthorized);
     }
 
+    // Validate that the key exists
+    if !GRANT_CONFIGS.has(deps.storage, msg_type_url.clone()) {
+        return Err(GrantConfigNotFound {
+            type_url: msg_type_url,
+        });
+    }
+
+    // Remove the grant config
     GRANT_CONFIGS.remove(deps.storage, msg_type_url.clone());
 
     Ok(Response::new().add_event(
@@ -103,6 +204,7 @@ pub fn remove_grant_config(
     ))
 }
 
+#[allow(dead_code)]
 pub fn update_fee_config(
     deps: DepsMut,
     info: MessageInfo,
@@ -118,21 +220,46 @@ pub fn update_fee_config(
     Ok(Response::new().add_event(Event::new("updated_treasury_fee_config")))
 }
 
+pub fn validate_params(params: &Params) -> ContractResult<()> {
+    Url::parse(params.redirect_url.as_str())?;
+    Url::parse(params.icon_url.as_str())?;
+    serde_json::from_str::<serde_json::Value>(&params.metadata)?;
+
+    Ok(())
+}
+
+#[allow(dead_code)]
 pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> ContractResult<Response> {
     let admin = ADMIN.load(deps.storage)?;
     if admin != info.sender {
         return Err(Unauthorized);
     }
 
-    Url::parse(params.display_url.as_str())?;
-    Url::parse(params.redirect_url.as_str())?;
-    Url::parse(params.icon_url.as_str())?;
+    validate_params(&params)?;
 
     PARAMS.save(deps.storage, &params)?;
 
     Ok(Response::new().add_event(Event::new("updated_params")))
 }
 
+#[allow(dead_code)]
+pub fn withdraw_coins(
+    deps: DepsMut,
+    info: MessageInfo,
+    coins: Vec<Coin>,
+) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    Ok(Response::new().add_message(Send {
+        to_address: info.sender.into_string(),
+        amount: coins,
+    }))
+}
+
+#[allow(dead_code)]
 pub fn deploy_fee_grant(
     deps: DepsMut,
     env: Env,
@@ -161,8 +288,12 @@ pub fn deploy_fee_grant(
         let response = QueryGrantsResponse::decode(authz_query_res.as_slice())?;
         let grants = response.grants;
 
-        if grants.clone().is_empty() && !grant_config.optional {
-            return Err(AuthzGrantNotFound { msg_type_url });
+        if grants.clone().is_empty() {
+            if grant_config.optional {
+                continue;
+            } else {
+                return Err(AuthzGrantNotFound { msg_type_url });
+            }
         } else {
             match grants.first() {
                 None => return Err(AuthzGrantNotFound { msg_type_url }),
@@ -253,6 +384,7 @@ pub fn deploy_fee_grant(
     }
 }
 
+#[allow(dead_code)]
 pub fn revoke_allowance(
     deps: DepsMut,
     env: Env,

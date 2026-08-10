@@ -11,6 +11,10 @@ mod secp256r1;
 mod sign_arb;
 pub mod util;
 
+pub mod testing {
+    pub use super::sign_arb::wrap_message;
+}
+
 #[derive(Serialize, Deserialize, Clone, JsonSchema, PartialEq, Debug)]
 pub enum AddAuthenticator {
     Secp256K1 {
@@ -105,7 +109,13 @@ impl Authenticator {
                 }
             }
             Authenticator::EthWallet { address } => {
-                let addr_bytes = hex::decode(&address[2..])?;
+                if !address.starts_with("0x") || address.len() != 42 {
+                    return Err(ContractError::InvalidEthAddress);
+                }
+                let normalized_address = address.to_lowercase();
+                let addr_bytes = hex::decode(&normalized_address[2..])
+                    .map_err(|_| ContractError::InvalidEthAddress)?;
+
                 match eth_crypto::verify(deps.api, tx_bytes, sig_bytes, &addr_bytes) {
                     Ok(_) => Ok(true),
                     Err(error) => Err(error),
