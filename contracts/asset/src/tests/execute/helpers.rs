@@ -1,7 +1,7 @@
 pub(crate) fn expect_ok<T, E: core::fmt::Debug>(res: Result<T, E>) -> T {
     match res {
         Ok(value) => value,
-        Err(err) => panic!("expected Ok(..) but got Err({:?})", err),
+        Err(err) => panic!("expected Ok(..) but got Err({err:?})"),
     }
 }
 
