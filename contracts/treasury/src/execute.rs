@@ -18,6 +18,7 @@ use cosmwasm_std::{
 };
 use url::Url;
 
+#[allow(dead_code)]
 pub fn init(
     deps: DepsMut,
     info: MessageInfo,
@@ -52,6 +53,7 @@ pub fn init(
     ))
 }
 
+#[allow(dead_code)]
 pub fn propose_admin(
     deps: DepsMut,
     info: MessageInfo,
@@ -79,6 +81,7 @@ pub fn propose_admin(
     )
 }
 
+#[allow(dead_code)]
 pub fn accept_admin(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
     // Load the pending admin
     let pending_admin = PENDING_ADMIN.load(deps.storage)?;
@@ -100,6 +103,7 @@ pub fn accept_admin(deps: DepsMut, info: MessageInfo) -> ContractResult<Response
     ))
 }
 
+#[allow(dead_code)]
 pub fn cancel_proposed_admin(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
     // Load the current admin
     let admin = ADMIN.load(deps.storage)?;
@@ -117,6 +121,7 @@ pub fn cancel_proposed_admin(deps: DepsMut, info: MessageInfo) -> ContractResult
     ))
 }
 
+#[allow(dead_code)]
 pub fn migrate(
     deps: DepsMut,
     env: Env,
@@ -147,6 +152,7 @@ pub fn migrate(
         .add_message(migrate_msg))
 }
 
+#[allow(dead_code)]
 pub fn update_grant_config(
     deps: DepsMut,
     info: MessageInfo,
@@ -170,6 +176,7 @@ pub fn update_grant_config(
     ))
 }
 
+#[allow(dead_code)]
 pub fn remove_grant_config(
     deps: DepsMut,
     info: MessageInfo,
@@ -197,6 +204,7 @@ pub fn remove_grant_config(
     ))
 }
 
+#[allow(dead_code)]
 pub fn update_fee_config(
     deps: DepsMut,
     info: MessageInfo,
@@ -220,6 +228,7 @@ pub fn validate_params(params: &Params) -> ContractResult<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> ContractResult<Response> {
     let admin = ADMIN.load(deps.storage)?;
     if admin != info.sender {
@@ -233,6 +242,7 @@ pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> Contra
     Ok(Response::new().add_event(Event::new("updated_params")))
 }
 
+#[allow(dead_code)]
 pub fn withdraw_coins(
     deps: DepsMut,
     info: MessageInfo,
@@ -249,6 +259,7 @@ pub fn withdraw_coins(
     }))
 }
 
+#[allow(dead_code)]
 pub fn deploy_fee_grant(
     deps: DepsMut,
     env: Env,
@@ -373,6 +384,7 @@ pub fn deploy_fee_grant(
     }
 }
 
+#[allow(dead_code)]
 pub fn revoke_allowance(
     deps: DepsMut,
     env: Env,
