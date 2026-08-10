@@ -10,6 +10,7 @@ use cosmos_sdk_proto::xion::v1::{AuthzAllowance, ContractsAllowance, MultiAnyAll
 use cosmos_sdk_proto::Timestamp;
 use cosmwasm_std::Addr;
 
+#[allow(dead_code)]
 pub fn format_allowance(
     allowance_any: Any,
     _granter: Addr,

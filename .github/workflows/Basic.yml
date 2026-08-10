@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - "v*.*.*"
+      - 'v*.*.*'
 
   pull_request:
 
@@ -23,7 +23,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.89.0
+          toolchain: 1.86.0
           target: wasm32-unknown-unknown
           override: true
 
@@ -45,7 +45,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.89.0
+          toolchain: 1.86.0
           override: true
           components: rustfmt, clippy
 
@@ -60,3 +60,11 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build development contracts
+        run: |
+          docker run --rm -v "${PWD}:/code" cosmwasm/optimizer:0.17.0
