@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
 pub enum ContractError {
     #[error(transparent)]
@@ -32,6 +33,13 @@ pub enum ContractError {
 
     #[error("unauthorized")]
     Unauthorized,
+
+    #[error("grant config for {type_url} not found")]
+    GrantConfigNotFound { type_url: String },
+
+    #[error(transparent)]
+    JsonError(#[from] serde_json::Error),
 }
 
+#[allow(dead_code)]
 pub type ContractResult<T> = Result<T, ContractError>;
