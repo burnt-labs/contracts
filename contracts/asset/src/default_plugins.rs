@@ -140,35 +140,26 @@ pub fn royalty_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> St
         return Ok(true);
     }
 
-    if let Some(ask_price) = &ctx.data.ask_price {
-        if ask_price.amount.is_zero() {
-            return Err(cosmwasm_std::StdError::generic_err(
-                "Ask price is zero, cannot calculate royalty".to_string(),
-            ));
-        }
-    } else {
-        Err(cosmwasm_std::StdError::generic_err(
-            "No ask price set for royalty calculation".to_string(),
-        ))?;
+    let ask_price = ctx.data.ask_price.as_ref().ok_or_else(|| {
+        cosmwasm_std::StdError::generic_err("No ask price set for royalty calculation")
+    })?;
+    if ask_price.amount.is_zero() {
+        return Err(cosmwasm_std::StdError::generic_err(
+            "Ask price is zero, cannot calculate royalty",
+        ));
     }
-    let fund = ctx
-        .info
+    ctx.info
         .funds
         .iter()
-        .find(|c| c.denom == ctx.data.ask_price.as_ref().unwrap().denom);
-    if fund.is_none() {
-        Err(cosmwasm_std::StdError::generic_err(
-            "No funds provided for royalty".to_string(),
-        ))?;
-    }
-    let fund = fund.unwrap();
-    let royalty_amount = fund.amount.multiply_ratio(bps as u128, 10_000u128);
+        .find(|coin| coin.denom == ask_price.denom)
+        .ok_or_else(|| cosmwasm_std::StdError::generic_err("No funds provided for royalty"))?;
+    let royalty_amount = ask_price.amount.multiply_ratio(bps as u128, 10_000u128);
     if royalty_amount.is_zero() {
         return Ok(true);
     }
 
     let royalty_coin = Coin {
-        denom: fund.denom.clone(),
+        denom: ask_price.denom.clone(),
         amount: royalty_amount,
     };
 

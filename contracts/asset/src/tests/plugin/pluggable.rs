@@ -321,6 +321,61 @@ fn on_buy_plugin_runs_allowed_marketplace_and_royalty_plugins() {
 }
 
 #[test]
+fn on_buy_plugin_enforces_the_configured_exact_price() {
+    let mut deps = mock_dependencies();
+    let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
+    let buyer = deps.api.addr_make("buyer");
+    let seller = deps.api.addr_make("seller");
+    let price = Coin::new(100u128, "uxion");
+
+    contract
+        .config
+        .listings
+        .save(
+            deps.as_mut().storage,
+            "token-exact",
+            &ListingInfo {
+                id: "token-exact".to_string(),
+                seller,
+                price: price.clone(),
+                reserved: None,
+            },
+        )
+        .unwrap();
+    contract
+        .config
+        .collection_plugins
+        .save(
+            deps.as_mut().storage,
+            "ExactPrice",
+            &Plugin::ExactPrice {
+                amount: price.clone(),
+            },
+        )
+        .unwrap();
+
+    let env = env_at(1_000);
+    let matching_info = message_info(&buyer, std::slice::from_ref(&price));
+    let mut matching_ctx = build_ctx(deps.as_ref(), env.clone(), matching_info);
+    assert!(
+        contract
+            .on_buy_plugin("token-exact", &None, &mut matching_ctx)
+            .unwrap()
+    );
+
+    let overpaid_info = message_info(&buyer, &[Coin::new(101u128, "uxion")]);
+    let mut overpaid_ctx = build_ctx(deps.as_ref(), env, overpaid_info);
+    let error = contract
+        .on_buy_plugin("token-exact", &None, &mut overpaid_ctx)
+        .expect_err("overpayment must be rejected");
+    assert_eq!(
+        error.to_string(),
+        cosmwasm_std::StdError::generic_err("Exact price not met: 100 required, 101 provided")
+            .to_string()
+    );
+}
+
+#[test]
 fn on_buy_plugin_errors_when_currency_not_allowed() {
     let mut deps = mock_dependencies();
     let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();

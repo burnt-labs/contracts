@@ -189,6 +189,30 @@ fn royalty_plugin_creates_deduction_and_message() {
     }
 }
 
+#[test]
+fn royalty_plugin_calculates_from_ask_price_when_buyer_overpays() {
+    let deps = mock_dependencies();
+    let env = env_at(1_000);
+    let info = message_info(
+        &deps.api.addr_make("buyer"),
+        &[Coin::new(1_200u128, "uxion")],
+    );
+    let mut ctx = build_ctx(deps.as_ref(), env, info);
+
+    ctx.data.ask_price = Some(Coin::new(1_000u128, "uxion"));
+    ctx.royalty.collection_royalty_recipient = Some(Addr::unchecked("artist"));
+    ctx.royalty.collection_royalty_bps = Some(500);
+
+    assert!(default_plugins::royalty_plugin(&mut ctx).is_ok());
+    assert_eq!(ctx.deductions[0].1, Coin::new(50u128, "uxion"));
+    match &ctx.response.messages[0].msg {
+        CosmosMsg::Bank(BankMsg::Send { amount, .. }) => {
+            assert_eq!(amount, &vec![Coin::new(50u128, "uxion")]);
+        }
+        other => panic!("unexpected message: {:?}", other),
+    }
+}
+
 #[allow(dead_code)]
 fn royalty_plugin_rounds_up_small_amounts() {
     let deps = mock_dependencies();
