@@ -105,8 +105,9 @@ pub fn execute(
         ),
 
         ExecuteMsg::CancelCollectionOffer { id } => execute_cancel_collection_offer(deps, info, id),
-        ExecuteMsg::ApproveSale { id } => execute_approve_sale(deps, info, id),
+        ExecuteMsg::ApproveSale { id } => execute_approve_sale(deps, env, info, id),
         ExecuteMsg::RejectSale { id } => execute_reject_sale(deps, info, id),
+        ExecuteMsg::ReclaimExpiredSale { id } => execute_reclaim_expired_sale(deps, env, info, id),
         ExecuteMsg::UpdateConfig { config } => execute_update_config(deps, info, config),
     }
 }
@@ -135,6 +136,13 @@ pub fn execute_create_listing(
     only_owner(&deps.querier, &info, &collection, &token_id)?;
     not_listed(&deps.querier, &collection, &token_id)?;
     let config = CONFIG.load(deps.storage)?;
+    if price.amount.is_zero() {
+        return Err(ContractError::InvalidPrice {
+            expected: price.clone(),
+            actual: price,
+        });
+    }
+
     ensure_eq!(
         price.denom,
         CONFIG.load(deps.storage)?.listing_denom,
@@ -246,6 +254,13 @@ pub fn execute_buy_item(
     let config = CONFIG.load(deps.storage)?;
     let listing = listings().load(deps.storage, listing_id.clone())?;
 
+    if listing.status != ListingStatus::Active {
+        return Err(ContractError::InvalidListingStatus {
+            expected: ListingStatus::Active.to_string(),
+            actual: listing.status.to_string(),
+        });
+    }
+
     if let Some(reserved_for) = listing.reserved_for.clone() {
         ensure_eq!(
             reserved_for,
@@ -280,7 +295,7 @@ pub fn execute_buy_item(
         .amount
         .checked_sub(asset_price.amount)
         .map_err(|_| ContractError::InsuficientFunds {})?;
-    Ok(Response::new()
+    let mut response = Response::new()
         .add_event(item_sold_event(
             listing.id,
             listing.collection.clone(),
@@ -295,14 +310,19 @@ pub fn execute_buy_item(
             contract_addr: listing.collection.clone().to_string(),
             msg: to_json_binary(&buy_msg)?,
             funds: vec![asset_price],
-        })
-        .add_message(BankMsg::Send {
+        });
+
+    if !marketplace_fee.is_zero() {
+        response = response.add_message(BankMsg::Send {
             to_address: config.fee_recipient.to_string(),
             amount: vec![Coin {
                 denom: payment.denom,
                 amount: marketplace_fee,
             }],
-        }))
+        });
+    }
+
+    Ok(response)
 }
 
 fn execute_create_pending_sale(
@@ -400,6 +420,7 @@ fn execute_create_pending_sale(
 
 pub fn execute_approve_sale(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     pending_sale_id: String,
 ) -> Result<Response, ContractError> {
@@ -408,6 +429,12 @@ pub fn execute_approve_sale(
 
     let config = CONFIG.load(deps.storage)?;
     let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
+
+    if env.block.time.seconds() >= pending_sale.expiration {
+        return Err(ContractError::PendingSaleExpired {
+            id: pending_sale_id,
+        });
+    }
 
     // Generate listing_id to find the listing
     let listing_id = generate_id(vec![
@@ -478,16 +505,12 @@ pub fn execute_approve_sale(
     Ok(response)
 }
 
-pub fn execute_reject_sale(
+fn remove_pending_sale(
     deps: DepsMut,
-    info: MessageInfo,
     pending_sale_id: String,
+    pending_sale: PendingSale,
+    reason: &str,
 ) -> Result<Response, ContractError> {
-    // Only manager can reject
-    only_manager(&info, &deps)?;
-
-    let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
-
     let listing_id = generate_id(vec![
         pending_sale.collection.as_bytes(),
         pending_sale.token_id.as_bytes(),
@@ -514,6 +537,7 @@ pub fn execute_reject_sale(
             funds: vec![],
         });
     }
+
     // refund buyer
     let refund_msg = BankMsg::Send {
         to_address: pending_sale.buyer.to_string(),
@@ -531,7 +555,43 @@ pub fn execute_reject_sale(
             pending_sale.buyer.clone(),
             pending_sale.seller,
             pending_sale.price,
+            reason,
         ))
         .add_message(refund_msg)
         .add_messages(sub_msgs))
+}
+
+pub fn execute_reject_sale(
+    deps: DepsMut,
+    info: MessageInfo,
+    pending_sale_id: String,
+) -> Result<Response, ContractError> {
+    only_manager(&info, &deps)?;
+
+    let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
+
+    remove_pending_sale(deps, pending_sale_id, pending_sale, "rejected_by_manager")
+}
+
+pub fn execute_reclaim_expired_sale(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    pending_sale_id: String,
+) -> Result<Response, ContractError> {
+    let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
+
+    if env.block.time.seconds() < pending_sale.expiration {
+        return Err(ContractError::PendingSaleNotExpired {
+            id: pending_sale_id,
+        });
+    }
+
+    if info.sender != pending_sale.buyer {
+        return Err(ContractError::Unauthorized {
+            message: "only the buyer can reclaim an expired sale".to_string(),
+        });
+    }
+
+    remove_pending_sale(deps, pending_sale_id, pending_sale, "expired")
 }

@@ -195,7 +195,8 @@ pub fn collection_offers<'a>(
 pub const AUTO_INCREMENT: Item<u64> = Item::new("auto_increment");
 
 // next_auto_increment is inteded to be used as a generator nonce for unique ids in combination
-// with other sources of entropy to generate unique ids.
+// with other sources of entropy to generate unique ids, and never to be used as source of unique ids
+// as it wraps around effectily resetting the counter.
 pub fn next_auto_increment(storage: &mut dyn Storage) -> Result<u64, ContractError> {
     let auto_increment = AUTO_INCREMENT.load(storage)?.wrapping_add(1);
     AUTO_INCREMENT.save(storage, &auto_increment)?;

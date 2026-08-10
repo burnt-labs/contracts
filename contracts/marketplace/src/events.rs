@@ -155,6 +155,7 @@ pub fn sale_rejected_event(
     buyer: Addr,
     seller: Addr,
     price: Coin,
+    reason: &str,
 ) -> Event {
     Event::new(format!("{}/sale-rejected", env!("CARGO_PKG_NAME")))
         .add_attribute("pending_sale_id", pending_sale_id)
@@ -163,4 +164,5 @@ pub fn sale_rejected_event(
         .add_attribute("buyer", buyer.to_string())
         .add_attribute("seller", seller.to_string())
         .add_attribute("price", price.to_string())
+        .add_attribute("reason", reason)
 }
