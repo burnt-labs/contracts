@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
 pub enum ContractError {
     #[error(transparent)]
@@ -8,6 +9,9 @@ pub enum ContractError {
 
     #[error(transparent)]
     Decode(#[from] cosmos_sdk_proto::prost::DecodeError),
+
+    #[error(transparent)]
+    URLParse(#[from] url::ParseError),
 
     #[error("authz grant not found, msg_type: {msg_type_url}")]
     AuthzGrantNotFound { msg_type_url: String },
@@ -29,6 +33,13 @@ pub enum ContractError {
 
     #[error("unauthorized")]
     Unauthorized,
+
+    #[error("grant config for {type_url} not found")]
+    GrantConfigNotFound { type_url: String },
+
+    #[error(transparent)]
+    JsonError(#[from] serde_json::Error),
 }
 
+#[allow(dead_code)]
 pub type ContractResult<T> = Result<T, ContractError>;

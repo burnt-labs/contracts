@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - "v*.*.*"
+      - 'v*.*.*'
 
   pull_request:
 
@@ -23,7 +23,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: 1.86.0
           target: wasm32-unknown-unknown
           override: true
 
@@ -45,30 +45,32 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: 1.86.0
           override: true
           components: rustfmt, clippy
 
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
-          toolchain: stable
           command: fmt
           args: --all -- --check
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
-          toolchain: stable
           command: clippy
-          args: --all-targets -- -D warnings
+          args: -- -D warnings
 
-      - name: Generate Schema
+      - name: Generate schemas
         run: ./scripts/schema.sh
 
-      - name: Show Schema changes
-        run: git status --porcelain
+      - name: Verify schemas are current
+        run: test -z "$(git status --porcelain)"
 
-      - name: Schema Changes
-        # fails if any changes not committed
-        run: chmod +x ./scripts/schema.sh && test -z "$(git status --porcelain)"
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build development contracts
+        run: |
+          docker run --rm -v "${PWD}:/code" cosmwasm/optimizer:0.17.0

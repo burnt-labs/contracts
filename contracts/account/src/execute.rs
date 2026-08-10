@@ -3,18 +3,17 @@ use std::borrow::BorrowMut;
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, Event, Order, Response};
 
 use crate::auth::{jwt, passkey, AddAuthenticator, Authenticator};
-use crate::proto::XionCustomQuery;
 use crate::{
     error::{ContractError, ContractResult},
     state::AUTHENTICATORS,
 };
 
 pub fn init(
-    deps: DepsMut<XionCustomQuery>,
+    deps: DepsMut,
     env: Env,
     add_authenticator: &mut AddAuthenticator,
 ) -> ContractResult<Response> {
-    add_auth_method(deps, env.clone(), add_authenticator)?;
+    add_auth_method(deps, &env, add_authenticator)?;
 
     Ok(
         Response::new().add_event(Event::new("create_abstract_account").add_attributes(vec![
@@ -26,7 +25,7 @@ pub fn init(
 }
 
 pub fn before_tx(
-    deps: Deps<XionCustomQuery>,
+    deps: Deps,
     env: &Env,
     tx_bytes: &Binary,
     cred_bytes: Option<&Binary>,
@@ -87,8 +86,8 @@ pub fn after_tx() -> ContractResult<Response> {
 }
 
 pub fn add_auth_method(
-    deps: DepsMut<XionCustomQuery>,
-    env: Env,
+    deps: DepsMut,
+    env: &Env,
     add_authenticator: &mut AddAuthenticator,
 ) -> ContractResult<Response> {
     match add_authenticator.borrow_mut() {
@@ -103,7 +102,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
@@ -124,7 +123,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
@@ -145,7 +144,7 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
@@ -188,13 +187,14 @@ pub fn add_auth_method(
 
             if !auth.verify(
                 deps.as_ref(),
-                &env,
+                env,
                 &Binary::from(env.contract.address.as_bytes()),
                 signature,
             )? {
                 Err(ContractError::InvalidSignature)
             } else {
-                AUTHENTICATORS.save(deps.storage, *id, &auth)?;
+                save_authenticator(deps, *id, &auth)?;
+
                 Ok(())
             }
         }
@@ -230,7 +230,7 @@ pub fn add_auth_method(
 }
 
 pub fn save_authenticator(
-    deps: DepsMut<XionCustomQuery>,
+    deps: DepsMut,
     id: u8,
     authenticator: &Authenticator,
 ) -> ContractResult<()> {
@@ -242,11 +242,8 @@ pub fn save_authenticator(
     Ok(())
 }
 
-pub fn remove_auth_method(
-    deps: DepsMut<XionCustomQuery>,
-    env: Env,
-    id: u8,
-) -> ContractResult<Response> {
+pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Response> {
+    // Ensure there is more than one authenticator before removing
     if AUTHENTICATORS
         .keys(deps.storage, None, None, Order::Ascending)
         .count()
@@ -255,13 +252,32 @@ pub fn remove_auth_method(
         return Err(ContractError::MinimumAuthenticatorCount);
     }
 
+    // Validate that the key exists
+    if !AUTHENTICATORS.has(deps.storage, id) {
+        return Err(ContractError::AuthenticatorNotFound { index: id });
+    }
+
+    // Remove the authenticator
     AUTHENTICATORS.remove(deps.storage, id);
+
     Ok(
         Response::new().add_event(Event::new("remove_auth_method").add_attributes(vec![
             ("contract_address", env.contract.address.to_string()),
             ("authenticator_id", id.to_string()),
         ])),
     )
+}
+
+const MAX_SIZE: usize = 1024;
+pub fn emit(env: Env, data: String) -> ContractResult<Response> {
+    if data.len() > MAX_SIZE {
+        Err(ContractError::EmissionSizeExceeded)
+    } else {
+        let emit_event = Event::new("account_emit")
+            .add_attribute("address", env.contract.address)
+            .add_attribute("data", data);
+        Ok(Response::new().add_event(emit_event))
+    }
 }
 
 pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {
@@ -273,23 +289,37 @@ pub fn assert_self(sender: &Addr, contract: &Addr) -> ContractResult<()> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use base64::{engine::general_purpose, Engine as _};
     use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
-    use cosmwasm_std::{Binary, OwnedDeps};
+    use cosmwasm_std::{Binary, CustomQuery, OwnedDeps};
+    use serde::{Deserialize, Serialize};
 
     use crate::auth::Authenticator;
     use crate::execute::before_tx;
-    use crate::proto::{self, QueryWebAuthNVerifyRegisterResponse, XionCustomQuery};
     use crate::state::AUTHENTICATORS;
     use cosmwasm_std::QueryRequest::Custom;
+
+    use cosmos_sdk_proto::xion::v1::{
+        QueryWebAuthNVerifyAuthenticateRequest, QueryWebAuthNVerifyRegisterRequest,
+        QueryWebAuthNVerifyRegisterResponse,
+    };
+
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+    #[serde(rename_all = "snake_case")]
+    pub enum XionCustomQuery {
+        Verify(QueryWebAuthNVerifyRegisterRequest),
+        Authenticate(QueryWebAuthNVerifyAuthenticateRequest),
+    }
+
+    impl CustomQuery for XionCustomQuery {}
 
     #[test]
     fn test_before_tx() {
         let auth_id = 0;
         let mut deps = OwnedDeps {
             storage: MockStorage::default(),
-            api: MockApi::default(),
+            api: MockApi::default().with_prefix("xion"),
             querier: MockQuerier::<XionCustomQuery>::new(&[]),
             custom_query_type: std::marker::PhantomData,
         };
@@ -346,10 +376,9 @@ mod tests {
                 ))
             }
             XionCustomQuery::Authenticate(_) => todo!(),
-            XionCustomQuery::JWTValidate(_) => todo!(),
         });
 
-        let query_msg = XionCustomQuery::Verify(proto::QueryWebAuthNVerifyRegisterRequest {
+        let query_msg = XionCustomQuery::Verify(QueryWebAuthNVerifyRegisterRequest {
             addr: "mock_address".to_string(),
             challenge: "mock_challenge".to_string(),
             rp: "mock_rp".to_string(),

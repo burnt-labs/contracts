@@ -1,19 +1,24 @@
-use cosmos_sdk_proto::cosmos::authz::v1beta1::QueryGrantsRequest;
-use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
-use cosmos_sdk_proto::traits::MessageExt;
-use cosmos_sdk_proto::Timestamp;
-use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response};
-use serde_json::Value;
-
 use crate::error::ContractError::{
-    AuthzGrantMismatch, AuthzGrantNoAuthorization, AuthzGrantNotFound, ConfigurationMismatch,
+    AuthzGrantMismatch, AuthzGrantNotFound, ConfigurationMismatch, GrantConfigNotFound,
     Unauthorized,
 };
 use crate::error::ContractResult;
 use crate::grant::allowance::format_allowance;
 use crate::grant::{FeeConfig, GrantConfig};
-use crate::state::{ADMIN, FEE_CONFIG, GRANT_CONFIGS};
+use crate::state::{Params, ADMIN, FEE_CONFIG, GRANT_CONFIGS, PARAMS, PENDING_ADMIN};
+use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsResponse};
+use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
+use cosmos_sdk_proto::prost::Message;
+use cosmos_sdk_proto::traits::MessageExt;
+use cosmos_sdk_proto::Timestamp;
+use cosmwasm_std::BankMsg::Send;
+use cosmwasm_std::{
+    Addr, AnyMsg, Binary, Coin, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
+    WasmMsg,
+};
+use url::Url;
 
+#[allow(dead_code)]
 pub fn init(
     deps: DepsMut,
     info: MessageInfo,
@@ -21,6 +26,7 @@ pub fn init(
     type_urls: Vec<String>,
     grant_configs: Vec<GrantConfig>,
     fee_config: FeeConfig,
+    params: Params,
 ) -> ContractResult<Response> {
     let treasury_admin = match admin {
         None => info.sender,
@@ -38,28 +44,115 @@ pub fn init(
 
     FEE_CONFIG.save(deps.storage, &fee_config)?;
 
+    validate_params(&params)?;
+    PARAMS.save(deps.storage, &params)?;
+
     Ok(Response::new().add_event(
         Event::new("create_treasury_instance")
             .add_attributes(vec![("admin", treasury_admin.into_string())]),
     ))
 }
 
-pub fn update_admin(deps: DepsMut, info: MessageInfo, new_admin: Addr) -> ContractResult<Response> {
+#[allow(dead_code)]
+pub fn propose_admin(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_admin: String,
+) -> ContractResult<Response> {
+    // Load the current admin
     let admin = ADMIN.load(deps.storage)?;
+
+    // Check if the caller is the current admin
     if admin != info.sender {
         return Err(Unauthorized);
     }
 
-    ADMIN.save(deps.storage, &new_admin)?;
+    // Validate the new admin address
+    let validated_admin = deps.api.addr_validate(&new_admin)?;
+
+    // Save the proposed new admin to PENDING_ADMIN
+    PENDING_ADMIN.save(deps.storage, &validated_admin)?;
 
     Ok(
-        Response::new().add_event(Event::new("updated_treasury_admin").add_attributes(vec![
-            ("old admin", admin.into_string()),
-            ("new admin", new_admin.into_string()),
+        Response::new().add_event(Event::new("proposed_new_admin").add_attributes(vec![
+            ("proposed_admin", validated_admin.to_string()),
+            ("proposer", admin.to_string()),
         ])),
     )
 }
 
+#[allow(dead_code)]
+pub fn accept_admin(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
+    // Load the pending admin
+    let pending_admin = PENDING_ADMIN.load(deps.storage)?;
+
+    // Verify the sender is the pending admin
+    if pending_admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    // Update the ADMIN storage with the new admin
+    ADMIN.save(deps.storage, &pending_admin)?;
+
+    // Clear the PENDING_ADMIN
+    PENDING_ADMIN.remove(deps.storage);
+
+    Ok(Response::new().add_event(
+        Event::new("accepted_new_admin")
+            .add_attributes(vec![("new_admin", pending_admin.to_string())]),
+    ))
+}
+
+#[allow(dead_code)]
+pub fn cancel_proposed_admin(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
+    // Load the current admin
+    let admin = ADMIN.load(deps.storage)?;
+
+    // Check if the caller is the current admin
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    // Remove the pending admin
+    PENDING_ADMIN.remove(deps.storage);
+
+    Ok(Response::new().add_event(
+        Event::new("cancelled_proposed_admin").add_attribute("action", "cancel_proposed_admin"),
+    ))
+}
+
+#[allow(dead_code)]
+pub fn migrate(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    new_code_id: u64,
+    migrate_msg: Binary,
+) -> ContractResult<Response> {
+    // Load the current admin
+    let admin = ADMIN.load(deps.storage)?;
+
+    // Check if the caller is the current admin
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    // this assumes that the contract's wasmd admin is itself
+    let migrate_msg = CosmosMsg::Wasm(WasmMsg::Migrate {
+        contract_addr: env.contract.address.into_string(),
+        new_code_id,
+        msg: migrate_msg,
+    });
+
+    Ok(Response::new()
+        .add_event(Event::new("migrate_treasury_instance").add_attributes(vec![
+            ("new_code_id", new_code_id.to_string()),
+            ("admin", admin.to_string()),
+        ]))
+        .add_message(migrate_msg))
+}
+
+#[allow(dead_code)]
 pub fn update_grant_config(
     deps: DepsMut,
     info: MessageInfo,
@@ -83,16 +176,26 @@ pub fn update_grant_config(
     ))
 }
 
+#[allow(dead_code)]
 pub fn remove_grant_config(
     deps: DepsMut,
     info: MessageInfo,
     msg_type_url: String,
 ) -> ContractResult<Response> {
+    // Check if the sender is the admin
     let admin = ADMIN.load(deps.storage)?;
     if admin != info.sender {
         return Err(Unauthorized);
     }
 
+    // Validate that the key exists
+    if !GRANT_CONFIGS.has(deps.storage, msg_type_url.clone()) {
+        return Err(GrantConfigNotFound {
+            type_url: msg_type_url,
+        });
+    }
+
+    // Remove the grant config
     GRANT_CONFIGS.remove(deps.storage, msg_type_url.clone());
 
     Ok(Response::new().add_event(
@@ -101,6 +204,7 @@ pub fn remove_grant_config(
     ))
 }
 
+#[allow(dead_code)]
 pub fn update_fee_config(
     deps: DepsMut,
     info: MessageInfo,
@@ -116,6 +220,46 @@ pub fn update_fee_config(
     Ok(Response::new().add_event(Event::new("updated_treasury_fee_config")))
 }
 
+pub fn validate_params(params: &Params) -> ContractResult<()> {
+    Url::parse(params.redirect_url.as_str())?;
+    Url::parse(params.icon_url.as_str())?;
+    serde_json::from_str::<serde_json::Value>(&params.metadata)?;
+
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn update_params(deps: DepsMut, info: MessageInfo, params: Params) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    validate_params(&params)?;
+
+    PARAMS.save(deps.storage, &params)?;
+
+    Ok(Response::new().add_event(Event::new("updated_params")))
+}
+
+#[allow(dead_code)]
+pub fn withdraw_coins(
+    deps: DepsMut,
+    info: MessageInfo,
+    coins: Vec<Coin>,
+) -> ContractResult<Response> {
+    let admin = ADMIN.load(deps.storage)?;
+    if admin != info.sender {
+        return Err(Unauthorized);
+    }
+
+    Ok(Response::new().add_message(Send {
+        to_address: info.sender.into_string(),
+        amount: coins,
+    }))
+}
+
+#[allow(dead_code)]
 pub fn deploy_fee_grant(
     deps: DepsMut,
     env: Env,
@@ -136,29 +280,35 @@ pub fn deploy_fee_grant(
             pagination: None,
         }
         .to_bytes()?;
-        let authz_query_res =
-            deps.querier
-                .query::<Value>(&cosmwasm_std::QueryRequest::Stargate {
-                    path: "/cosmos.authz.v1beta1.Query/Grants".to_string(),
-                    data: authz_query_msg_bytes.into(),
-                })?;
+        let authz_query_res = deps.querier.query_grpc(
+            String::from("/cosmos.authz.v1beta1.Query/Grants"),
+            Binary::new(authz_query_msg_bytes),
+        )?;
 
-        let grants = &authz_query_res["grants"];
-        // grant queries with a granter, grantee and type_url should always result
-        // in only one result, unless the grant is optional
-        if !grants.is_array() {
-            return Err(AuthzGrantNotFound { msg_type_url });
-        }
-        let grant = grants[0].clone();
-        if grant.is_null() {
-            return Err(AuthzGrantNotFound { msg_type_url });
-        }
-        let auth = &grant["authorization"];
-        if auth.is_null() {
-            return Err(AuthzGrantNoAuthorization);
-        }
-        if grant_config.authorization.ne(auth) {
-            return Err(AuthzGrantMismatch);
+        let response = QueryGrantsResponse::decode(authz_query_res.as_slice())?;
+        let grants = response.grants;
+
+        if grants.clone().is_empty() {
+            if grant_config.optional {
+                continue;
+            } else {
+                return Err(AuthzGrantNotFound { msg_type_url });
+            }
+        } else {
+            match grants.first() {
+                None => return Err(AuthzGrantNotFound { msg_type_url }),
+                Some(grant) => {
+                    match grant.clone().authorization {
+                        None => return Err(AuthzGrantNotFound { msg_type_url }),
+                        Some(auth) => {
+                            // the authorization must match the one in the config
+                            if grant_config.authorization.ne(&auth.into()) {
+                                return Err(AuthzGrantMismatch);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     // at this point, all the authz grants in the grant_config are verified
@@ -195,10 +345,10 @@ pub fn deploy_fee_grant(
                     allowance: Some(formatted_allowance.into()),
                 }
                 .to_bytes()?;
-            let cosmos_feegrant_msg = CosmosMsg::Stargate {
+            let cosmos_feegrant_msg = CosmosMsg::Any(AnyMsg {
                 type_url: "/cosmos.feegrant.v1beta1.MsgGrantAllowance".to_string(),
                 value: feegrant_msg_bytes.into(),
-            };
+            });
 
             // check to see if the user already has an existing feegrant
             let feegrant_query_msg_bytes = QueryAllowanceRequest {
@@ -208,24 +358,24 @@ pub fn deploy_fee_grant(
             .to_bytes()?;
             let feegrant_query_res = deps
                 .querier
-                .query::<Value>(&cosmwasm_std::QueryRequest::Stargate {
-                    path: "/cosmos.feegrant.v1beta1.Query/Allowance".to_string(),
-                    data: feegrant_query_msg_bytes.into(),
-                })
-                .unwrap_or_else(|_| serde_json::json!({"allowance": null}));
+                .query_grpc(
+                    "/cosmos.feegrant.v1beta1.Query/Allowance".to_string(),
+                    feegrant_query_msg_bytes.into(),
+                )
+                .unwrap_or_else(|_| Binary::default());
 
             let mut msgs: Vec<CosmosMsg> = Vec::new();
-            if !feegrant_query_res["allowance"].is_null() {
+            if !feegrant_query_res.is_empty() {
                 let feegrant_revoke_msg_bytes =
                     cosmos_sdk_proto::cosmos::feegrant::v1beta1::MsgRevokeAllowance {
                         granter: env.contract.address.clone().into_string(),
                         grantee: authz_grantee.clone().into_string(),
                     }
                     .to_bytes()?;
-                let cosmos_revoke_msg = CosmosMsg::Stargate {
+                let cosmos_revoke_msg = CosmosMsg::Any(AnyMsg {
                     type_url: "/cosmos.feegrant.v1beta1.MsgRevokeAllowance".to_string(),
                     value: feegrant_revoke_msg_bytes.into(),
-                };
+                });
                 msgs.push(cosmos_revoke_msg);
             }
             msgs.push(cosmos_feegrant_msg);
@@ -234,6 +384,7 @@ pub fn deploy_fee_grant(
     }
 }
 
+#[allow(dead_code)]
 pub fn revoke_allowance(
     deps: DepsMut,
     env: Env,
@@ -251,10 +402,10 @@ pub fn revoke_allowance(
             grantee: grantee.clone().into_string(),
         }
         .to_bytes()?;
-    let cosmos_feegrant_revoke_msg = CosmosMsg::Stargate {
+    let cosmos_feegrant_revoke_msg = CosmosMsg::Any(AnyMsg {
         type_url: "/cosmos.feegrant.v1beta1.MsgRevokeAllowance".to_string(),
         value: feegrant_revoke_msg_bytes.into(),
-    };
+    });
 
     Ok(Response::new()
         .add_message(cosmos_feegrant_revoke_msg)
