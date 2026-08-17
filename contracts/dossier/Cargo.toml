@@ -1,0 +1,37 @@
+[package]
+edition.workspace = true
+name              = "dossier-contract"
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[package.metadata.optimizer]
+builds         = [{ name = "mock", features = ["mock-attestation", "unsafe-devnet"] }]
+standard-build = false
+
+[features]
+accepting-proof  = ["dossier-protocol/accepting-proof"]
+mock-attestation = ["dossier-protocol/mock-attestation"]
+unsafe-devnet    = []
+verification     = []
+
+[dependencies]
+cosmwasm-std = { version = "3", default-features = false, features = [
+  "std",
+  "exports",
+  "stargate",
+  "cosmwasm_2_0",
+] }
+cw-storage-plus = "3"
+dossier-protocol = { path = "../protocol" }
+prost = { version = "0.13", default-features = false, features = ["std", "derive"] }
+quartz-zkdcap = { git = "https://github.com/reliqlabs/quartz.git", rev = "0c24049d99a9e7faef29e6e49cad0b2537e85a85", features = [
+  "xion-backend",
+] }
+serde = { version = "1", default-features = false, features = ["derive"] }
+sha2 = "0.10"
+
+[dev-dependencies]
+dossier-protocol = { path = "../protocol", features = ["mock-attestation"] }
+proptest         = "1"
