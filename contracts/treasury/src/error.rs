@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
 pub enum ContractError {
     #[error(transparent)]
@@ -40,4 +41,5 @@ pub enum ContractError {
     JsonError(#[from] serde_json::Error),
 }
 
+#[allow(dead_code)]
 pub type ContractResult<T> = Result<T, ContractError>;
