@@ -7,6 +7,12 @@ pub struct VerificationState {
     pub decrypt_verifications: u64,
 }
 
+impl Default for VerificationState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VerificationState {
     pub fn new() -> Self {
         Self {
