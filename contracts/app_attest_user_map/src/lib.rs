@@ -17,31 +17,28 @@ pub fn always_fail(_buf: &mut [u8]) -> Result<(), Error> {
 use getrandom::register_custom_getrandom;
 register_custom_getrandom!(always_fail);
 
-
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::contract;
+    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+    use base64::prelude::*;
     use cosmwasm_std::{Binary, BlockInfo, Response, Timestamp};
     use cw_orch::core::CwEnvError;
-    use super::*;
-    use cw_orch::{interface};
+    use cw_orch::interface;
     use cw_orch::prelude::*;
-    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
     use ios_app_attest::msg::VerifyAttestation;
-    use crate::contract;
-    use base64::prelude::*;
 
     #[interface(InstantiateMsg, ExecuteMsg, QueryMsg, Empty)]
     pub struct AppAttestUserMap;
 
-    impl <Chain> Uploadable for AppAttestUserMap<Chain> {
+    impl<Chain> Uploadable for AppAttestUserMap<Chain> {
         fn wrapper() -> Box<dyn MockContract<Empty>> {
-            Box::new(
-                ContractWrapper::new_with_empty(
-                    contract::execute,
-                    contract::instantiate,
-                    contract::query,
-                )
-            )
+            Box::new(ContractWrapper::new_with_empty(
+                contract::execute,
+                contract::instantiate,
+                contract::query,
+            ))
         }
     }
 
@@ -50,17 +47,22 @@ mod tests {
         let sender = Addr::unchecked("sender");
         // Create a new mock chain (backed by cw-multi-test)
         let chain = Mock::new_with_chain_id(&sender, "xion_testnet");
-        chain.app.borrow_mut().set_block(BlockInfo{
+        chain.app.borrow_mut().set_block(BlockInfo {
             height: 12345,
             time: Timestamp::from_seconds(1760375682),
             chain_id: "xion_testnet".to_string(),
         });
 
-        let app_attest_verifier_base: AppAttestUserMap<Mock> = AppAttestUserMap::new("ios_app_attest", chain);
+        let app_attest_verifier_base: AppAttestUserMap<Mock> =
+            AppAttestUserMap::new("ios_app_attest", chain);
         app_attest_verifier_base.upload().unwrap();
 
-        let app_attest_init_msg = InstantiateMsg { app_id: "85A34A7PB2.com.burnt.integrityexample".to_string() };
-        app_attest_verifier_base.instantiate(&app_attest_init_msg, None, &[]).unwrap();
+        let app_attest_init_msg = InstantiateMsg {
+            app_id: "85A34A7PB2.com.burnt.integrityexample".to_string(),
+        };
+        app_attest_verifier_base
+            .instantiate(&app_attest_init_msg, None, &[])
+            .unwrap();
         //
         // let app_id = "85A34A7PB2.com.burnt.integrityexample";
         // let challenge_str = r#"{"timestamp":1759774575574,"latitude":40.40437277350917,"longitude":-74.35697807465439,"accuracy":8.772937993014178}"#;
@@ -82,6 +84,5 @@ mod tests {
         let verification_response = app_attest_verifier_base.execute(&execute_msg, &[]);
         println!("{:?}", verification_response);
         assert!(verification_response.is_ok());
-
     }
 }

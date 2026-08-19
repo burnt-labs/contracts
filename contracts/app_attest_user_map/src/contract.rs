@@ -1,11 +1,14 @@
 use crate::error::ContractError;
+use crate::error::ContractError::InvalidAppId;
 use crate::error::ContractResult;
 use crate::msg::InstantiateMsg;
 use crate::msg::{ExecuteMsg, QueryMsg};
-use crate::state::{APP_ID, user_map, BacReading, BacResponse};
-use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult};
+use crate::state::{APP_ID, BacReading, BacResponse, user_map};
+use cosmwasm_std::{
+    Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, entry_point,
+    to_json_binary,
+};
 use cw_storage_plus::PrefixBound;
-use crate::error::ContractError::InvalidAppId;
 
 #[entry_point]
 pub fn instantiate(
@@ -63,7 +66,7 @@ pub fn execute(
         ExecuteMsg::Update { attestation } => {
             // require app id to match
             if attestation.app_id != APP_ID.load(deps.storage)? {
-                return Err(InvalidAppId)
+                return Err(InvalidAppId);
             }
 
             // verify the attestation

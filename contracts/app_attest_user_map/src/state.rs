@@ -4,8 +4,8 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 
 #[cw_serde]
 pub struct BacReading {
-    pub bac_millis: u32,  // BAC * 1000 (e.g., 0.042 → 42)
-    pub timestamp: u64,   // seconds since epoch
+    pub bac_millis: u32, // BAC * 1000 (e.g., 0.042 → 42)
+    pub timestamp: u64,  // seconds since epoch
 }
 
 /// BAC elimination rate: ~0.015 per hour = 15 millis per hour
@@ -28,9 +28,9 @@ impl BacReading {
 
 #[cw_serde]
 pub struct BacResponse {
-    pub bac_millis: u32,          // original reading
-    pub current_bac_millis: u32,  // estimated current value
-    pub timestamp: u64,           // when reading was taken
+    pub bac_millis: u32,         // original reading
+    pub current_bac_millis: u32, // estimated current value
+    pub timestamp: u64,          // when reading was taken
 }
 
 pub struct BacReadingIndexes<'a> {

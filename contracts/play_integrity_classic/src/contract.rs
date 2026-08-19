@@ -1,8 +1,8 @@
 use crate::error::ContractError;
 use crate::error::ContractResult;
+use crate::msg::IntegrityVerdict;
 use crate::msg::{InstantiateMsg, QueryMsg, VerifyResponse};
 use crate::state::AUD;
-use crate::msg::IntegrityVerdict;
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response,
 };
@@ -78,8 +78,8 @@ fn query_verify(deps: Deps, compact_jws: String) -> ContractResult<Binary> {
         Binary::new(req_bz),
     )?;
 
-    let resp: proto::QueryVerifyJwsResponse = prost::Message::decode(resp_bz.as_slice())
-        .map_err(|e| {
+    let resp: proto::QueryVerifyJwsResponse =
+        prost::Message::decode(resp_bz.as_slice()).map_err(|e| {
             ContractError::Std(cosmwasm_std::StdError::generic_err(format!(
                 "failed to decode VerifyJWS response: {}",
                 e

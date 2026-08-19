@@ -81,10 +81,19 @@ mod tests {
         let payload = verify_jws_payload(&jws, &sec1_bytes).unwrap();
         let verdict: IntegrityVerdict = serde_json::from_slice(&payload).unwrap();
 
-        assert_eq!(verdict.request_details.request_package_name, "com.burnt.xion");
+        assert_eq!(
+            verdict.request_details.request_package_name,
+            "com.burnt.xion"
+        );
         assert_eq!(verdict.request_details.nonce, "dGVzdC1ub25jZQ");
-        assert_eq!(verdict.app_integrity.app_recognition_verdict, "PLAY_RECOGNIZED");
-        assert_eq!(verdict.app_integrity.package_name.as_deref(), Some("com.burnt.xion"));
+        assert_eq!(
+            verdict.app_integrity.app_recognition_verdict,
+            "PLAY_RECOGNIZED"
+        );
+        assert_eq!(
+            verdict.app_integrity.package_name.as_deref(),
+            Some("com.burnt.xion")
+        );
         assert_eq!(
             verdict.device_integrity.device_recognition_verdict,
             vec!["MEETS_DEVICE_INTEGRITY"]
@@ -121,8 +130,8 @@ mod tests {
         use crate::msg::{InstantiateMsg, QueryMsg, VerifyResponse};
         use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
         use cosmwasm_std::{
-            from_json, Binary, ContractResult, Empty, GrpcQuery, OwnedDeps, Querier,
-            QuerierResult, QueryRequest, SystemError, SystemResult,
+            from_json, Binary, ContractResult, Empty, GrpcQuery, OwnedDeps, Querier, QuerierResult,
+            QueryRequest, SystemError, SystemResult,
         };
         use josekit::jwe::{self, JweHeader, A256KW};
         use prost::Message;
@@ -163,9 +172,7 @@ mod tests {
                 };
 
                 match &request {
-                    QueryRequest::Grpc(GrpcQuery { path, data }) => {
-                        self.handle_grpc(path, data)
-                    }
+                    QueryRequest::Grpc(GrpcQuery { path, data }) => self.handle_grpc(path, data),
                     _ => self.base.handle_query(&request),
                 }
             }

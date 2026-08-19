@@ -5,7 +5,7 @@ pub enum ContractError {
 
     #[error(transparent)]
     JsonError(#[from] serde_json::Error),
-    
+
     #[error("invalid app id")]
     InvalidAppId,
 }

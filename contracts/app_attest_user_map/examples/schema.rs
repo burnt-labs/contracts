@@ -1,5 +1,5 @@
-use cosmwasm_schema::write_api;
 use app_attest_user_map::msg::*;
+use cosmwasm_schema::write_api;
 
 fn main() {
     write_api! {
