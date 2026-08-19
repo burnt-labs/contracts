@@ -9,7 +9,7 @@ use cosmos_sdk_proto::{
     traits::MessageExt,
     xion::v1::zk::{ProofVerifyResponse, QueryVerifyRequest},
 };
-use cosmwasm_std::{Binary, Deps, QuerierWrapper, Uint256};
+use cosmwasm_std::{Deps, Uint256};
 use serde::{Deserialize, Serialize};
 use serde_json as _;
 
