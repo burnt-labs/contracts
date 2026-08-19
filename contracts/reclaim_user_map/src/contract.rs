@@ -1,12 +1,15 @@
-use std::collections::HashMap;
 use crate::error::ContractError;
+use crate::error::ContractError::ClaimKeyInvalid;
 use crate::error::ContractResult;
 use crate::msg::InstantiateMsg;
 use crate::msg::{ExecuteMsg, QueryMsg};
 use crate::state::{CLAIM_VALUE_KEY, USER_MAP, VERIFICATION_ADDR};
-use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg};
+use cosmwasm_std::{
+    entry_point, to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Order,
+    Response, StdResult, WasmMsg,
+};
 use serde_json::Value;
-use crate::error::ContractError::ClaimKeyInvalid;
+use std::collections::HashMap;
 
 #[entry_point]
 pub fn instantiate(
@@ -18,7 +21,7 @@ pub fn instantiate(
     deps.api.addr_validate(msg.verification_addr.as_str())?;
     VERIFICATION_ADDR.save(deps.storage, &msg.verification_addr)?;
     if msg.claim_key.is_empty() {
-        return Err(ClaimKeyInvalid)
+        return Err(ClaimKeyInvalid);
     }
     CLAIM_VALUE_KEY.save(deps.storage, &msg.claim_key)?;
 
@@ -36,24 +39,28 @@ pub fn execute(
     match msg {
         ExecuteMsg::Update { value } => {
             // validate JSON
-            let context: HashMap<&str, Value> = serde_json::from_str(&value.proof.claimInfo.context)?;
-            
+            let context: HashMap<&str, Value> =
+                serde_json::from_str(&value.proof.claimInfo.context)?;
+
             let extracted_parameters = match context.get("extractedParameters") {
                 None => return Err(ContractError::ExtractedParametersMissing {}),
-                Some(v) => v
-            };
-            
-            let verified_value = match extracted_parameters.get(CLAIM_VALUE_KEY.load(deps.storage)?.as_str()) {
-                Some(v) => v.to_string(),
-                None => return Err(ContractError::JSONKeyMissing {}),
+                Some(v) => v,
             };
 
+            let verified_value =
+                match extracted_parameters.get(CLAIM_VALUE_KEY.load(deps.storage)?.as_str()) {
+                    Some(v) => v.to_string(),
+                    None => return Err(ContractError::JSONKeyMissing {}),
+                };
+
             USER_MAP.save(deps.storage, info.sender, &verified_value)?;
-            Ok(Response::default().add_message(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: VERIFICATION_ADDR.load(deps.storage)?.into_string(),
-                msg: to_json_binary(&reclaim_xion::msg::ExecuteMsg::VerifyProof(value))?,
-                funds: vec![],
-            })))
+            Ok(
+                Response::default().add_message(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: VERIFICATION_ADDR.load(deps.storage)?.into_string(),
+                    msg: to_json_binary(&reclaim_xion::msg::ExecuteMsg::VerifyProof(value))?,
+                    funds: vec![],
+                })),
+            )
         }
     }
 }
