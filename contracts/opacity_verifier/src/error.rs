@@ -14,7 +14,6 @@ pub enum ContractError {
 
     // #[error(transparent)]
     // AlloySignatureError(#[from] alloy_primitives::SignatureError),
-
     #[error("only the admin can call this method")]
     Unauthorized,
 

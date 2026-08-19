@@ -5,9 +5,9 @@ pub enum ContractError {
 
     #[error(transparent)]
     JsonError(#[from] serde_json::Error),
-    
+
     #[error("Invalid proof")]
-    VerificationError
+    VerificationError,
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;

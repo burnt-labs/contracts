@@ -1,11 +1,14 @@
 use crate::error::ContractError;
+use crate::error::ContractError::VerificationError;
 use crate::error::ContractResult;
 use crate::msg::InstantiateMsg;
 use crate::msg::{ExecuteMsg, QueryMsg};
-use crate::state::{USER_MAP, OPACITY_VERIFIER};
-use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult};
+use crate::state::{OPACITY_VERIFIER, USER_MAP};
+use cosmwasm_std::{
+    entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response,
+    StdResult,
+};
 use serde_json::Value;
-use crate::error::ContractError::VerificationError;
 
 #[entry_point]
 pub fn instantiate(
@@ -33,16 +36,13 @@ pub fn execute(
 
             let verified: bool = deps.querier.query_wasm_smart(
                 OPACITY_VERIFIER.load(deps.storage)?,
-                &opacity_verifier::msg::QueryMsg::Verify {
-                    message,
-                    signature
-                }
+                &opacity_verifier::msg::QueryMsg::Verify { message, signature },
             )?;
 
             if verified {
                 USER_MAP.save(deps.storage, info.sender, &value)?;
             } else {
-                return Err(VerificationError)
+                return Err(VerificationError);
             }
 
             Ok(Response::default())

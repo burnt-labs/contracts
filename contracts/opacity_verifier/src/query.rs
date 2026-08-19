@@ -1,8 +1,13 @@
-use cosmwasm_std::{Addr, Api, Order, StdError, StdResult, Storage};
 use crate::error::{ContractError, ContractResult};
 use crate::state::{ADMIN, VERIFICATION_KEY_ALLOW_LIST};
+use cosmwasm_std::{Addr, Api, Order, StdError, StdResult, Storage};
 
-pub fn verify(api: &dyn Api, store: &dyn Storage, signature: String, message: String) -> ContractResult<bool> {
+pub fn verify(
+    api: &dyn Api,
+    store: &dyn Storage,
+    signature: String,
+    message: String,
+) -> ContractResult<bool> {
     // 1. Get the signature and message from the response
     let signature_hex = signature.trim_start_matches("0x");
     let sig_bytes = hex::decode(signature_hex)?;
@@ -25,7 +30,12 @@ pub fn verify(api: &dyn Api, store: &dyn Storage, signature: String, message: St
     Ok(key_found)
 }
 
-pub fn verify_query(store: &dyn Storage, api: &dyn Api, signature: String, message: String) -> StdResult<bool> {
+pub fn verify_query(
+    store: &dyn Storage,
+    api: &dyn Api,
+    signature: String,
+    message: String,
+) -> StdResult<bool> {
     match verify(api, store, signature, message) {
         Ok(b) => Ok(b),
         Err(error) => Err(StdError::generic_err(error.to_string())),
