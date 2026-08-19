@@ -144,7 +144,7 @@ fn unreserve_flow() {
         assert!(stored.is_none());
     }
 
-    // non-reserver cannot unreserve
+    // non-reserver cannot unreserve while the reservation is live
     {
         let mut deps = mock_dependencies();
         let env = mock_env();
@@ -184,7 +184,64 @@ fn unreserve_flow() {
             "token-3".to_string(),
             false,
         ));
+        assert_eq!(
+            err,
+            ContractError::ReservedAsset {
+                id: "token-3".to_string()
+            }
+        );
+    }
+
+    // once the reservation lapses the listing permission check applies again
+    {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let owner_addr = deps.api.addr_make("owner");
+        let reserver_addr = deps.api.addr_make("reserver");
+        let intruder_addr = deps.api.addr_make("intruder");
+        let nft_info = NftInfo {
+            owner: owner_addr.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        };
+        expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+            deps.as_mut().storage,
+            "token-4",
+            &nft_info,
+        ));
+
+        expect_ok(AssetConfig::<Empty>::default().listings.save(
+            deps.as_mut().storage,
+            "token-4",
+            &ListingInfo {
+                id: "token-4".to_string(),
+                seller: owner_addr.clone(),
+                price: Coin::new(200_u128, "uxion"),
+                reserved: Some(Reserve {
+                    reserver: reserver_addr.clone(),
+                    reserved_until: env.block.time.minus_seconds(1),
+                }),
+            },
+        ));
+
+        let err = expect_err(unreserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&intruder_addr, &[]),
+            "token-4".to_string(),
+            false,
+        ));
         assert_eq!(err, ContractError::Unauthorized {});
+
+        // ...and the owner, who can list, may clear it
+        expect_ok(unreserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&owner_addr, &[]),
+            "token-4".to_string(),
+            false,
+        ));
     }
 
     // cannot unreserve when listing not reserved
