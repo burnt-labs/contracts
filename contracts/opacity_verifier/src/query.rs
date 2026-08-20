@@ -11,8 +11,11 @@ pub fn verify(
     // 1. Get the signature and message from the response
     let signature_hex = signature.trim_start_matches("0x");
     let sig_bytes = hex::decode(signature_hex)?;
-    if sig_bytes.len() < 65 {
-        return Err(ContractError::ShortSignature);
+    // Ethereum ECDSA signatures are exactly r(32) || s(32) || v(1). Accepting
+    // anything longer would silently ignore the trailing bytes, so the same
+    // effective signature could be presented in unboundedly many encodings.
+    if sig_bytes.len() != 65 {
+        return Err(ContractError::InvalidSignatureLength);
     }
 
     // 2. Recover the public key

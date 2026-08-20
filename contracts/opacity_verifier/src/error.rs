@@ -17,8 +17,8 @@ pub enum ContractError {
     #[error("only the admin can call this method")]
     Unauthorized,
 
-    #[error("short signature")]
-    ShortSignature,
+    #[error("signature must be exactly 65 bytes")]
+    InvalidSignatureLength,
 
     #[error("recovery id can only be one of 0, 1, 27, 28")]
     InvalidRecoveryId,

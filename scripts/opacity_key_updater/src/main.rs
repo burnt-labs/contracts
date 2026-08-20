@@ -21,6 +21,10 @@ pub enum UpdaterError {
     MissingContract,
     #[error("unexpected response shape: {0}")]
     UnexpectedShape(String),
+    #[error("CONFIG: {0} must be set to submit updates")]
+    MissingConfig(&'static str),
+    #[error("failed to build chain daemon: {0}")]
+    Daemon(String),
 }
 
 #[derive(Clone, Debug)]
@@ -162,6 +166,17 @@ fn save_state(path: &PathBuf, state: &State) -> Result<(), UpdaterError> {
     Ok(())
 }
 
+/// Print the exact `ExecuteMsg` that a non-dry-run pass would broadcast, so
+/// operators can eyeball it before flipping DRY_RUN=false. The README documents
+/// this as part of dry-run behaviour.
+fn print_execute_msg(keys: &BTreeSet<String>) -> Result<(), UpdaterError> {
+    let msg = ExecuteMsg::UpdateAllowList {
+        keys: keys.iter().cloned().collect(),
+    };
+    println!("{}", serde_json::to_string_pretty(&msg)?);
+    Ok(())
+}
+
 async fn submit_update(cfg: &Config, keys: Vec<String>) -> Result<(), UpdaterError> {
     use cw_orch::prelude::*;
     use std::collections::BTreeSet;
@@ -173,27 +188,33 @@ async fn submit_update(cfg: &Config, keys: Vec<String>) -> Result<(), UpdaterErr
     let chain_id = cfg
         .chain_id
         .clone()
-        .expect("CHAIN_ID required when submitting");
+        .ok_or(UpdaterError::MissingConfig("CHAIN_ID"))?;
     let gas_denom = cfg
         .gas_denom
         .clone()
-        .expect("GAS_DENOM required when submitting");
+        .ok_or(UpdaterError::MissingConfig("GAS_DENOM"))?;
     let rpc = cfg
         .rpc_endpoint
         .clone()
-        .expect("RPC_ENDPOINT required when submitting");
+        .ok_or(UpdaterError::MissingConfig("RPC_ENDPOINT"))?;
+    // Only an explicit `http://` scheme is upgraded. A blanket
+    // replace("http", "https") would rewrite the "http" inside an existing
+    // "https://" and produce "httpss://".
     let grpc = cfg
         .grpc_endpoint
         .clone()
-        .unwrap_or_else(|| rpc.replace("http", "https"));
+        .unwrap_or_else(|| match rpc.strip_prefix("http://") {
+            Some(rest) => format!("https://{rest}"),
+            None => rpc.clone(),
+        });
     let prefix = cfg
         .bech32_prefix
         .clone()
-        .expect("BECH32_PREFIX required when submitting");
+        .ok_or(UpdaterError::MissingConfig("BECH32_PREFIX"))?;
     let mnemonic = cfg
         .admin_mnemonic
         .clone()
-        .expect("ADMIN_MNEMONIC required when submitting");
+        .ok_or(UpdaterError::MissingConfig("ADMIN_MNEMONIC"))?;
     let gas_price = cfg
         .gas_price
         .clone()
@@ -231,7 +252,9 @@ async fn submit_update(cfg: &Config, keys: Vec<String>) -> Result<(), UpdaterErr
     builder.mnemonic(&mnemonic);
     builder.gas(Some(&gas_denom), Some(gp_num));
 
-    let daemon = builder.build().expect("failed to build daemon");
+    let daemon = builder
+        .build()
+        .map_err(|e| UpdaterError::Daemon(e.to_string()))?;
 
     #[cw_orch::interface(
         opacity_verifier::msg::InstantiateMsg,
@@ -325,6 +348,7 @@ async fn run_once(cfg: &Config) -> Result<(), UpdaterError> {
                     "DRY-RUN: would submit UpdateAllowList with {} keys.",
                     set.len()
                 );
+                print_execute_msg(&set)?;
                 // Still write state so subsequent run only submits once when toggling off dry-run
                 save_state(
                     &cfg.state_path,
@@ -355,6 +379,7 @@ async fn run_once(cfg: &Config) -> Result<(), UpdaterError> {
                 "DRY-RUN: would submit initial UpdateAllowList with {} keys.",
                 set.len()
             );
+            print_execute_msg(&set)?;
             save_state(
                 &cfg.state_path,
                 &State {
