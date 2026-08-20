@@ -1,4 +1,4 @@
-mod error;
+pub mod error;
 pub mod msg;
 
 use appattest_rs::attestation::Attestation;
