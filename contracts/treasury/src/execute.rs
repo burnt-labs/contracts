@@ -263,9 +263,14 @@ pub fn withdraw_coins(
 pub fn deploy_fee_grant(
     deps: DepsMut,
     env: Env,
+    info: MessageInfo,
     authz_granter: Addr,
     authz_grantee: Addr,
 ) -> ContractResult<Response> {
+    // Ensure the caller is the authz_granter to prevent unauthorized fee grant deployment
+    if info.sender != authz_granter {
+        return Err(Unauthorized);
+    }
     // iterate through all grant configs to validate user has correct permissions
     // we must iterate, because calling for the list of grants doesn't return msg_type_urls
     for key in GRANT_CONFIGS.keys(deps.storage, None, None, Order::Ascending) {
