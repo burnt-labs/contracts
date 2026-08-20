@@ -42,7 +42,7 @@ pub fn execute(
         ExecuteMsg::DeployFeeGrant {
             authz_granter,
             authz_grantee,
-        } => execute::deploy_fee_grant(deps, env, authz_granter, authz_grantee),
+        } => execute::deploy_fee_grant(deps, env, info, authz_granter, authz_grantee),
         ExecuteMsg::ProposeAdmin { new_admin } => {
             execute::propose_admin(deps, info, new_admin.into_string())
         }
