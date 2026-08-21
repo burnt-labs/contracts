@@ -531,7 +531,7 @@ fn remove_pending_sale(
 
     let mut sub_msgs: Vec<SubMsg> = vec![];
 
-    if asset_listing.is_ok() {
+    if let Ok(asset_info) = &asset_listing {
         let listing = listings().may_load(deps.storage, listing_id.clone())?;
         let reserved_for_buyer = listing.as_ref().is_some_and(|l| l.reserved_for.is_some());
 
@@ -541,17 +541,22 @@ fn remove_pending_sale(
             // already consumed (BuyItem replaced it with a short-lived one).
             // Restoring Active without it would let anyone bypass the
             // reserved-buyer check, so remove both sides — re-listing
-            // re-establishes the reservation. UnReserve { delist: true }
-            // rather than Delist: the marketplace holds the reservation, so
-            // it stays authorized even if the seller revoked the NFT
-            // approval, where Delist's check_can_list would fail and leave
-            // the asset listing exposed to direct purchase after expiry.
+            // re-establishes the reservation. While the reservation is still
+            // present, UnReserve { delist: true } acts under the
+            // marketplace's reserver authority and survives a revoked NFT
+            // approval; if the seller already cleared the expired reservation
+            // themselves, fall back to a plain Delist under the listing
+            // approval.
             listings().remove(deps.storage, listing_id.clone())?;
-            let unreserve_msg = asset_unreserve_msg(pending_sale.token_id.clone(), true);
+            let cleanup_msg = if asset_info.reserved.is_some() {
+                to_json_binary(&asset_unreserve_msg(pending_sale.token_id.clone(), true))?
+            } else {
+                to_json_binary(&asset_delist_msg(pending_sale.token_id.clone()))?
+            };
             sub_msgs.push(SubMsg::reply_on_error(
                 WasmMsg::Execute {
                     contract_addr: pending_sale.collection.to_string(),
-                    msg: to_json_binary(&unreserve_msg)?,
+                    msg: cleanup_msg,
                     funds: vec![],
                 },
                 REPLY_UNRESERVE_BEST_EFFORT,
