@@ -99,11 +99,12 @@ where
     // unreserving + delisting + transferring the NFT while buyer funds
     // are still locked in the marketplace.
     if reserved.reserver != info.sender {
+        // permission check first, matching delist: callers without list
+        // permission get Unauthorized rather than reservation state
+        check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;
         if !Expiration::AtTime(reserved.reserved_until).is_expired(&env.block) {
             return Err(ContractError::ReservedAsset { id: id.clone() });
         }
-        // Reservation has expired — anyone with list permission can unreserve
-        check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;
     }
 
     let response = Response::<TCustomResponseMsg>::default()

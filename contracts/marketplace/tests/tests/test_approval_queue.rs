@@ -551,8 +551,8 @@ fn test_reject_sale_success() {
     );
     let restored_listing = listing_query.unwrap();
     assert_eq!(
-        restored_listing.status.to_string(),
-        "Active",
+        restored_listing.status,
+        ListingStatus::Active,
         "Listing status should be Active after rejection"
     );
 

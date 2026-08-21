@@ -177,10 +177,23 @@ fn unreserve_flow() {
             },
         ));
 
+        // a caller without list permission is turned away before learning
+        // anything about the reservation
         let err = expect_err(unreserve::<Empty, Empty>(
             deps.as_mut(),
             &env,
             &message_info(&intruder_addr, &[]),
+            "token-3".to_string(),
+            false,
+        ));
+        assert_eq!(err, ContractError::Unauthorized {});
+
+        // the owner has list permission, but the live third-party
+        // reservation still blocks the unreserve
+        let err = expect_err(unreserve::<Empty, Empty>(
+            deps.as_mut(),
+            &env,
+            &message_info(&owner_addr, &[]),
             "token-3".to_string(),
             false,
         ));

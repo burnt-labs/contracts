@@ -505,10 +505,10 @@ pub fn execute_approve_sale(
     Ok(response)
 }
 
-/// Reply ID for best-effort asset delist during pending sale removal.
-/// If the delist SubMsg fails (e.g. ownership changed, marketplace lost
+/// Reply ID for best-effort asset unreserve during pending sale removal.
+/// If the unreserve SubMsg fails (e.g. ownership changed, marketplace lost
 /// operator rights), we still want the refund to proceed.
-pub const REPLY_DELIST_BEST_EFFORT: u64 = 1;
+pub const REPLY_UNRESERVE_BEST_EFFORT: u64 = 1;
 
 fn remove_pending_sale(
     deps: DepsMut,
@@ -539,20 +539,21 @@ fn remove_pending_sale(
 
     let mut sub_msgs: Vec<SubMsg> = vec![];
 
-    // Delist from asset contract using reply_on_error so that if the
-    // delist fails (seller transferred NFT, revoked operator, etc.),
-    // the buyer refund still executes. The asset-side listing becomes
-    // stale but the marketplace listing is already restored to Active
-    // and can be cleaned up by the seller or on next interaction.
+    // Clear the reservation on the asset contract while keeping its listing:
+    // the marketplace listing was just restored to Active, so delisting on
+    // the asset side would leave it pointing at a listing that no longer
+    // exists and make the next BuyItem fail. reply_on_error keeps this
+    // best-effort — if the unreserve fails (seller transferred NFT, revoked
+    // operator, etc.), the buyer refund still executes.
     if asset_listing.is_ok() {
-        let delist_msg = asset_delist_msg(pending_sale.token_id.clone());
+        let unreserve_msg = asset_unreserve_msg(pending_sale.token_id.clone(), false);
         sub_msgs.push(SubMsg::reply_on_error(
             WasmMsg::Execute {
                 contract_addr: pending_sale.collection.to_string(),
-                msg: to_json_binary(&delist_msg)?,
+                msg: to_json_binary(&unreserve_msg)?,
                 funds: vec![],
             },
-            REPLY_DELIST_BEST_EFFORT,
+            REPLY_UNRESERVE_BEST_EFFORT,
         ));
     }
 
@@ -580,13 +581,13 @@ fn remove_pending_sale(
         .add_submessages(sub_msgs))
 }
 
-/// Handle reply from best-effort delist SubMsg. We intentionally swallow
-/// errors here — the delist was best-effort and the refund has already
+/// Handle reply from best-effort unreserve SubMsg. We intentionally swallow
+/// errors here — the unreserve was best-effort and the refund has already
 /// been dispatched as a top-level message.
-pub fn reply_delist_best_effort(_deps: DepsMut, _msg: Reply) -> Result<Response, ContractError> {
-    // Delist on asset contract failed (ownership changed, operator revoked, etc.)
+pub fn reply_unreserve_best_effort(_deps: DepsMut, _msg: Reply) -> Result<Response, ContractError> {
+    // Unreserve on asset contract failed (ownership changed, operator revoked, etc.)
     // This is expected in adversarial scenarios. The buyer refund proceeds regardless.
-    Ok(Response::new().add_attribute("delist_status", "failed_best_effort"))
+    Ok(Response::new().add_attribute("unreserve_status", "failed_best_effort"))
 }
 
 pub fn execute_reject_sale(
