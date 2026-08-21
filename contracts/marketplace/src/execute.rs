@@ -521,15 +521,6 @@ fn remove_pending_sale(
         pending_sale.token_id.as_bytes(),
     ]);
 
-    // Restore the marketplace listing to Active instead of deleting it.
-    // This lets the seller keep their listing without having to re-list
-    // and pay gas again after a rejected or expired pending sale.
-    let listing_result = listings().may_load(deps.storage, listing_id.clone())?;
-    if let Some(mut listing) = listing_result {
-        listing.status = ListingStatus::Active;
-        listings().save(deps.storage, listing_id.clone(), &listing)?;
-    }
-
     // query if there is a listing in the asset contract
     let asset_listing = query_listing(
         &deps.querier,
@@ -539,16 +530,22 @@ fn remove_pending_sale(
 
     let mut sub_msgs: Vec<SubMsg> = vec![];
 
-    // Clear the reservation on the asset contract while keeping its listing:
-    // the marketplace listing was just restored to Active, so delisting on
-    // the asset side would leave it pointing at a listing that no longer
-    // exists and make the next BuyItem fail. reply_on_error keeps this
-    // best-effort — if the unreserve fails (seller transferred NFT, revoked
-    // operator, etc.), the buyer refund still executes and the reply handler
-    // removes the marketplace listing so it is not advertised as Active while
-    // the asset side can no longer honor it. The listing id rides along as
-    // the reply payload.
     if asset_listing.is_ok() {
+        // Restore the marketplace listing to Active instead of deleting it.
+        // This lets the seller keep their listing without having to re-list
+        // and pay gas again after a rejected or expired pending sale.
+        if let Some(mut listing) = listings().may_load(deps.storage, listing_id.clone())? {
+            listing.status = ListingStatus::Active;
+            listings().save(deps.storage, listing_id.clone(), &listing)?;
+        }
+
+        // Clear the reservation on the asset contract while keeping its
+        // listing, so the restored Active listing stays buyable. reply_on_error
+        // keeps this best-effort — if the unreserve fails (ownership changed,
+        // reservation already cleared, etc.), the buyer refund still executes
+        // and the reply handler removes the marketplace listing so it is not
+        // advertised as Active while the asset side can no longer honor it.
+        // The listing id rides along as the reply payload.
         let unreserve_msg = asset_unreserve_msg(pending_sale.token_id.clone(), false);
         sub_msgs.push(
             SubMsg::reply_on_error(
@@ -561,6 +558,15 @@ fn remove_pending_sale(
             )
             .with_payload(Binary::from(listing_id.as_bytes())),
         );
+    } else if listings()
+        .may_load(deps.storage, listing_id.clone())?
+        .is_some()
+    {
+        // The asset-side listing is already gone (e.g. the seller delisted
+        // after the reservation expired), so there is nothing to restore —
+        // an Active marketplace listing would advertise what the asset
+        // contract can no longer sell.
+        listings().remove(deps.storage, listing_id.clone())?;
     }
 
     // refund buyer — this is a top-level message so it always executes
