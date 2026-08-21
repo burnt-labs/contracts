@@ -18,9 +18,10 @@ use crate::state::{listings, pending_sales, Listing, ListingStatus, PendingSale,
 use crate::state::{Config, CONFIG};
 use asset::msg::ReserveMsg;
 use cosmwasm_std::{
-    ensure_eq, to_json_binary, Addr, BankMsg, Binary, Coin, DepsMut, Env, MessageInfo, Reply,
-    Response, StdError, SubMsg, Timestamp, WasmMsg,
+    ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Reply, Response,
+    SubMsg, Timestamp, WasmMsg,
 };
+use cw_storage_plus::Item;
 use cw_utils::maybe_addr;
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn execute(
@@ -531,33 +532,55 @@ fn remove_pending_sale(
     let mut sub_msgs: Vec<SubMsg> = vec![];
 
     if asset_listing.is_ok() {
-        // Restore the marketplace listing to Active instead of deleting it.
-        // This lets the seller keep their listing without having to re-list
-        // and pay gas again after a rejected or expired pending sale.
-        if let Some(mut listing) = listings().may_load(deps.storage, listing_id.clone())? {
-            listing.status = ListingStatus::Active;
-            listings().save(deps.storage, listing_id.clone(), &listing)?;
-        }
+        let listing = listings().may_load(deps.storage, listing_id.clone())?;
+        let reserved_for_buyer = listing.as_ref().is_some_and(|l| l.reserved_for.is_some());
 
-        // Clear the reservation on the asset contract while keeping its
-        // listing, so the restored Active listing stays buyable. reply_on_error
-        // keeps this best-effort — if the unreserve fails (ownership changed,
-        // reservation already cleared, etc.), the buyer refund still executes
-        // and the reply handler removes the marketplace listing so it is not
-        // advertised as Active while the asset side can no longer honor it.
-        // The listing id rides along as the reply payload.
-        let unreserve_msg = asset_unreserve_msg(pending_sale.token_id.clone(), false);
-        sub_msgs.push(
-            SubMsg::reply_on_error(
+        if reserved_for_buyer {
+            // A reserved listing's protection against direct asset-contract
+            // purchases is the asset-side reservation, which the pending sale
+            // already consumed (BuyItem replaced it with a short-lived one).
+            // Restoring Active without it would let anyone bypass the
+            // reserved-buyer check, so remove both sides — re-listing
+            // re-establishes the reservation.
+            listings().remove(deps.storage, listing_id.clone())?;
+            let delist_msg = asset_delist_msg(pending_sale.token_id.clone());
+            sub_msgs.push(SubMsg::reply_on_error(
+                WasmMsg::Execute {
+                    contract_addr: pending_sale.collection.to_string(),
+                    msg: to_json_binary(&delist_msg)?,
+                    funds: vec![],
+                },
+                REPLY_UNRESERVE_BEST_EFFORT,
+            ));
+        } else {
+            // Restore the marketplace listing to Active instead of deleting
+            // it. This lets the seller keep their listing without having to
+            // re-list and pay gas again after a rejected or expired pending
+            // sale.
+            if let Some(mut listing) = listing {
+                listing.status = ListingStatus::Active;
+                listings().save(deps.storage, listing_id.clone(), &listing)?;
+            }
+
+            // Clear the reservation on the asset contract while keeping its
+            // listing, so the restored Active listing stays buyable.
+            let unreserve_msg = asset_unreserve_msg(pending_sale.token_id.clone(), false);
+            sub_msgs.push(SubMsg::reply_on_error(
                 WasmMsg::Execute {
                     contract_addr: pending_sale.collection.to_string(),
                     msg: to_json_binary(&unreserve_msg)?,
                     funds: vec![],
                 },
                 REPLY_UNRESERVE_BEST_EFFORT,
-            )
-            .with_payload(Binary::from(listing_id.as_bytes())),
-        );
+            ));
+        }
+
+        // The cleanup is best-effort: if it fails (ownership changed,
+        // reservation already cleared, etc.), the buyer refund still executes
+        // and the reply handler removes the marketplace listing so it is not
+        // advertised while the asset side cannot honor it. The listing id is
+        // stashed for the reply, which runs within this same transaction.
+        CLEANUP_LISTING_ID.save(deps.storage, &listing_id)?;
     } else if listings()
         .may_load(deps.storage, listing_id.clone())?
         .is_some()
@@ -593,15 +616,22 @@ fn remove_pending_sale(
         .add_submessages(sub_msgs))
 }
 
-/// Handle reply from best-effort unreserve SubMsg. We intentionally swallow
-/// the error — the unreserve was best-effort and the refund has already been
-/// dispatched as a top-level message — but a failed unreserve means the asset
-/// side can no longer honor the listing (ownership changed, operator revoked,
-/// etc.), so the marketplace listing restored to Active a moment ago is
+/// Transient stash for the marketplace listing id while a best-effort asset
+/// cleanup submessage is in flight. Written just before dispatch and consumed
+/// by the error reply, all within one transaction.
+const CLEANUP_LISTING_ID: Item<String> = Item::new("cleanup_listing_id");
+
+/// Handle reply from a best-effort asset cleanup SubMsg. We intentionally
+/// swallow the error — the cleanup was best-effort and the refund has already
+/// been dispatched as a top-level message — but a failed cleanup means the
+/// asset side can no longer honor the listing (ownership changed, operator
+/// revoked, etc.), so any marketplace listing restored a moment ago is
 /// removed rather than advertised as buyable.
-pub fn reply_unreserve_best_effort(deps: DepsMut, msg: Reply) -> Result<Response, ContractError> {
-    let listing_id = String::from_utf8(msg.payload.to_vec())
-        .map_err(|_| StdError::generic_err("unreserve reply payload is not a listing id"))?;
+pub fn reply_unreserve_best_effort(deps: DepsMut, _msg: Reply) -> Result<Response, ContractError> {
+    let Some(listing_id) = CLEANUP_LISTING_ID.may_load(deps.storage)? else {
+        return Ok(Response::new().add_attribute("unreserve_status", "failed_best_effort"));
+    };
+    CLEANUP_LISTING_ID.remove(deps.storage);
 
     let mut response = Response::new().add_attribute("unreserve_status", "failed_best_effort");
     if listings()

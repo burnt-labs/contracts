@@ -930,6 +930,117 @@ fn test_reject_sale_removes_listing_when_asset_listing_gone() {
 }
 
 #[test]
+fn test_reject_sale_delists_reserved_listing() {
+    // A reserved listing's protection against direct asset-contract buys is
+    // its asset-side reservation, which BuyItem replaces with the pending
+    // sale's short-lived one. After a rejection the original reservation
+    // cannot simply be restored, so the listing is removed on both sides —
+    // leaving it Active without a reservation would let anyone bypass the
+    // reserved-buyer check by buying directly from the asset contract.
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    // List reserved for the buyer (helper always lists open, so inline)
+    let approve_msg = cw721_base::msg::ExecuteMsg::Approve {
+        spender: marketplace_contract.to_string(),
+        token_id: "token1".to_string(),
+        expires: None,
+    };
+    app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+        .unwrap();
+    let price = coin(100, "uxion");
+    let list_msg = ExecuteMsg::ListItem {
+        collection: asset_contract.to_string(),
+        price: price.clone(),
+        token_id: "token1".to_string(),
+        reserved_for: Some(buyer.to_string()),
+    };
+    let list_result =
+        app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+    assert!(list_result.is_ok(), "{:?}", list_result.err());
+    let listing_id = xion_nft_marketplace::helpers::generate_id(vec![
+        asset_contract.as_bytes(),
+        "token1".as_bytes(),
+    ]);
+
+    let buyer_balance_before = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(buy_result.is_ok(), "{:?}", buy_result.err());
+
+    let pending_sale_id = buy_result
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    let reject_msg = ExecuteMsg::RejectSale {
+        id: pending_sale_id.clone(),
+    };
+    let reject_result = app.execute_contract(
+        manager.clone(),
+        marketplace_contract.clone(),
+        &reject_msg,
+        &[],
+    );
+    assert!(reject_result.is_ok(), "{:?}", reject_result.err());
+
+    let buyer_balance_after = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+    assert_eq!(
+        buyer_balance_after, buyer_balance_before,
+        "reserved buyer must be made whole after rejection"
+    );
+
+    let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(
+        marketplace_contract.clone(),
+        &QueryMsg::PendingSale {
+            id: pending_sale_id,
+        },
+    );
+    assert!(pending_sale_query.is_err(), "pending sale must be removed");
+
+    let listing_query = app
+        .wrap()
+        .query_wasm_smart::<Listing>(marketplace_contract, &QueryMsg::Listing { listing_id });
+    assert!(
+        listing_query.is_err(),
+        "reserved marketplace listing must be removed, not restored"
+    );
+
+    // The asset-side listing is delisted too, so nothing is left for a
+    // direct asset-contract purchase to bypass the reserved-buyer check.
+    let asset_listing = query_listing(&app.wrap(), &asset_contract, "token1");
+    assert!(
+        asset_listing.is_err(),
+        "asset listing must be delisted for reserved listings"
+    );
+}
+
+#[test]
 fn test_reject_sale_unauthorized() {
     let mut app = setup_app_with_balances();
     let minter = app.api().addr_make("minter");
