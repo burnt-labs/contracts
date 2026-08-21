@@ -18,8 +18,8 @@ use crate::state::{listings, pending_sales, Listing, ListingStatus, PendingSale,
 use crate::state::{Config, CONFIG};
 use asset::msg::ReserveMsg;
 use cosmwasm_std::{
-    ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Reply, Response,
-    SubMsg, Timestamp, WasmMsg,
+    ensure_eq, to_json_binary, Addr, BankMsg, Binary, Coin, DepsMut, Env, MessageInfo, Reply,
+    Response, StdError, SubMsg, Timestamp, WasmMsg,
 };
 use cw_utils::maybe_addr;
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
@@ -527,7 +527,7 @@ fn remove_pending_sale(
     let listing_result = listings().may_load(deps.storage, listing_id.clone())?;
     if let Some(mut listing) = listing_result {
         listing.status = ListingStatus::Active;
-        listings().save(deps.storage, listing_id, &listing)?;
+        listings().save(deps.storage, listing_id.clone(), &listing)?;
     }
 
     // query if there is a listing in the asset contract
@@ -544,17 +544,23 @@ fn remove_pending_sale(
     // the asset side would leave it pointing at a listing that no longer
     // exists and make the next BuyItem fail. reply_on_error keeps this
     // best-effort — if the unreserve fails (seller transferred NFT, revoked
-    // operator, etc.), the buyer refund still executes.
+    // operator, etc.), the buyer refund still executes and the reply handler
+    // removes the marketplace listing so it is not advertised as Active while
+    // the asset side can no longer honor it. The listing id rides along as
+    // the reply payload.
     if asset_listing.is_ok() {
         let unreserve_msg = asset_unreserve_msg(pending_sale.token_id.clone(), false);
-        sub_msgs.push(SubMsg::reply_on_error(
-            WasmMsg::Execute {
-                contract_addr: pending_sale.collection.to_string(),
-                msg: to_json_binary(&unreserve_msg)?,
-                funds: vec![],
-            },
-            REPLY_UNRESERVE_BEST_EFFORT,
-        ));
+        sub_msgs.push(
+            SubMsg::reply_on_error(
+                WasmMsg::Execute {
+                    contract_addr: pending_sale.collection.to_string(),
+                    msg: to_json_binary(&unreserve_msg)?,
+                    funds: vec![],
+                },
+                REPLY_UNRESERVE_BEST_EFFORT,
+            )
+            .with_payload(Binary::from(listing_id.as_bytes())),
+        );
     }
 
     // refund buyer — this is a top-level message so it always executes
@@ -582,12 +588,24 @@ fn remove_pending_sale(
 }
 
 /// Handle reply from best-effort unreserve SubMsg. We intentionally swallow
-/// errors here — the unreserve was best-effort and the refund has already
-/// been dispatched as a top-level message.
-pub fn reply_unreserve_best_effort(_deps: DepsMut, _msg: Reply) -> Result<Response, ContractError> {
-    // Unreserve on asset contract failed (ownership changed, operator revoked, etc.)
-    // This is expected in adversarial scenarios. The buyer refund proceeds regardless.
-    Ok(Response::new().add_attribute("unreserve_status", "failed_best_effort"))
+/// the error — the unreserve was best-effort and the refund has already been
+/// dispatched as a top-level message — but a failed unreserve means the asset
+/// side can no longer honor the listing (ownership changed, operator revoked,
+/// etc.), so the marketplace listing restored to Active a moment ago is
+/// removed rather than advertised as buyable.
+pub fn reply_unreserve_best_effort(deps: DepsMut, msg: Reply) -> Result<Response, ContractError> {
+    let listing_id = String::from_utf8(msg.payload.to_vec())
+        .map_err(|_| StdError::generic_err("unreserve reply payload is not a listing id"))?;
+
+    let mut response = Response::new().add_attribute("unreserve_status", "failed_best_effort");
+    if listings()
+        .may_load(deps.storage, listing_id.clone())?
+        .is_some()
+    {
+        listings().remove(deps.storage, listing_id.clone())?;
+        response = response.add_attribute("listing_removed", listing_id);
+    }
+    Ok(response)
 }
 
 pub fn execute_reject_sale(
