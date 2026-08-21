@@ -30,6 +30,10 @@ fn uint256_to_string(val: &Uint256) -> String {
     val.to_string()
 }
 
+/// Verifier key ids registered in the XION zk module.
+const SHUFFLE_VKEY_ID: u64 = 3;
+const DECRYPT_VKEY_ID: u64 = 2;
+
 pub fn groth16_proof_to_snarkjs(
     a: &[Uint256; 2],
     b: &[[Uint256; 2]; 2],
@@ -61,23 +65,15 @@ pub fn public_inputs_to_string(inputs: &[Uint256]) -> Vec<String> {
     inputs.iter().map(uint256_to_string).collect()
 }
 
-/// Verify a shuffle proof using the XION zk module
+/// Verify a Groth16 proof against a verifier key registered in the XION zk module.
 ///
-/// # Arguments
-/// * `deps` - Deps for querier access
-/// * `proof` - Groth16 proof (a, b, c components)
-/// * `public_inputs` - Public inputs for the proof circuit
-/// * `verifier_name` - Name of the verifier key stored in the zk module
-///
-/// # Returns
-/// * `Ok(true)` if proof is valid
-/// * `Ok(false)` if proof is invalid
-/// * `Err(ContractError)` if verification fails due to other errors
-pub fn verify_shuffle_proof(
+/// `verify_shuffle_proof` and `verify_decrypt_proof` differ only in `vkey_id`.
+fn verify_groth16_proof(
     deps: Deps,
     proof: &([Uint256; 2], [[Uint256; 2]; 2], [Uint256; 2]),
     public_inputs: &[Uint256],
     verifier_name: &str,
+    vkey_id: u64,
 ) -> Result<bool, ContractError> {
     let snarkjs_proof = groth16_proof_to_snarkjs(&proof.0, &proof.1, &proof.2);
     let public_inputs_str = public_inputs_to_string(public_inputs);
@@ -91,7 +87,7 @@ pub fn verify_shuffle_proof(
         })?,
         public_inputs: public_inputs_str,
         vkey_name: verifier_name.to_string(),
-        vkey_id: 3,
+        vkey_id,
     };
 
     let request_bytes = verify_request.to_bytes().map_err(|e| {
@@ -125,6 +121,27 @@ pub fn verify_shuffle_proof(
     Ok(verify_response.verified)
 }
 
+/// Verify a shuffle proof using the XION zk module
+///
+/// # Arguments
+/// * `deps` - Deps for querier access
+/// * `proof` - Groth16 proof (a, b, c components)
+/// * `public_inputs` - Public inputs for the proof circuit
+/// * `verifier_name` - Name of the verifier key stored in the zk module
+///
+/// # Returns
+/// * `Ok(true)` if proof is valid
+/// * `Ok(false)` if proof is invalid
+/// * `Err(ContractError)` if verification fails due to other errors
+pub fn verify_shuffle_proof(
+    deps: Deps,
+    proof: &([Uint256; 2], [[Uint256; 2]; 2], [Uint256; 2]),
+    public_inputs: &[Uint256],
+    verifier_name: &str,
+) -> Result<bool, ContractError> {
+    verify_groth16_proof(deps, proof, public_inputs, verifier_name, SHUFFLE_VKEY_ID)
+}
+
 /// Verify a decryption proof using the XION zk module
 ///
 /// # Arguments
@@ -143,50 +160,7 @@ pub fn verify_decrypt_proof(
     public_inputs: &[Uint256],
     verifier_name: &str,
 ) -> Result<bool, ContractError> {
-    let snarkjs_proof = groth16_proof_to_snarkjs(&proof.0, &proof.1, &proof.2);
-    let public_inputs_str = public_inputs_to_string(public_inputs);
-
-    let verify_request = QueryVerifyRequest {
-        proof: serde_json::to_vec(&snarkjs_proof).map_err(|e| {
-            ContractError::Std(cosmwasm_std::StdError::generic_err(format!(
-                "Failed to serialize proof: {}",
-                e
-            )))
-        })?,
-        public_inputs: public_inputs_str,
-        vkey_name: verifier_name.to_string(),
-        vkey_id: 2,
-    };
-
-    let request_bytes = verify_request.to_bytes().map_err(|e| {
-        ContractError::Std(cosmwasm_std::StdError::generic_err(format!(
-            "Failed to encode verify request: {}",
-            e
-        )))
-    })?;
-
-    let response: cosmwasm_std::Binary = deps
-        .querier
-        .query_grpc(
-            "/xion.zk.v1.Query/ProofVerify".to_string(),
-            cosmwasm_std::Binary::from(request_bytes),
-        )
-        .map_err(|e| {
-            ContractError::Std(cosmwasm_std::StdError::generic_err(format!(
-                "Failed to query zk module: {}",
-                e
-            )))
-        })?;
-
-    let verify_response: ProofVerifyResponse = ProofVerifyResponse::decode(response.as_slice())
-        .map_err(|e| {
-            ContractError::Std(cosmwasm_std::StdError::generic_err(format!(
-                "Failed to decode verify response: {}",
-                e
-            )))
-        })?;
-
-    Ok(verify_response.verified)
+    verify_groth16_proof(deps, proof, public_inputs, verifier_name, DECRYPT_VKEY_ID)
 }
 
 #[cfg(test)]
