@@ -998,6 +998,16 @@ fn test_reject_sale_delists_reserved_listing() {
         .value
         .clone();
 
+    // The seller revokes the marketplace's approval mid-sale — the cleanup
+    // must still remove the asset listing, because the marketplace acts as
+    // the reservation holder, not through the revoked approval.
+    let revoke_msg = cw721_base::msg::ExecuteMsg::Revoke {
+        spender: marketplace_contract.to_string(),
+        token_id: "token1".to_string(),
+    };
+    app.execute_contract(seller.clone(), asset_contract.clone(), &revoke_msg, &[])
+        .unwrap();
+
     let reject_msg = ExecuteMsg::RejectSale {
         id: pending_sale_id.clone(),
     };

@@ -541,13 +541,17 @@ fn remove_pending_sale(
             // already consumed (BuyItem replaced it with a short-lived one).
             // Restoring Active without it would let anyone bypass the
             // reserved-buyer check, so remove both sides — re-listing
-            // re-establishes the reservation.
+            // re-establishes the reservation. UnReserve { delist: true }
+            // rather than Delist: the marketplace holds the reservation, so
+            // it stays authorized even if the seller revoked the NFT
+            // approval, where Delist's check_can_list would fail and leave
+            // the asset listing exposed to direct purchase after expiry.
             listings().remove(deps.storage, listing_id.clone())?;
-            let delist_msg = asset_delist_msg(pending_sale.token_id.clone());
+            let unreserve_msg = asset_unreserve_msg(pending_sale.token_id.clone(), true);
             sub_msgs.push(SubMsg::reply_on_error(
                 WasmMsg::Execute {
                     contract_addr: pending_sale.collection.to_string(),
-                    msg: to_json_binary(&delist_msg)?,
+                    msg: to_json_binary(&unreserve_msg)?,
                     funds: vec![],
                 },
                 REPLY_UNRESERVE_BEST_EFFORT,
