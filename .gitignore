@@ -23,5 +23,6 @@
 **/.circleci/
 
 .env
+.env.local
 wasm/
 /node_modules
