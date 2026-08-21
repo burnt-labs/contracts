@@ -408,8 +408,11 @@ where
                 id: token_id.to_string(),
             })?;
         ctx.data.ask_price = Some(listing.price.clone());
-        if let Some(plugin) = exact_price_plugin {
-            plugin.run_asset_plugin(ctx)?;
+        // run the check directly rather than through run_asset_plugin: the plugin's
+        // configured amount must not replace the listing price, which is what buy()
+        // settles at and what the royalty plugin below calculates from
+        if exact_price_plugin.is_some() {
+            default_plugins::exact_price_plugin(ctx)?;
         }
         if let Some(plugin) = allowed_currencies_plugin {
             plugin.run_asset_plugin(ctx)?;
