@@ -107,7 +107,7 @@ pub fn execute(
 
         ExecuteMsg::CancelCollectionOffer { id } => execute_cancel_collection_offer(deps, info, id),
         ExecuteMsg::ApproveSale { id } => execute_approve_sale(deps, env, info, id),
-        ExecuteMsg::RejectSale { id } => execute_reject_sale(deps, info, id),
+        ExecuteMsg::RejectSale { id } => execute_reject_sale(deps, env, info, id),
         ExecuteMsg::ReclaimExpiredSale { id } => execute_reclaim_expired_sale(deps, env, info, id),
         ExecuteMsg::UpdateConfig { config } => execute_update_config(deps, info, config),
     }
@@ -513,6 +513,7 @@ pub const REPLY_UNRESERVE_BEST_EFFORT: u64 = 1;
 
 fn remove_pending_sale(
     deps: DepsMut,
+    env: &Env,
     pending_sale_id: String,
     pending_sale: PendingSale,
     reason: &str,
@@ -531,7 +532,20 @@ fn remove_pending_sale(
 
     let mut sub_msgs: Vec<SubMsg> = vec![];
 
-    if let Ok(asset_info) = &asset_listing {
+    // The pending sale's claim on the asset-side listing is the reservation
+    // the marketplace holds. Only while the current asset listing still
+    // carries that reservation may this cleanup touch it — if the seller
+    // cleared an expired reservation, or delisted and re-listed, the listing
+    // no longer represents this sale and the only correct action is dropping
+    // the marketplace record. This also keeps cleanup independent of the
+    // CW721 approval, which the seller can revoke.
+    let sale_reservation_held = asset_listing
+        .as_ref()
+        .ok()
+        .and_then(|l| l.reserved.as_ref())
+        .is_some_and(|r| r.reserver == env.contract.address);
+
+    if sale_reservation_held {
         let listing = listings().may_load(deps.storage, listing_id.clone())?;
         let reserved_for_buyer = listing.as_ref().is_some_and(|l| l.reserved_for.is_some());
 
@@ -541,22 +555,15 @@ fn remove_pending_sale(
             // already consumed (BuyItem replaced it with a short-lived one).
             // Restoring Active without it would let anyone bypass the
             // reserved-buyer check, so remove both sides — re-listing
-            // re-establishes the reservation. While the reservation is still
-            // present, UnReserve { delist: true } acts under the
-            // marketplace's reserver authority and survives a revoked NFT
-            // approval; if the seller already cleared the expired reservation
-            // themselves, fall back to a plain Delist under the listing
-            // approval.
+            // re-establishes the reservation. UnReserve { delist: true } acts
+            // under the marketplace's reserver authority, so a revoked NFT
+            // approval cannot strand the listing.
             listings().remove(deps.storage, listing_id.clone())?;
-            let cleanup_msg = if asset_info.reserved.is_some() {
-                to_json_binary(&asset_unreserve_msg(pending_sale.token_id.clone(), true))?
-            } else {
-                to_json_binary(&asset_delist_msg(pending_sale.token_id.clone()))?
-            };
+            let unreserve_msg = asset_unreserve_msg(pending_sale.token_id.clone(), true);
             sub_msgs.push(SubMsg::reply_always(
                 WasmMsg::Execute {
                     contract_addr: pending_sale.collection.to_string(),
-                    msg: cleanup_msg,
+                    msg: to_json_binary(&unreserve_msg)?,
                     funds: vec![],
                 },
                 REPLY_UNRESERVE_BEST_EFFORT,
@@ -601,10 +608,10 @@ fn remove_pending_sale(
         .may_load(deps.storage, listing_id.clone())?
         .is_some()
     {
-        // The asset-side listing is already gone (e.g. the seller delisted
-        // after the reservation expired), so there is nothing to restore —
-        // an Active marketplace listing would advertise what the asset
-        // contract can no longer sell.
+        // The asset side no longer carries this sale's reservation — the
+        // listing is gone, or the seller reclaimed it after expiry. There is
+        // nothing of ours to restore or clean up, and an Active marketplace
+        // record would advertise a listing this sale no longer represents.
         listings().remove(deps.storage, listing_id.clone())?;
     }
 
@@ -672,6 +679,7 @@ pub fn reply_unreserve_best_effort(deps: DepsMut, msg: Reply) -> Result<Response
 
 pub fn execute_reject_sale(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     pending_sale_id: String,
 ) -> Result<Response, ContractError> {
@@ -679,7 +687,13 @@ pub fn execute_reject_sale(
 
     let pending_sale = pending_sales().load(deps.storage, pending_sale_id.clone())?;
 
-    remove_pending_sale(deps, pending_sale_id, pending_sale, "rejected_by_manager")
+    remove_pending_sale(
+        deps,
+        &env,
+        pending_sale_id,
+        pending_sale,
+        "rejected_by_manager",
+    )
 }
 
 pub fn execute_reclaim_expired_sale(
@@ -702,5 +716,5 @@ pub fn execute_reclaim_expired_sale(
         });
     }
 
-    remove_pending_sale(deps, pending_sale_id, pending_sale, "expired")
+    remove_pending_sale(deps, &env, pending_sale_id, pending_sale, "expired")
 }

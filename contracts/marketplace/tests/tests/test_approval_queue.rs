@@ -699,12 +699,11 @@ fn test_reject_sale_after_manual_delist() {
 }
 
 #[test]
-fn test_reject_sale_refunds_when_asset_cleanup_fails() {
-    // If the asset-side unreserve fails during reject (here: the seller
-    // transferred the NFT away, so the asset contract reports a stale
-    // listing), the buyer refund and pending sale removal must still go
-    // through, and the marketplace listing must not be advertised as
-    // Active when the asset side can no longer honor it.
+fn test_reject_sale_refunds_when_sale_claim_lost() {
+    // When the sale's reservation is gone by reject time (the seller
+    // cleared it after expiry), the refund and pending sale removal must
+    // still go through, and the marketplace listing must not be advertised
+    // as Active when this sale no longer backs it.
     let mut app = setup_app_with_balances();
     let minter = app.api().addr_make("minter");
     let seller = app.api().addr_make("seller");
@@ -754,9 +753,7 @@ fn test_reject_sale_refunds_when_asset_cleanup_fails() {
         .clone();
 
     // Once the reservation expires the seller may legitimately clear it on
-    // the asset contract. A later reject then finds the asset listing
-    // present but the reservation gone, so the marketplace's UnReserve
-    // submessage fails — the desync the cleanup reply has to reconcile.
+    // the asset contract — the sale loses its claim on the listing.
     app.update_block(|b| b.time = b.time.plus_seconds(366 * 24 * 60 * 60));
     let unreserve_msg = asset::msg::ExecuteMsg::<
         cw721::DefaultOptionalNftExtensionMsg,
@@ -777,7 +774,7 @@ fn test_reject_sale_refunds_when_asset_cleanup_fails() {
     );
 
     // Rejecting the sale must still refund the buyer even though the
-    // asset-side unreserve now fails with ReservationNotFound.
+    // sale's reservation no longer exists.
     let reject_msg = ExecuteMsg::RejectSale {
         id: pending_sale_id.clone(),
     };
@@ -814,7 +811,7 @@ fn test_reject_sale_refunds_when_asset_cleanup_fails() {
         .query_wasm_smart::<Listing>(marketplace_contract, &QueryMsg::Listing { listing_id });
     assert!(
         listing_query.is_err(),
-        "listing must not be advertised after failed asset cleanup"
+        "listing must not be advertised once the sale claim is gone"
     );
 }
 
@@ -1051,11 +1048,11 @@ fn test_reject_sale_delists_reserved_listing() {
 }
 
 #[test]
-fn test_reject_sale_delists_reserved_listing_after_seller_unreserve() {
+fn test_reject_sale_after_seller_unreserve_releases_listing() {
     // If the pending sale's reservation expires and the seller clears it
-    // themselves, the marketplace can no longer unreserve — the cleanup
-    // falls back to a plain delist through the listing approval, so the
-    // asset listing still cannot be bought directly.
+    // themselves, the sale no longer holds a claim on the asset listing —
+    // rejection removes the marketplace record and leaves the asset listing
+    // to the seller, who chose to reclaim it.
     let mut app = setup_app_with_balances();
     let minter = app.api().addr_make("minter");
     let seller = app.api().addr_make("seller");
@@ -1160,11 +1157,128 @@ fn test_reject_sale_delists_reserved_listing_after_seller_unreserve() {
         "reserved marketplace listing must be removed"
     );
 
+    // The asset listing stays with the seller — the sale's reservation was
+    // already gone, so the cleanup must not touch what the seller reclaimed.
     let asset_listing = query_listing(&app.wrap(), &asset_contract, "token1");
     assert!(
-        asset_listing.is_err(),
-        "asset listing must be delisted via the approval fallback"
+        asset_listing.is_ok(),
+        "asset listing reclaimed by the seller must be left alone"
     );
+}
+
+#[test]
+fn test_reject_sale_leaves_replacement_listing_alone() {
+    // After the pending reservation expires the seller may delist and
+    // re-list the same token. Rejecting the stale sale must not delete the
+    // replacement — the sale's claim was its reservation, which the
+    // replacement listing does not carry.
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    let buyer_balance_before = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.clone(),
+        price: price.clone(),
+    };
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(buy_result.is_ok());
+
+    let pending_sale_id = buy_result
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    // Reservation lapses; the seller reclaims the token and re-lists it
+    // directly on the asset contract at a new price.
+    app.update_block(|b| b.time = b.time.plus_seconds(2 * 24 * 60 * 60));
+    let unreserve_msg = asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        asset::msg::AssetExtensionExecuteMsg,
+    >::UpdateExtension {
+        msg: asset::msg::AssetExtensionExecuteMsg::UnReserve {
+            token_id: "token1".to_string(),
+            delist: Some(true),
+        },
+    };
+    app.execute_contract(seller.clone(), asset_contract.clone(), &unreserve_msg, &[])
+        .unwrap();
+    let relist_msg = asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        asset::msg::AssetExtensionExecuteMsg,
+    >::UpdateExtension {
+        msg: asset::msg::AssetExtensionExecuteMsg::List {
+            token_id: "token1".to_string(),
+            price: coin(250, "uxion"),
+            reservation: None,
+        },
+    };
+    let relist_result =
+        app.execute_contract(seller.clone(), asset_contract.clone(), &relist_msg, &[]);
+    assert!(relist_result.is_ok(), "{:?}", relist_result.err());
+
+    let reject_msg = ExecuteMsg::RejectSale {
+        id: pending_sale_id.clone(),
+    };
+    let reject_result = app.execute_contract(
+        manager.clone(),
+        marketplace_contract.clone(),
+        &reject_msg,
+        &[],
+    );
+    assert!(reject_result.is_ok(), "{:?}", reject_result.err());
+
+    let buyer_balance_after = app.wrap().query_balance(&buyer, "uxion").unwrap().amount;
+    assert_eq!(
+        buyer_balance_after, buyer_balance_before,
+        "buyer must be made whole after rejection"
+    );
+
+    let listing_query = app
+        .wrap()
+        .query_wasm_smart::<Listing>(marketplace_contract, &QueryMsg::Listing { listing_id });
+    assert!(
+        listing_query.is_err(),
+        "stale marketplace listing must be removed"
+    );
+
+    // The replacement listing survives untouched at its new price.
+    let replacement = query_listing(&app.wrap(), &asset_contract, "token1")
+        .expect("replacement asset listing must survive stale-sale cleanup");
+    assert_eq!(replacement.price, coin(250, "uxion"));
 }
 
 #[test]
