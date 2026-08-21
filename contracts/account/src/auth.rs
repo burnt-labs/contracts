@@ -174,10 +174,10 @@ impl Authenticator {
                 email_salt,
                 allowed_email_hosts,
             } => {
-                let tx_bytes_hash = util::base64url_encode(tx_bytes);
+                let tx_bytes_b64 = util::base64url_encode(tx_bytes);
                 let verification = zkemail::verify(
                     deps,
-                    tx_bytes_hash.as_bytes(),
+                    tx_bytes_b64.as_bytes(),
                     sig_bytes,
                     email_salt,
                     allowed_email_hosts,

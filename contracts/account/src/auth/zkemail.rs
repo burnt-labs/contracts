@@ -34,7 +34,7 @@ pub fn verify(
     email_salt: &str,
     allowed_email_hosts: &[String],
 ) -> ContractResult<bool> {
-    // split the sig_bytes into 2 parts proof and publicOutputs
+    // sig_bytes is a JSON-encoded ZKEmailSignature carrying the proof and its public inputs
     let sig: ZKEmailSignature = from_json(sig_bytes)?;
     let proof = sig.proof;
     let public_inputs = sig.public_inputs;
