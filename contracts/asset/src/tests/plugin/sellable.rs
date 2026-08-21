@@ -95,10 +95,10 @@ fn buy_deducts_royalty_fees() {
                 } else if *to_address == royalty_recipient.to_string() {
                     royalty_paid = Some(coin);
                 } else {
-                    panic!("unexpected recipient {}", to_address);
+                    panic!("unexpected recipient {to_address}");
                 }
             }
-            other => panic!("unexpected message: {:?}", other),
+            other => panic!("unexpected message: {other:?}"),
         }
     }
 

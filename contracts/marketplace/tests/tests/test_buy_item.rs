@@ -87,8 +87,8 @@ fn test_buy_item_success() {
             assert!(listing_resp.is_err());
         }
         Err(error) => {
-            println!("Error: {:?}", error);
-            panic!("Buy item failed: {:?}", error);
+            println!("Error: {error:?}");
+            panic!("Buy item failed: {error:?}");
         }
     }
 }
@@ -507,22 +507,19 @@ fn test_buy_item_success_with_royalties() {
     assert_eq!(
         seller_balance_after.u128(),
         seller_balance_before.u128() + expected_seller_payment,
-        "Seller should receive {} uxion (1000 - 25 marketplace fee - 50 royalty)",
-        expected_seller_payment
+        "Seller should receive {expected_seller_payment} uxion (1000 - 25 marketplace fee - 50 royalty)"
     );
 
     assert_eq!(
         manager_balance_after,
         manager_balance_before + Uint128::from(expected_marketplace_fee),
-        "Manager should receive {} uxion marketplace fee",
-        expected_marketplace_fee
+        "Manager should receive {expected_marketplace_fee} uxion marketplace fee"
     );
 
     assert_eq!(
         royalty_recipient_balance_after,
         royalty_recipient_balance_before + Uint128::from(expected_royalty),
-        "Royalty recipient should receive {} uxion royalty",
-        expected_royalty
+        "Royalty recipient should receive {expected_royalty} uxion royalty"
     );
 
     let owner_query = cw721_base::msg::QueryMsg::OwnerOf {

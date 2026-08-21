@@ -127,7 +127,7 @@ mod tests {
 
         // valid JSON, but total length exceeds the cap
         let too_long = "a".repeat(MAX_VALUE_LEN + 1);
-        let value = format!("{{\"k\":\"{}\"}}", too_long);
+        let value = format!("{{\"k\":\"{too_long}\"}}");
 
         let err = execute(
             deps.as_mut(),
