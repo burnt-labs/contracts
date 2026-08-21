@@ -59,6 +59,8 @@ pub struct AppIntegrity {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceIntegrity {
+    // Google omits this and returns "deviceIntegrity": {} when no label applies.
+    #[serde(default)]
     pub device_recognition_verdict: Vec<String>,
 }
 

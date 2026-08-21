@@ -1,4 +1,3 @@
-#[cfg(not(feature = "library"))]
 pub mod contract;
 pub mod error;
 pub mod msg;
@@ -13,15 +12,9 @@ mod tests {
 
     use crate::msg::IntegrityVerdict;
 
-    // Original test data from app_attest_android — the verification key (SPKI DER,
-    // base64-standard) and the JWE integrity token. The JWE decryption key and token
-    // are preserved here for reference; the relayer would decrypt the JWE off-chain
-    // to obtain the inner JWS before submitting it on-chain.
-    #[allow(dead_code)]
-    const DECRYPTION_KEY: &str = "lhzLdY8Ap3h5VvEuaTu0A1v3VGCPx6Agd0ORlN1BGCw=";
+    // SPKI DER (base64-standard) verification key retained from the original
+    // app_attest_android test data.
     const VERIFICATION_KEY_SPKI: &str = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEehNYmCDWCZAGSRLtOHOx6xeuoaWZlpavBRXRpeI3apBrmSDUBYsftwUXmGZh5lLlKeO3yTZOZgDnEq8Mu0t5+w==";
-    #[allow(dead_code)]
-    const INTEGRITY_TOKEN_JWE: &str = "eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2R0NNIn0.Umc2gHxcsCqrSHLmjwmH0vsRGgTY_dZJ56QQxpAk_S8h0Dn8imbVAw.qfzNXdKNon8eW_BI.-vZ7AI8PeHpAwytVQQ-3UAjWQCz5R_4H7pjLYMJqLB_UlbYwhLXzFhrF9QkX9I21emwTsevqmYhLgMjC4TsgTTjTGTYUzQiRFlBzFoQ_bh0-jjJddsmNE5WRzXpZQuhalWrhEACthop7iUxLk4oCPGtmNA7ezma_sadfxXr2U31kqhuw_DRn_jSJoYLM85oambqYIRMwF0xJr4EYQdWP_f1J2OqT7gI4U4YtoH-FKMaNg4JvWR00E7wUzi_3nyu5XGkWLsmmC2qxLBpB644-2Qwvd2K9A022Eh7fb4GOi-lXW9u-L5IEXsOuQjxvv-FsLvu-SX99qDhaQ8DfUZT9aKHu7T7ZyB6254-BUzFPCVgxCbyq5LD4RbLxBsXpmMd7Qfdq9syqJ8W6s3250JuY_yCtUXRDQQo_UNZWf6rxiNh_mINz7OQFwLduqlvV-qX0O5jZCwElgv9QFU_nbJMzdnGgCkDcLGXkQLnLOvOSeRnDMxFrbqruho0oXeZCUMDRKAGa92MQoYQMhEKWwvOsoomIPAP5OsKHQtzGKljYHAx2T9cFLWQZjgdLkmoMTE8p0D1VLIf6Sa8DyG66BJG3hKLLJ9jYuE0a3cYfcmkTpDyCVPj-7mLuQoRkj8QeZFiHRE8iZWoXRU9KE6_wfPYBybkhWXf0kSHZINzdipnshsc7EeM_ErarQZVazARa5EZXw-qM3R5xUvAGVzM8uyHlaL0dtE0KPoCCWhp5mO01kwnD28QhHYT6at3kARHMCFplXR3MDKprCRJFQFpTKLb8Cbz41W3-Yd4mgeKciOe_DoYpPhi2jMT1mbY5IcniP0gXNMKfShZswxIaIOK0PyQM2gd1Tc6jGsE_ApGnvmgStCxXCtR5Sbk8kLrqGUJ8jkVa40wX5aH3c8jymbQwqbXtuVbDsDYtY5IgWuZD0spukCfHfaolwHQZOZAOYkx2IKoGJetIMQBKGYF3z6Jy31kw65Vg6qpTb9-x__0vqtHffy24Sx5j3eQVQ7rjFysnEpFEI93Pn5tQIMlgVdGRYlz8M0a7V_HgY-C05lGwgVe5aeuzZgOg7qUlESghV1S96TRJ4F1AMwKvXvga4_12qtj2sOIvYR1zFzRhUw005jpqCbm867nBoEKs6wGnFNKQ91WPVXy2mMA3eM5L0jSp2HCAb_KGFKFt_zyFebFv6hP96H1bo-ebt3gQape4lFoDYc1QCs6QZg.q8WYiDAj7O9nETLw62NwJw";
 
     /// A realistic Play Integrity verdict payload matching Google's format.
     fn sample_verdict_json() -> &'static str {

@@ -25,7 +25,7 @@ mod proto {
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -39,7 +39,7 @@ pub fn instantiate(
         .add_attribute("aud", msg.aud))
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     _deps: DepsMut,
     _env: Env,
@@ -51,7 +51,7 @@ pub fn execute(
     )))
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> ContractResult<Binary> {
     match msg {
         QueryMsg::Verify { compact_jws } => query_verify(deps, compact_jws),
