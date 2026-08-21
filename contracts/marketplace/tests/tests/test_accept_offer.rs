@@ -98,7 +98,7 @@ fn test_accept_offer_fee_routing() {
     );
 
     if let Err(ref e) = accept_result {
-        println!("Accept offer error: {:?}", e);
+        println!("Accept offer error: {e:?}");
     }
     assert!(accept_result.is_ok());
 
