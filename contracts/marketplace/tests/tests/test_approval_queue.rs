@@ -638,6 +638,67 @@ fn test_reject_sale_after_manual_unreserve() {
 }
 
 #[test]
+fn test_reject_sale_after_manual_delist() {
+    // Delist removes the listing and with it the reservation stored inside,
+    // so it must obey the same rule as unreserve: while the marketplace holds
+    // an active reservation for a pending sale, the seller cannot delist.
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    // Buyer purchases, creating a pending sale
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id,
+        price: price.clone(),
+    };
+
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(&price),
+    );
+    assert!(buy_result.is_ok());
+
+    // Seller tries to delist directly on the asset contract — this must fail
+    // while the marketplace holds an active reservation
+    let delist_msg = asset::msg::ExecuteMsg::<
+        cw721::DefaultOptionalNftExtensionMsg,
+        cw721::DefaultOptionalCollectionExtensionMsg,
+        asset::msg::AssetExtensionExecuteMsg,
+    >::UpdateExtension {
+        msg: asset::msg::AssetExtensionExecuteMsg::Delist {
+            token_id: "token1".to_string(),
+        },
+    };
+
+    let delist_result =
+        app.execute_contract(seller.clone(), asset_contract.clone(), &delist_msg, &[]);
+
+    assert!(
+        delist_result.is_err(),
+        "Delist should fail while marketplace has active reservation"
+    );
+}
+
+#[test]
 fn test_reject_sale_unauthorized() {
     let mut app = setup_app_with_balances();
     let minter = app.api().addr_make("minter");
