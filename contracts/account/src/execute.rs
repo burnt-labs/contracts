@@ -285,6 +285,11 @@ pub fn remove_auth_method(deps: DepsMut, env: Env, id: u8) -> ContractResult<Res
         return Err(ContractError::MinimumAuthenticatorCount);
     }
 
+    // Validate that the key exists
+    if !AUTHENTICATORS.has(deps.storage, id) {
+        return Err(ContractError::AuthenticatorNotFound);
+    }
+
     // Remove the authenticator
     AUTHENTICATORS.remove(deps.storage, id);
 
@@ -424,20 +429,37 @@ pub fn remove_allowed_email_host(
     match authenticator {
         Authenticator::ZKEmail {
             email_salt,
-            mut allowed_email_hosts,
+            allowed_email_hosts,
         } => {
-            // Ensure at least one email host remains after removal
-            if allowed_email_hosts.len() <= 1 {
-                return Err(ContractError::NoAllowedEmailHosts);
+            // Work out what would remain before deciding anything, so a stored
+            // duplicate cannot drop the list to empty via the length check.
+            let remaining: Vec<String> = allowed_email_hosts
+                .iter()
+                .filter(|host| *host != &email_host)
+                .cloned()
+                .collect();
+
+            // The host was not registered: report a no-op instead of claiming a removal.
+            if remaining.len() == allowed_email_hosts.len() {
+                return Ok(Response::new().add_event(
+                    Event::new("remove_allowed_email_host").add_attributes(vec![
+                        ("contract_address", env.contract.address.to_string()),
+                        ("authenticator_id", id.to_string()),
+                        ("email_host", email_host),
+                        ("status", "not_found".to_string()),
+                    ]),
+                ));
             }
 
-            // Remove the email host
-            allowed_email_hosts.retain(|host| host != &email_host);
+            // Never persist a ZKEmail authenticator with no allowed hosts.
+            if remaining.is_empty() {
+                return Err(ContractError::NoAllowedEmailHosts);
+            }
 
             // Update the authenticator
             let updated_auth = Authenticator::ZKEmail {
                 email_salt,
-                allowed_email_hosts,
+                allowed_email_hosts: remaining,
             };
 
             AUTHENTICATORS.save(deps.storage, id, &updated_auth)?;
@@ -606,6 +628,113 @@ pub mod tests {
 
         // Verify the authenticator was not saved
         assert!(!AUTHENTICATORS.has(deps.as_ref().storage, 1));
+    }
+
+    #[test]
+    fn test_remove_allowed_email_host_edge_cases() {
+        use crate::auth::Authenticator;
+        use crate::error::ContractError;
+        use crate::execute::remove_allowed_email_host;
+
+        let mut deps = OwnedDeps {
+            storage: MockStorage::default(),
+            api: MockApi::default().with_prefix("xion"),
+            querier: MockQuerier::<XionCustomQuery>::new(&[]),
+            custom_query_type: std::marker::PhantomData,
+        };
+        let env = mock_env();
+        let auth_id = 7u8;
+
+        // Removing a host that was never registered is a no-op, not a removal.
+        AUTHENTICATORS
+            .save(
+                deps.as_mut().storage,
+                auth_id,
+                &Authenticator::ZKEmail {
+                    email_salt: "salt".to_string(),
+                    allowed_email_hosts: vec!["a.com".to_string(), "b.com".to_string()],
+                },
+            )
+            .unwrap();
+
+        let res = remove_allowed_email_host(
+            deps.as_mut(),
+            env.clone(),
+            auth_id,
+            "absent.com".to_string(),
+        )
+        .unwrap();
+        assert!(res.events[0]
+            .attributes
+            .iter()
+            .any(|attr| attr.key == "status" && attr.value == "not_found"));
+
+        match AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap() {
+            Authenticator::ZKEmail {
+                allowed_email_hosts,
+                ..
+            } => assert_eq!(allowed_email_hosts.len(), 2),
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+
+        // A duplicate entry must not let the removal drop the list to empty.
+        AUTHENTICATORS
+            .save(
+                deps.as_mut().storage,
+                auth_id,
+                &Authenticator::ZKEmail {
+                    email_salt: "salt".to_string(),
+                    allowed_email_hosts: vec!["dup.com".to_string(), "dup.com".to_string()],
+                },
+            )
+            .unwrap();
+
+        let err =
+            remove_allowed_email_host(deps.as_mut(), env.clone(), auth_id, "dup.com".to_string())
+                .unwrap_err();
+        assert_eq!(err, ContractError::NoAllowedEmailHosts);
+
+        match AUTHENTICATORS.load(deps.as_ref().storage, auth_id).unwrap() {
+            Authenticator::ZKEmail {
+                allowed_email_hosts,
+                ..
+            } => assert_eq!(allowed_email_hosts.len(), 2),
+            _ => panic!("Expected ZKEmail authenticator"),
+        }
+    }
+
+    #[test]
+    fn test_remove_auth_method_rejects_unknown_id() {
+        use crate::auth::Authenticator;
+        use crate::error::ContractError;
+        use crate::execute::remove_auth_method;
+
+        let mut deps = OwnedDeps {
+            storage: MockStorage::default(),
+            api: MockApi::default().with_prefix("xion"),
+            querier: MockQuerier::<XionCustomQuery>::new(&[]),
+            custom_query_type: std::marker::PhantomData,
+        };
+        let env = mock_env();
+
+        for id in [1u8, 2u8] {
+            AUTHENTICATORS
+                .save(
+                    deps.as_mut().storage,
+                    id,
+                    &Authenticator::ZKEmail {
+                        email_salt: "salt".to_string(),
+                        allowed_email_hosts: vec!["a.com".to_string()],
+                    },
+                )
+                .unwrap();
+        }
+
+        let err = remove_auth_method(deps.as_mut(), env.clone(), 9u8).unwrap_err();
+        assert_eq!(err, ContractError::AuthenticatorNotFound);
+
+        assert!(AUTHENTICATORS.has(deps.as_ref().storage, 1));
+        assert!(AUTHENTICATORS.has(deps.as_ref().storage, 2));
     }
 
     #[test]
