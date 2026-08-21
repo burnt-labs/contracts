@@ -533,17 +533,25 @@ fn remove_pending_sale(
     let mut sub_msgs: Vec<SubMsg> = vec![];
 
     // The pending sale's claim on the asset-side listing is the reservation
-    // the marketplace holds. Only while the current asset listing still
-    // carries that reservation may this cleanup touch it — if the seller
-    // cleared an expired reservation, or delisted and re-listed, the listing
-    // no longer represents this sale and the only correct action is dropping
-    // the marketplace record. This also keeps cleanup independent of the
-    // CW721 approval, which the seller can revoke.
+    // the marketplace created for it: reserver = this contract, deadline =
+    // the sale's expiration (BuyItem sets both from the same clock). Only
+    // while the current asset listing still carries that exact reservation
+    // may this cleanup touch it — if the seller cleared an expired
+    // reservation, or delisted and re-listed (even naming the marketplace as
+    // reserver of the replacement), the listing no longer represents this
+    // sale and the only correct action is dropping the marketplace record.
+    // This also keeps cleanup independent of the CW721 approval, which the
+    // seller can revoke. A seller can still forge a replacement reservation
+    // copying both public fields, but that is deliberately granting this
+    // sale authority over their own listing.
     let sale_reservation_held = asset_listing
         .as_ref()
         .ok()
         .and_then(|l| l.reserved.as_ref())
-        .is_some_and(|r| r.reserver == env.contract.address);
+        .is_some_and(|r| {
+            r.reserver == env.contract.address
+                && r.reserved_until.seconds() == pending_sale.expiration
+        });
 
     if sale_reservation_held {
         let listing = listings().may_load(deps.storage, listing_id.clone())?;

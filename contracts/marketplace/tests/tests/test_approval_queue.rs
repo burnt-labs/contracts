@@ -1235,6 +1235,9 @@ fn test_reject_sale_leaves_replacement_listing_alone() {
     };
     app.execute_contract(seller.clone(), asset_contract.clone(), &unreserve_msg, &[])
         .unwrap();
+    // The replacement even names the marketplace as its reserver (the asset
+    // contract lets the lister choose one) — the sale's claim is identified
+    // by reserver AND deadline, so this must still not match.
     let relist_msg = asset::msg::ExecuteMsg::<
         cw721::DefaultOptionalNftExtensionMsg,
         cw721::DefaultOptionalCollectionExtensionMsg,
@@ -1243,7 +1246,10 @@ fn test_reject_sale_leaves_replacement_listing_alone() {
         msg: asset::msg::AssetExtensionExecuteMsg::List {
             token_id: "token1".to_string(),
             price: coin(250, "uxion"),
-            reservation: None,
+            reservation: Some(asset::msg::ReserveMsg {
+                reserver: Some(marketplace_contract.to_string()),
+                reserved_until: app.block_info().time.plus_seconds(30 * 24 * 60 * 60),
+            }),
         },
     };
     let relist_result =
@@ -1275,10 +1281,15 @@ fn test_reject_sale_leaves_replacement_listing_alone() {
         "stale marketplace listing must be removed"
     );
 
-    // The replacement listing survives untouched at its new price.
+    // The replacement listing survives untouched: new price kept and its
+    // own reservation intact.
     let replacement = query_listing(&app.wrap(), &asset_contract, "token1")
         .expect("replacement asset listing must survive stale-sale cleanup");
     assert_eq!(replacement.price, coin(250, "uxion"));
+    assert!(
+        replacement.reserved.is_some(),
+        "replacement's own reservation must not be cleared by stale-sale cleanup"
+    );
 }
 
 #[test]
