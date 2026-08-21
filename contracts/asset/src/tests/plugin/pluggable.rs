@@ -309,7 +309,7 @@ fn on_buy_plugin_runs_allowed_marketplace_and_royalty_plugins() {
             assert_eq!(to_address, &royalty_recipient.to_string());
             assert_eq!(amount, &vec![Coin::new(5u128, "uxion")]);
         }
-        msg => panic!("unexpected message: {:?}", msg),
+        msg => panic!("unexpected message: {msg:?}"),
     }
     let amount_attr = ctx
         .response

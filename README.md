@@ -22,9 +22,17 @@ This repository contains the source code for smart contracts that can be deploye
 
 ### Contracts
 
-- **Account**: MetaAccount implementation
-- **Treasury**: Treasury management contract
+- **Asset**: Asset contract with pluggable extensions
+- **Marketplace**: NFT marketplace contract
 - **User Map**: User mapping functionality
+
+### Moved Contracts
+
+The core protocol contracts now live in their own repositories, each with its
+subdirectory history preserved:
+
+- **Account** → [burnt-labs/account-contract](https://github.com/burnt-labs/account-contract)
+- **Treasury** → [burnt-labs/treasury-contract](https://github.com/burnt-labs/treasury-contract)
 
 ### Compiling
 

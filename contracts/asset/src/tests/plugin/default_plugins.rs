@@ -185,7 +185,7 @@ fn royalty_plugin_creates_deduction_and_message() {
             assert_eq!(to_address, "artist");
             assert_eq!(amount, &vec![Coin::new(50u128, "uxion")]);
         }
-        other => panic!("unexpected message: {:?}", other),
+        other => panic!("unexpected message: {other:?}"),
     }
 }
 
@@ -235,7 +235,7 @@ fn royalty_plugin_rounds_up_small_amounts() {
             assert_eq!(to_address, "artist");
             assert_eq!(amount, &vec![Coin::new(1u128, "uxion")]);
         }
-        other => panic!("unexpected message: {:?}", other),
+        other => panic!("unexpected message: {other:?}"),
     }
 }
 
