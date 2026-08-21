@@ -321,6 +321,80 @@ fn on_buy_plugin_runs_allowed_marketplace_and_royalty_plugins() {
 }
 
 #[test]
+fn on_buy_plugin_enforces_the_configured_exact_price() {
+    let mut deps = mock_dependencies();
+    let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
+    let buyer = deps.api.addr_make("buyer");
+    let seller = deps.api.addr_make("seller");
+    let price = Coin::new(100u128, "uxion");
+
+    contract
+        .config
+        .listings
+        .save(
+            deps.as_mut().storage,
+            "token-exact",
+            &ListingInfo {
+                id: "token-exact".to_string(),
+                seller,
+                price: price.clone(),
+                reserved: None,
+            },
+        )
+        .unwrap();
+    // the configured amount deliberately differs from the listing price: the
+    // plugin's presence enables the check, but the listing price is what buy()
+    // settles at, so it must be what gets enforced
+    contract
+        .config
+        .collection_plugins
+        .save(
+            deps.as_mut().storage,
+            "ExactPrice",
+            &Plugin::ExactPrice {
+                amount: Coin::new(250u128, "uxion"),
+            },
+        )
+        .unwrap();
+
+    let env = env_at(1_000);
+    let matching_info = message_info(&buyer, std::slice::from_ref(&price));
+    let mut matching_ctx = build_ctx(deps.as_ref(), env.clone(), matching_info);
+    assert!(
+        contract
+            .on_buy_plugin("token-exact", &None, &mut matching_ctx)
+            .unwrap()
+    );
+    assert_eq!(
+        matching_ctx.data.ask_price,
+        Some(price.clone()),
+        "listing price must survive the exact price check"
+    );
+
+    let overpaid_info = message_info(&buyer, &[Coin::new(101u128, "uxion")]);
+    let mut overpaid_ctx = build_ctx(deps.as_ref(), env.clone(), overpaid_info);
+    let error = contract
+        .on_buy_plugin("token-exact", &None, &mut overpaid_ctx)
+        .expect_err("overpayment must be rejected");
+    assert_eq!(
+        error.to_string(),
+        cosmwasm_std::StdError::generic_err("Exact price not met: 100 required, 101 provided")
+            .to_string()
+    );
+
+    let plugin_amount_info = message_info(&buyer, &[Coin::new(250u128, "uxion")]);
+    let mut plugin_amount_ctx = build_ctx(deps.as_ref(), env, plugin_amount_info);
+    let error = contract
+        .on_buy_plugin("token-exact", &None, &mut plugin_amount_ctx)
+        .expect_err("paying the configured plugin amount instead of the listing price must fail");
+    assert_eq!(
+        error.to_string(),
+        cosmwasm_std::StdError::generic_err("Exact price not met: 100 required, 250 provided")
+            .to_string()
+    );
+}
+
+#[test]
 fn on_buy_plugin_errors_when_currency_not_allowed() {
     let mut deps = mock_dependencies();
     let contract: DefaultAssetContract<'static, Empty, Empty, Empty, Empty> = Default::default();
