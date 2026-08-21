@@ -1063,7 +1063,7 @@ fn test_approve_sale_fee_routing_with_zero_fee() {
     );
 
     if let Err(ref e) = approve_result {
-        println!("Approve sale error with zero fee: {:?}", e);
+        println!("Approve sale error with zero fee: {e:?}");
     }
     assert!(approve_result.is_ok());
 
@@ -1320,7 +1320,7 @@ fn test_approve_sale_with_existing_pending_sale() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let token_id = format!("test_approve_existing_pending_{}", timestamp);
+    let token_id = format!("test_approve_existing_pending_{timestamp}");
     mint_nft(&mut app, &asset_contract, &minter, &seller, &token_id);
 
     let price = coin(100, "uxion");

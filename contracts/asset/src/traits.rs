@@ -284,7 +284,7 @@ where
             AssetExtensionExecuteMsg::RemoveCollectionPlugin { plugins } => {
                 self.remove_plugin(deps, env, info, &plugins)?;
                 Ok(Response::new()
-                    .add_attribute("action", format!("remove_collection_plugin {:?}", plugins)))
+                    .add_attribute("action", format!("remove_collection_plugin {plugins:?}")))
             }
         }
     }
