@@ -22,6 +22,8 @@ pub enum QueryMsg {
     GetValueByUser { address: Addr },
     #[returns(Vec<(Addr, String)>)]
     GetMap {},
+    #[returns(String)]
+    GetClaimKey {},
 }
 
 #[cw_serde]
