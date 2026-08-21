@@ -10,12 +10,12 @@ use cosmos_sdk_proto::cosmos::authz::v1beta1::{QueryGrantsRequest, QueryGrantsRe
 use cosmos_sdk_proto::cosmos::feegrant::v1beta1::QueryAllowanceRequest;
 use cosmos_sdk_proto::prost::Message;
 use cosmos_sdk_proto::traits::MessageExt;
-use cosmos_sdk_proto::Timestamp;
 use cosmwasm_std::BankMsg::Send;
 use cosmwasm_std::{
     Addr, AnyMsg, Binary, Coin, CosmosMsg, DepsMut, Env, Event, MessageInfo, Order, Response,
     WasmMsg,
 };
+use pbjson_types::Timestamp;
 use url::Url;
 
 #[allow(dead_code)]

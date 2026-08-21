@@ -1,5 +1,6 @@
 pub mod allowance;
 
+use cosmos_sdk_proto::prost::bytes::Bytes;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Binary;
 
@@ -37,6 +38,24 @@ impl From<Any> for cosmos_sdk_proto::Any {
         cosmos_sdk_proto::Any {
             type_url: value.type_url,
             value: value.value.to_vec(),
+        }
+    }
+}
+
+impl From<pbjson_types::Any> for Any {
+    fn from(value: pbjson_types::Any) -> Self {
+        Any {
+            type_url: value.type_url,
+            value: Binary::from(value.value.to_vec()),
+        }
+    }
+}
+
+impl From<Any> for pbjson_types::Any {
+    fn from(value: Any) -> Self {
+        pbjson_types::Any {
+            type_url: value.type_url,
+            value: Bytes::from(value.value.to_vec()),
         }
     }
 }

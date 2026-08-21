@@ -1,0 +1,53 @@
+services:
+  # Build the custom optimizer image
+  optimizer-build:
+    build:
+      context: .
+      dockerfile: docker/custom_coswam_optimiser.docker
+      platforms:
+        - linux/amd64
+    platform: linux/amd64
+    image: cosmwasm/optimizer-ssh:latest
+    command: echo "Image built successfully"
+
+  # Service for optimizing the account contract
+  optimize-account:
+    platform: linux/amd64
+    image: cosmwasm/optimizer-ssh:latest
+    volumes:
+      - ./:/code
+      - ~/.ssh:/root/.ssh:ro
+    working_dir: /code
+    command: contracts/account
+    environment:
+      - SSH_AUTH_SOCK=/ssh-agent
+    depends_on:
+      - optimizer-build
+
+  # Service for optimizing the treasury contract
+  optimize-treasury:
+    platform: linux/amd64
+    image: cosmwasm/optimizer-ssh:latest
+    volumes:
+      - ./:/code
+      - ~/.ssh:/root/.ssh:ro
+    working_dir: /code
+    command: contracts/treasury
+    environment:
+      - SSH_AUTH_SOCK=/ssh-agent
+    depends_on:
+      - optimizer-build
+
+  # Service for optimizing the user_map contract
+  optimize-user-map:
+    platform: linux/amd64
+    image: cosmwasm/optimizer-ssh:latest
+    volumes:
+      - ./:/code
+      - ~/.ssh:/root/.ssh:ro
+    working_dir: /code
+    command: contracts/user_map
+    environment:
+      - SSH_AUTH_SOCK=/ssh-agent
+    depends_on:
+      - optimizer-build

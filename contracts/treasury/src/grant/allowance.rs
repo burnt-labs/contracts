@@ -7,8 +7,8 @@ use cosmos_sdk_proto::cosmos::feegrant::v1beta1::{
 use cosmos_sdk_proto::prost::Message;
 use cosmos_sdk_proto::traits::MessageExt;
 use cosmos_sdk_proto::xion::v1::{AuthzAllowance, ContractsAllowance, MultiAnyAllowance};
-use cosmos_sdk_proto::Timestamp;
 use cosmwasm_std::Addr;
+use pbjson_types::Timestamp;
 
 #[allow(dead_code)]
 pub fn format_allowance(
