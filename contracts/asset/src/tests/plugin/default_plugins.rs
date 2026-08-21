@@ -209,7 +209,7 @@ fn royalty_plugin_calculates_from_ask_price_when_buyer_overpays() {
         CosmosMsg::Bank(BankMsg::Send { amount, .. }) => {
             assert_eq!(amount, &vec![Coin::new(50u128, "uxion")]);
         }
-        other => panic!("unexpected message: {:?}", other),
+        other => panic!("unexpected message: {other:?}"),
     }
 }
 
