@@ -36,7 +36,7 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
     match msg.id {
         REPLY_DELIST_BEST_EFFORT => reply_delist_best_effort(deps, msg),
         id => Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
-            format!("unknown reply id: {}", id),
+            format!("unknown reply id: {id}"),
         ))),
     }
 }

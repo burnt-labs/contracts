@@ -2,7 +2,7 @@ use cosmwasm_std::{
     Coin, Empty,
     testing::{message_info, mock_dependencies, mock_env},
 };
-use cw721::state::NftInfo;
+use cw721::{Approval, Expiration, state::NftInfo};
 
 use crate::{
     error::ContractError,
@@ -189,7 +189,11 @@ fn delist_respects_active_reservations() {
             "token-1",
             &NftInfo {
                 owner: seller_addr.clone(),
-                approvals: vec![],
+                // the marketplace holds an approval, as it does in the real flow
+                approvals: vec![Approval {
+                    spender: reserver_addr.clone(),
+                    expires: Expiration::Never {},
+                }],
                 token_uri: None,
                 extension: Empty {},
             },
