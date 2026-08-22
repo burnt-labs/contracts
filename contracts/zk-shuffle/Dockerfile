@@ -12,7 +12,4 @@ ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 RUN echo 'export CARGO_NET_GIT_FETCH_WITH_CLI=true' >> /etc/profile \
  && echo 'export CARGO_NET_GIT_FETCH_WITH_CLI=true' >> /root/.bashrc
 
-# Optional: set git config to use SSH instead of HTTPS (for submodules)
-RUN git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
-
 ENTRYPOINT ["/usr/local/bin/optimize.sh"]
