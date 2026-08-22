@@ -106,20 +106,20 @@ pub enum Plugin {
 impl Display for Plugin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Plugin::ExactPrice { amount } => write!(f, "ExactPrice: {}", amount),
-            Plugin::MinimumPrice { amount } => write!(f, "MinimumPrice: {}", amount),
-            Plugin::RequiresProof { proof } => write!(f, "RequiresProof: {:?}", proof),
-            Plugin::NotBefore { time } => write!(f, "NotBefore: {}", time),
-            Plugin::NotAfter { time } => write!(f, "NotAfter: {}", time),
-            Plugin::TimeLock { time } => write!(f, "TimeLock: {:?}", time),
+            Plugin::ExactPrice { amount } => write!(f, "ExactPrice: {amount}"),
+            Plugin::MinimumPrice { amount } => write!(f, "MinimumPrice: {amount}"),
+            Plugin::RequiresProof { proof } => write!(f, "RequiresProof: {proof:?}"),
+            Plugin::NotBefore { time } => write!(f, "NotBefore: {time}"),
+            Plugin::NotAfter { time } => write!(f, "NotAfter: {time}"),
+            Plugin::TimeLock { time } => write!(f, "TimeLock: {time:?}"),
             Plugin::Royalty { bps, recipient } => {
-                write!(f, "Royalty: {} bps to {}", bps, recipient)
+                write!(f, "Royalty: {bps} bps to {recipient}")
             }
             Plugin::AllowedMarketplaces { marketplaces } => {
-                write!(f, "AllowedMarketplaces: {:?}", marketplaces)
+                write!(f, "AllowedMarketplaces: {marketplaces:?}")
             }
             Plugin::AllowedCurrencies { denoms } => {
-                write!(f, "AllowedCurrencies: {:?}", denoms)
+                write!(f, "AllowedCurrencies: {denoms:?}")
             }
         }
     }
