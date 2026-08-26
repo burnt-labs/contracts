@@ -23,8 +23,8 @@ cw-address-like = "2.0.0"
 cw-storage-plus = "2.0.0"
 cw-utils = "2.0.0"
 cw2 = "2.0.0"
-cw721 = "0.20.0"
-cw721-base = "0.20.0"
+cw721 = "0.21.0"
+cw721-base = "0.21.0"
 ed25519-zebra = { version = "=4.0.3", default-features = false }
 getrandom = { version = "0.2.10", features = ["custom"] }
 hex = "0.4"
