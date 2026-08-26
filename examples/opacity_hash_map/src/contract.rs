@@ -39,6 +39,21 @@ pub fn execute(
                 &opacity_verifier::msg::QueryMsg::Verify { message, signature },
             )?;
 
+            // NOT SAFE TO COPY AS-IS. The verifier answers one question: was
+            // this message signed by an allowlisted Opacity key. It says
+            // nothing about who is submitting it. Every (message, signature)
+            // pair is public once it lands in a tx, so anyone can replay one
+            // and have it stored under their own address here - the map
+            // records "some allowlisted notary attested this payload", not
+            // "this sender is the subject of it".
+            //
+            // That is tolerable for an example whose point is the verifier
+            // call. A contract that treats these entries as claims about the
+            // sender must bind the two, and the binding has to come from
+            // inside the attested payload - an Opacity response carries no
+            // Xion address, so nothing at this layer can add one after the
+            // fact. Either the notary signs over the caller's address, or the
+            // sender proves control of an identity the payload does name.
             if verified {
                 USER_MAP.save(deps.storage, info.sender, &value)?;
             } else {

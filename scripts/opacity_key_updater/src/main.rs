@@ -95,26 +95,49 @@ struct State {
     hash: String,
 }
 
+/// Turn the endpoint's array into keys, refusing anything that is not a
+/// complete list of strings.
+///
+/// The update this feeds is a full replacement of the on-chain allowlist, so a
+/// silently shortened list is not a smaller update - it is a revocation. An
+/// empty array would clear the allowlist outright and make every valid Opacity
+/// proof fail to verify, and dropping non-string entries would revoke exactly
+/// the keys whose encoding the endpoint changed. Both are far more likely to be
+/// an endpoint having a bad day than a genuine instruction to revoke, so both
+/// are errors here: run_once logs and retries on the next poll, leaving the
+/// current allowlist in place.
+fn collect_keys(arr: &[serde_json::Value]) -> Result<Vec<String>, UpdaterError> {
+    if arr.is_empty() {
+        return Err(UpdaterError::UnexpectedShape(
+            "endpoint returned an empty key list; refusing to clear the allowlist".to_string(),
+        ));
+    }
+    let mut keys = Vec::with_capacity(arr.len());
+    for (i, x) in arr.iter().enumerate() {
+        match x.as_str() {
+            Some(s) => keys.push(s.to_string()),
+            None => {
+                return Err(UpdaterError::UnexpectedShape(format!(
+                    "key list entry {i} is {x}, not a string; refusing to submit a partial list"
+                )))
+            }
+        }
+    }
+    Ok(keys)
+}
+
 async fn fetch_keys(url: &str, keys_field: Option<&str>) -> Result<Vec<String>, UpdaterError> {
     let client = reqwest::Client::builder().build()?;
     let res = client.get(url).send().await?.error_for_status()?;
     // Accept either a top-level array of strings, or an object with the configured field name
     let v: serde_json::Value = res.json().await?;
     if let Some(arr) = v.as_array() {
-        let keys: Vec<String> = arr
-            .iter()
-            .filter_map(|x| x.as_str().map(|s| s.to_string()))
-            .collect();
-        return Ok(keys);
+        return collect_keys(arr);
     }
     if let Some(obj) = v.as_object() {
         if let Some(name) = keys_field {
             if let Some(arr) = obj.get(name).and_then(|k| k.as_array()) {
-                let keys: Vec<String> = arr
-                    .iter()
-                    .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                    .collect();
-                return Ok(keys);
+                return collect_keys(arr);
             }
             return Err(UpdaterError::UnexpectedShape(format!(
                 "object did not contain configured KEYS_FIELD='{}' as an array; available fields = {:?}",
@@ -349,14 +372,12 @@ async fn run_once(cfg: &Config) -> Result<(), UpdaterError> {
                     set.len()
                 );
                 print_execute_msg(&set)?;
-                // Still write state so subsequent run only submits once when toggling off dry-run
-                save_state(
-                    &cfg.state_path,
-                    &State {
-                        keys: set.clone(),
-                        hash: new_hash,
-                    },
-                )?;
+                // Deliberately no save_state here. Persisting the new hash on a
+                // dry run means the next real run sees "no change" and returns
+                // before submitting, so the operator who previews an update and
+                // then enables submissions never sends it - the allowlist stays
+                // stale until the endpoint changes again or someone deletes the
+                // state file. A dry run reports; it does not advance state.
             } else {
                 // Submit update then persist
                 submit_update(cfg, set.iter().cloned().collect()).await?;
