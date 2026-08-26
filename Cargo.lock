@@ -307,14 +307,14 @@ checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 [[package]]
 name = "cosmos-sdk-proto"
 version = "0.23.0-pre"
-source = "git+https://github.com/burnt-labs/cosmos-rust?branch=feat%2Fxion-zk#1c8a6832143d515287db0bda225bd7d598c00b02"
+source = "git+https://github.com/burnt-labs/cosmos-rust?rev=c0fa9e3f6b99836228de38bb08358a1df0206343#c0fa9e3f6b99836228de38bb08358a1df0206343"
 dependencies = [
  "pbjson",
  "pbjson-types",
  "prost 0.13.5",
  "prost-types",
  "serde",
- "tendermint-proto",
+ "tendermint-proto 0.38.1",
 ]
 
 [[package]]
@@ -2182,6 +2182,22 @@ dependencies = [
 
 [[package]]
 name = "tendermint-proto"
+version = "0.38.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ed14abe3b0502a3afe21ca74ca5cdd6c7e8d326d982c26f98a394445eb31d6e"
+dependencies = [
+ "bytes",
+ "flex-error",
+ "prost 0.13.5",
+ "prost-types",
+ "serde",
+ "serde_bytes",
+ "subtle-encoding",
+ "time",
+]
+
+[[package]]
+name = "tendermint-proto"
 version = "0.40.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2c40e13d39ca19082d8a7ed22de7595979350319833698f8b1080f29620a094"
@@ -2414,7 +2430,7 @@ dependencies = [
  "informalsystems-pbjson",
  "prost 0.13.5",
  "serde",
- "tendermint-proto",
+ "tendermint-proto 0.40.4",
 ]
 
 [[package]]
