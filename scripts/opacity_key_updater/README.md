@@ -11,7 +11,8 @@ Features
 - Endpoint shape: accepts either a top-level JSON array of strings, or a JSON object with the array located at the configured field name (set via KEYS_FIELD).
 
 Build
-- Default (no on-chain submission code):
+- There is one build; cw-orch and the submit path are always compiled in.
+  Submission is gated at runtime by DRY_RUN, not at compile time:
   cargo build -p opacity_key_updater
 
 

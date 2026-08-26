@@ -46,10 +46,12 @@ pub fn verify_query(
 }
 
 pub fn verification_keys(store: &dyn Storage) -> StdResult<Vec<String>> {
-    Ok(VERIFICATION_KEY_ALLOW_LIST
+    // collect::<StdResult<_>>, not unwrap: a storage iteration error in a query
+    // handler should come back to the caller as an StdError, not abort the
+    // contract.
+    VERIFICATION_KEY_ALLOW_LIST
         .keys(store, None, None, Order::Ascending)
-        .map(|k| k.unwrap())
-        .collect())
+        .collect::<StdResult<Vec<String>>>()
 }
 
 pub fn admin(store: &dyn Storage) -> StdResult<Addr> {

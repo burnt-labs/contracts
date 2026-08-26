@@ -25,6 +25,10 @@ pub enum UpdaterError {
     MissingConfig(&'static str),
     #[error("failed to build chain daemon: {0}")]
     Daemon(String),
+    #[error("chain query failed: {0}")]
+    Query(String),
+    #[error("chain execute failed: {0}")]
+    Execute(String),
 }
 
 #[derive(Clone, Debug)]
@@ -290,9 +294,12 @@ async fn submit_update(cfg: &Config, keys: Vec<String>) -> Result<(), UpdaterErr
     let contract: OpacityVerifier<Daemon> = OpacityVerifier::new(&contract_addr, daemon);
 
     // Before submitting, pull current on-chain keys and compare
+    // Errors rather than panics: main's loop calls run_once, logs whatever comes
+    // back and polls again, so a node being briefly unreachable should cost one
+    // cycle - a panic here takes the whole updater down instead.
     let onchain_keys: Vec<String> = contract
         .query(&opacity_verifier::msg::QueryMsg::VerificationKeys {})
-        .expect("failed to query VerificationKeys");
+        .map_err(|e| UpdaterError::Query(e.to_string()))?;
 
     let mut onchain_set: BTreeSet<String> = BTreeSet::new();
     for k in onchain_keys {
@@ -318,7 +325,7 @@ async fn submit_update(cfg: &Config, keys: Vec<String>) -> Result<(), UpdaterErr
     // Execute update
     contract
         .execute(&ExecuteMsg::UpdateAllowList { keys }, &[])
-        .expect("failed to submit UpdateAllowList");
+        .map_err(|e| UpdaterError::Execute(e.to_string()))?;
 
     Ok(())
 }
