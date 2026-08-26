@@ -218,7 +218,7 @@ async fn submit_update(cfg: &Config, keys: Vec<String>) -> Result<(), UpdaterErr
     let gas_price = cfg
         .gas_price
         .clone()
-        .unwrap_or_else(|| format!("0.025{}", gas_denom));
+        .unwrap_or_else(|| format!("0.025{gas_denom}"));
 
     // Build chain info
     use cw_orch::daemon::{Daemon, DaemonBuilder};
