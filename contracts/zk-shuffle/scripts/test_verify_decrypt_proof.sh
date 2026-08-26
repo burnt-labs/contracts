@@ -51,6 +51,13 @@ if [ ! -f "$PROOF_FILE" ]; then
     exit 1
 fi
 
+# Query the current decrypt verification count from the contract.
+query_decrypt_verifications() {
+    xiond query wasm contract-state smart "$CONTRACT_ADDRESS" '{"verification_count": {}}' \
+        --node "$RPC_URL" \
+        --output json | jq -r '.data.decrypt_verifications'
+}
+
 echo "Loading proof data from $PROOF_FILE..."
 
 # Parse proof data from decrypt.json
@@ -109,38 +116,98 @@ echo "Execute Message:"
 echo "$EXECUTE_MSG" | jq '.'
 echo ""
 
+# Capture the verification count before submitting so we can confirm the
+# on-chain execute actually recorded a verification.
+echo "Querying decrypt verification count before submitting..."
+COUNT_BEFORE=$(query_decrypt_verifications)
+if ! [[ "$COUNT_BEFORE" =~ ^[0-9]+$ ]]; then
+    echo "✗ Failed to read decrypt_verifications before submitting (got: '$COUNT_BEFORE')"
+    exit 1
+fi
+echo "decrypt_verifications before: $COUNT_BEFORE"
+echo ""
+
 # Execute the transaction
 echo "Executing VerifyDecryptProof transaction..."
 echo "---"
 
-xiond tx wasm execute "$CONTRACT_ADDRESS" "$EXECUTE_MSG" \
+# Broadcast in sync mode and capture the txhash from the JSON output. Sync mode
+# only guarantees mempool acceptance, so we must poll for block inclusion below.
+TX_OUTPUT=$(xiond tx wasm execute "$CONTRACT_ADDRESS" "$EXECUTE_MSG" \
     --from "$FROM_ACCOUNT" \
     --gas-prices 0.025uxion \
     --gas auto \
     --gas-adjustment 1.3 \
     -y \
+    --broadcast-mode sync \
+    --output json \
     --node "$RPC_URL" \
-    --chain-id "$CHAIN_ID"
+    --chain-id "$CHAIN_ID")
 
-TX_RESULT=$?
-
+echo "$TX_OUTPUT" | jq '.'
 echo ""
 echo "---"
 
-if [ $TX_RESULT -eq 0 ]; then
-    echo "✓ VerifyDecryptProof transaction executed successfully!"
-    echo "Sleeping for 10 seconds before querying contract state"
-    sleep 10
-    # Query verification count
-    echo ""
-    echo "Querying verification count..."
-    QUERY_MSG='{"verification_count": {}}'
-
-    xiond query wasm contract-state smart "$CONTRACT_ADDRESS" "$QUERY_MSG" \
-        --node "$RPC_URL" \
-        --output json | jq '.'
-else
-    echo "✗ VerifyDecryptProof transaction failed"
-    echo "Please check the error messages above"
+# The sync broadcast response carries its own code; a non-zero code means the
+# transaction was rejected by CheckTx and never entered the mempool.
+BROADCAST_CODE=$(echo "$TX_OUTPUT" | jq -r '.code')
+if [ "$BROADCAST_CODE" != "0" ]; then
+    echo "✗ VerifyDecryptProof transaction was rejected during broadcast (code: $BROADCAST_CODE)"
+    echo "$TX_OUTPUT" | jq -r '.raw_log'
     exit 1
 fi
+
+TX_HASH=$(echo "$TX_OUTPUT" | jq -r '.txhash')
+if [ -z "$TX_HASH" ] || [ "$TX_HASH" == "null" ]; then
+    echo "✗ VerifyDecryptProof transaction did not return a txhash"
+    exit 1
+fi
+
+echo "Transaction broadcast, txhash: $TX_HASH"
+echo "Polling for block inclusion..."
+
+# Poll for the transaction to be committed in a block, then assert its
+# DeliverTx result code is 0 (success).
+TX_QUERY=""
+for _ in $(seq 1 30); do
+    if TX_QUERY=$(xiond query tx "$TX_HASH" --node "$RPC_URL" --output json 2>/dev/null); then
+        break
+    fi
+    TX_QUERY=""
+    sleep 2
+done
+
+if [ -z "$TX_QUERY" ]; then
+    echo "✗ Transaction $TX_HASH was not committed within the timeout"
+    exit 1
+fi
+
+TX_CODE=$(echo "$TX_QUERY" | jq -r '.code')
+if [ "$TX_CODE" != "0" ]; then
+    echo "✗ VerifyDecryptProof transaction failed on-chain (code: $TX_CODE)"
+    echo "$TX_QUERY" | jq -r '.raw_log'
+    exit 1
+fi
+
+echo "✓ VerifyDecryptProof transaction committed successfully!"
+echo ""
+
+# Confirm the verification was actually recorded by comparing the counter.
+echo "Querying decrypt verification count after commit..."
+COUNT_AFTER=$(query_decrypt_verifications)
+if ! [[ "$COUNT_AFTER" =~ ^[0-9]+$ ]]; then
+    echo "✗ Failed to read decrypt_verifications after commit (got: '$COUNT_AFTER')"
+    exit 1
+fi
+echo "decrypt_verifications after: $COUNT_AFTER"
+
+# Greater-than rather than exactly one more: this runs against a shared
+# testnet contract, so someone else's verification landing between the two
+# queries legitimately moves the counter further. What this is checking is
+# that our own tx was recorded, and any advance proves that.
+if [ "$COUNT_AFTER" -le "$COUNT_BEFORE" ]; then
+    echo "✗ decrypt_verifications did not advance (before: $COUNT_BEFORE, after: $COUNT_AFTER)"
+    exit 1
+fi
+
+echo "✓ decrypt_verifications advanced from $COUNT_BEFORE to $COUNT_AFTER"

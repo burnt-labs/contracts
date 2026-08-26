@@ -46,7 +46,7 @@ schemars = "0.8.10"
 serde = { version = "1.0.203", default-features = false, features = ["derive"] }
 serde_json = "1.0.87"
 thiserror = "1.0.50"
-cosmos-sdk-proto = { package = "cosmos-sdk-proto", git = "https://github.com/burnt-labs/cosmos-rust", branch = "feat/xion-zk", default-features = false, features = [
+cosmos-sdk-proto = { package = "cosmos-sdk-proto", git = "https://github.com/burnt-labs/cosmos-rust", rev = "c0fa9e3f6b99836228de38bb08358a1df0206343", default-features = false, features = [
   "cosmwasm",
   "xion",
 ] }
