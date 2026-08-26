@@ -26,10 +26,10 @@ mod tests {
         let header = r#"{"alg":"ES256","typ":"JWT"}"#;
         let header_b64 = URL_SAFE_NO_PAD.encode(header.as_bytes());
         let payload_b64 = URL_SAFE_NO_PAD.encode(payload_json.as_bytes());
-        let signing_input = format!("{}.{}", header_b64, payload_b64);
+        let signing_input = format!("{header_b64}.{payload_b64}");
         let signature: p256::ecdsa::Signature = signing_key.sign(signing_input.as_bytes());
         let sig_b64 = URL_SAFE_NO_PAD.encode(signature.to_bytes());
-        format!("{}.{}.{}", header_b64, payload_b64, sig_b64)
+        format!("{header_b64}.{payload_b64}.{sig_b64}")
     }
 
     /// Verify a compact JWS and return the payload bytes.
@@ -236,7 +236,7 @@ mod tests {
 
             // ── 3. Encrypt the JWS into a JWE (A256KW + A256GCM) ──
             let aes_key = [0x42u8; 32]; // test AES-256 key-encryption-key
-            let encrypter = A256KW.encrypter_from_bytes(&aes_key).unwrap();
+            let encrypter = A256KW.encrypter_from_bytes(aes_key).unwrap();
             let mut jwe_header = JweHeader::new();
             jwe_header.set_content_encryption("A256GCM");
             let jwe_token =
@@ -246,7 +246,7 @@ mod tests {
             assert_eq!(jwe_token.split('.').count(), 5);
 
             // ── 4. Decrypt the JWE (relayer's off-chain work) ──
-            let decrypter = A256KW.decrypter_from_bytes(&aes_key).unwrap();
+            let decrypter = A256KW.decrypter_from_bytes(aes_key).unwrap();
             let (plaintext, _header) = jwe::deserialize_compact(&jwe_token, &decrypter).unwrap();
             let decrypted_jws = String::from_utf8(plaintext).unwrap();
             assert_eq!(decrypted_jws, compact_jws);

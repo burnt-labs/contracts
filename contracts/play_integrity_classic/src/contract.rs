@@ -81,8 +81,7 @@ fn query_verify(deps: Deps, compact_jws: String) -> ContractResult<Binary> {
     let resp: proto::QueryVerifyJwsResponse =
         prost::Message::decode(resp_bz.as_slice()).map_err(|e| {
             ContractError::Std(cosmwasm_std::StdError::generic_err(format!(
-                "failed to decode VerifyJWS response: {}",
-                e
+                "failed to decode VerifyJWS response: {e}"
             )))
         })?;
 
