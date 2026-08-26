@@ -81,8 +81,7 @@ fn verify_groth16_proof(
     let verify_request = QueryVerifyRequest {
         proof: serde_json::to_vec(&snarkjs_proof).map_err(|e| {
             ContractError::Std(cosmwasm_std::StdError::generic_err(format!(
-                "Failed to serialize proof: {}",
-                e
+                "Failed to serialize proof: {e}"
             )))
         })?,
         public_inputs: public_inputs_str,
@@ -92,8 +91,7 @@ fn verify_groth16_proof(
 
     let request_bytes = verify_request.to_bytes().map_err(|e| {
         ContractError::Std(cosmwasm_std::StdError::generic_err(format!(
-            "Failed to encode verify request: {}",
-            e
+            "Failed to encode verify request: {e}"
         )))
     })?;
 
@@ -105,16 +103,14 @@ fn verify_groth16_proof(
         )
         .map_err(|e| {
             ContractError::Std(cosmwasm_std::StdError::generic_err(format!(
-                "Failed to query zk module: {}",
-                e
+                "Failed to query zk module: {e}"
             )))
         })?;
 
     let verify_response: ProofVerifyResponse = ProofVerifyResponse::decode(response.as_slice())
         .map_err(|e| {
             ContractError::Std(cosmwasm_std::StdError::generic_err(format!(
-                "Failed to decode verify response: {}",
-                e
+                "Failed to decode verify response: {e}"
             )))
         })?;
 

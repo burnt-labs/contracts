@@ -67,8 +67,7 @@ pub fn min_price_plugin(ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>) -> 
             }
             if ask_price.amount.u128() < min_price.amount.u128() {
                 return Err(cosmwasm_std::StdError::generic_err(format!(
-                    "Minimum price not met: {} required, {} provided",
-                    min_price, ask_price
+                    "Minimum price not met: {min_price} required, {ask_price} provided"
                 )));
             }
         } else {
