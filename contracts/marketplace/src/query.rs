@@ -28,6 +28,16 @@ pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             limit,
         )?),
+        QueryMsg::ListingsByCollection {
+            collection,
+            start_after,
+            limit,
+        } => to_json_binary(&query_listings_by_collection(
+            _deps,
+            collection,
+            start_after,
+            limit,
+        )?),
         QueryMsg::Offer { offer_id } => to_json_binary(&query_offer(_deps, offer_id)?),
         QueryMsg::CollectionOffer {
             collection_offer_id,
@@ -115,6 +125,26 @@ pub fn query_listings_by_seller(
         .idx
         .by_seller
         .prefix(seller)
+        .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .map(|item| item.map(|(_, listing)| listing))
+        .collect()
+}
+
+pub fn query_listings_by_collection(
+    deps: Deps,
+    collection: String,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<Vec<Listing>> {
+    let collection = deps.api.addr_validate(&collection)?;
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = start_after.map(Bound::exclusive);
+
+    listings()
+        .idx
+        .by_collection
+        .prefix(collection)
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| item.map(|(_, listing)| listing))

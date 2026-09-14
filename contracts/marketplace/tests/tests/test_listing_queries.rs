@@ -3,7 +3,7 @@ use cw_multi_test::{App, Executor};
 
 use xion_nft_marketplace::{
     msg::{ExecuteMsg, QueryMsg},
-    query::{query_listings, query_listings_by_seller},
+    query::{query_listings, query_listings_by_collection, query_listings_by_seller},
     state::{listings, Listing, ListingStatus},
 };
 
@@ -17,8 +17,11 @@ struct ListingFixture {
     marketplace: Addr,
     seller: Addr,
     other_seller: Addr,
+    collection: Addr,
+    other_collection: Addr,
     listing_ids: Vec<String>,
     seller_listing_ids: Vec<String>,
+    collection_listing_ids: Vec<String>,
 }
 
 fn setup_listings() -> ListingFixture {
@@ -27,21 +30,28 @@ fn setup_listings() -> ListingFixture {
     let minter = app.api().addr_make("minter");
     let seller = app.api().addr_make("seller");
     let other_seller = app.api().addr_make("other-seller");
-    let asset = setup_asset_contract(&mut app, &minter);
+    let collection = setup_asset_contract(&mut app, &minter);
+    let other_collection = setup_asset_contract(&mut app, &minter);
     let marketplace = setup_marketplace_contract(&mut app, &manager);
 
     let mut listing_ids = Vec::new();
     let mut seller_listing_ids = Vec::new();
-    for (token_id, owner, amount) in [
-        ("token-1", seller.clone(), 100),
-        ("token-2", seller.clone(), 200),
-        ("token-3", other_seller.clone(), 300),
+    let mut collection_listing_ids = Vec::new();
+    for (token_id, owner, listing_collection, amount) in [
+        ("token-1", seller.clone(), collection.clone(), 100),
+        ("token-2", seller.clone(), collection.clone(), 200),
+        (
+            "token-3",
+            other_seller.clone(),
+            other_collection.clone(),
+            300,
+        ),
     ] {
-        mint_nft(&mut app, &asset, &minter, &owner, token_id);
+        mint_nft(&mut app, &listing_collection, &minter, &owner, token_id);
         let listing_id = create_listing(
             &mut app,
             &marketplace,
-            &asset,
+            &listing_collection,
             &owner,
             token_id,
             coin(amount, "uxion"),
@@ -49,18 +59,25 @@ fn setup_listings() -> ListingFixture {
         if owner == seller {
             seller_listing_ids.push(listing_id.clone());
         }
+        if listing_collection == collection {
+            collection_listing_ids.push(listing_id.clone());
+        }
         listing_ids.push(listing_id);
     }
     listing_ids.sort();
     seller_listing_ids.sort();
+    collection_listing_ids.sort();
 
     ListingFixture {
         app,
         marketplace,
         seller,
         other_seller,
+        collection,
+        other_collection,
         listing_ids,
         seller_listing_ids,
+        collection_listing_ids,
     }
 }
 
@@ -175,6 +192,61 @@ fn listings_by_seller_filters_and_paginates() {
 }
 
 #[test]
+fn listings_by_collection_filters_and_paginates() {
+    let fixture = setup_listings();
+
+    let first_page: Vec<Listing> = fixture
+        .app
+        .wrap()
+        .query_wasm_smart(
+            &fixture.marketplace,
+            &QueryMsg::ListingsByCollection {
+                collection: fixture.collection.to_string(),
+                start_after: None,
+                limit: Some(1),
+            },
+        )
+        .unwrap();
+    assert_eq!(first_page.len(), 1);
+    assert_eq!(first_page[0].collection, fixture.collection);
+    assert_eq!(first_page[0].id, fixture.collection_listing_ids[0]);
+
+    let second_page: Vec<Listing> = fixture
+        .app
+        .wrap()
+        .query_wasm_smart(
+            &fixture.marketplace,
+            &QueryMsg::ListingsByCollection {
+                collection: fixture.collection.to_string(),
+                start_after: Some(first_page[0].id.clone()),
+                limit: None,
+            },
+        )
+        .unwrap();
+    assert_eq!(second_page.len(), 1);
+    assert_eq!(second_page[0].collection, fixture.collection);
+    assert_eq!(second_page[0].id, fixture.collection_listing_ids[1]);
+
+    let other_collection_listings: Vec<Listing> = fixture
+        .app
+        .wrap()
+        .query_wasm_smart(
+            &fixture.marketplace,
+            &QueryMsg::ListingsByCollection {
+                collection: fixture.other_collection.to_string(),
+                start_after: None,
+                limit: None,
+            },
+        )
+        .unwrap();
+    assert_eq!(other_collection_listings.len(), 1);
+    assert_eq!(
+        other_collection_listings[0].collection,
+        fixture.other_collection
+    );
+}
+
+#[test]
 fn listing_queries_apply_default_and_max_limits() {
     let mut deps = mock_dependencies();
     let seller = deps.api.addr_make("seller");
@@ -209,6 +281,11 @@ fn listing_queries_apply_default_and_max_limits() {
     let capped_seller_page =
         query_listings_by_seller(deps.as_ref(), seller.to_string(), None, Some(101)).unwrap();
     assert_eq!(capped_seller_page.len(), 100);
+
+    let capped_collection_page =
+        query_listings_by_collection(deps.as_ref(), collection.to_string(), None, Some(101))
+            .unwrap();
+    assert_eq!(capped_collection_page.len(), 100);
 }
 
 #[test]
@@ -221,6 +298,24 @@ fn listings_by_seller_rejects_invalid_address() {
         &marketplace,
         &QueryMsg::ListingsBySeller {
             seller: "not a valid address".to_string(),
+            start_after: None,
+            limit: None,
+        },
+    );
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn listings_by_collection_rejects_invalid_address() {
+    let mut app = setup_app();
+    let manager = app.api().addr_make("manager");
+    let marketplace = setup_marketplace_contract(&mut app, &manager);
+
+    let result = app.wrap().query_wasm_smart::<Vec<Listing>>(
+        &marketplace,
+        &QueryMsg::ListingsByCollection {
+            collection: "not a valid address".to_string(),
             start_after: None,
             limit: None,
         },
@@ -286,6 +381,19 @@ fn listing_queries_include_reserved_listings() {
         )
         .unwrap();
     assert_eq!(seller_listings, listings);
+
+    let collection_listings: Vec<Listing> = app
+        .wrap()
+        .query_wasm_smart(
+            &marketplace,
+            &QueryMsg::ListingsByCollection {
+                collection: asset.to_string(),
+                start_after: None,
+                limit: None,
+            },
+        )
+        .unwrap();
+    assert_eq!(collection_listings, listings);
 }
 
 #[test]
@@ -294,6 +402,7 @@ fn listing_queries_return_empty_results() {
     let manager = app.api().addr_make("manager");
     let seller = app.api().addr_make("seller");
     let marketplace = setup_marketplace_contract(&mut app, &manager);
+    let collection = app.api().addr_make("collection");
 
     let listings: Vec<Listing> = app
         .wrap()
@@ -319,4 +428,17 @@ fn listing_queries_return_empty_results() {
         )
         .unwrap();
     assert!(seller_listings.is_empty());
+
+    let collection_listings: Vec<Listing> = app
+        .wrap()
+        .query_wasm_smart(
+            &marketplace,
+            &QueryMsg::ListingsByCollection {
+                collection: collection.to_string(),
+                start_after: None,
+                limit: None,
+            },
+        )
+        .unwrap();
+    assert!(collection_listings.is_empty());
 }
