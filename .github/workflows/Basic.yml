@@ -73,4 +73,9 @@ jobs:
           target: wasm32-unknown-unknown
           override: true
       - name: Build development contracts
-        run: cargo build --workspace --release --locked --target wasm32-unknown-unknown
+        # opacity_key_updater is a native operator CLI, not a contract: it pulls
+        # cw-orch and therefore tokio with net/process features, which refuse to
+        # compile for wasm32 ("Only features sync,macros,io-util,rt,time are
+        # supported on wasm"). It stays a workspace member so the Lints job still
+        # covers it on the host target; only this wasm build skips it.
+        run: cargo build --workspace --exclude opacity_key_updater --release --locked --target wasm32-unknown-unknown

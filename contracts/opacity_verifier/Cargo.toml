@@ -1,0 +1,25 @@
+[package]
+name = "opacity_verifier"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# enable feature if you want to disable entry points
+library = []
+
+[dependencies]
+hex                = { workspace = true }
+cosmwasm-std       = { workspace = true }
+cosmwasm-schema    = { workspace = true }
+cw-storage-plus    = { workspace = true }
+thiserror          = { workspace = true }
+cw2                = { workspace = true }
+getrandom          = { workspace = true }
+tiny-keccak        = { workspace = true }
+
+[dev-dependencies]
+cw-orch = "0.28.0"
