@@ -1,0 +1,25 @@
+[package]
+name = "ios-app-attest"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# enable feature if you want to disable entry points
+library = []
+
+[dependencies]
+cosmwasm-schema    = "3.0.4"
+cosmwasm-std       = { version = "3.0.4", features = ["stargate", "cosmwasm_2_1"] }
+thiserror          = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+appattest-rs = {git = "https://github.com/mvid/appattest-rs.git", rev = "3bbcd1c959d7f6eeb5c1ffa15fae32d6612b250f"}
+ciborium = "0.2.2"
+getrandom          = { workspace = true }
+
+[dev-dependencies]
+cw-orch = "0.28.0"
+base64 = "0.22.1"

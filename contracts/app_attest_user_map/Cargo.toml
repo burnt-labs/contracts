@@ -1,0 +1,25 @@
+[package]
+name = "app_attest_user_map"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# enable feature if you want to disable entry points
+library = []
+
+[dependencies]
+cosmwasm-schema    = "3.0.4"
+cosmwasm-std       = { version = "3.0.4", features = ["stargate", "cosmwasm_2_1"] }
+cw-storage-plus    = "3.0.1"
+thiserror          = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+ios-app-attest = {path = "../../libraries/ios-app-attest", features = ["library"]}
+getrandom          = { workspace = true }
+
+[dev-dependencies]
+cw-orch = "0.28.0"
+base64 = "0.22.1"
