@@ -935,6 +935,7 @@ fn test_accept_offer_disabled_with_approvals() {
             sale_approvals: true, // Enable approvals
             fee_bps: 250,
             listing_denom: "uxion".to_string(),
+            min_listing_price: None,
         },
     };
 
@@ -1074,6 +1075,7 @@ fn test_accept_collection_offer_disabled_with_approvals() {
             sale_approvals: true, // Enable approvals
             fee_bps: 250,
             listing_denom: "uxion".to_string(),
+            min_listing_price: None,
         },
     };
 

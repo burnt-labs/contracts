@@ -12,6 +12,10 @@ pub struct Config<T: AddressLike> {
     pub sale_approvals: bool,
     pub fee_bps: u64,
     pub listing_denom: String,
+    /// Floor for every sale path (listing, offer and collection-offer acceptance).
+    /// Denominated in `listing_denom`. `None` means no floor.
+    #[serde(default)]
+    pub min_listing_price: Option<Coin>,
 }
 
 // Maximum fee bps allowed.
@@ -46,6 +50,15 @@ impl Config<String> {
             !self.fee_recipient.is_empty(),
             ContractError::InvalidFeeRecipient {}
         );
+        if let Some(min) = &self.min_listing_price {
+            ensure!(
+                min.denom == self.listing_denom,
+                ContractError::InvalidListingDenom {
+                    expected: self.listing_denom.clone(),
+                    actual: min.denom.clone(),
+                }
+            );
+        }
         Ok(())
     }
     pub fn to_addr(&self, api: &dyn Api) -> Result<Config<Addr>, ContractError> {
@@ -55,6 +68,7 @@ impl Config<String> {
             fee_bps: self.fee_bps,
             sale_approvals: self.sale_approvals,
             listing_denom: self.listing_denom.clone(),
+            min_listing_price: self.min_listing_price.clone(),
         })
     }
 }
@@ -66,7 +80,21 @@ impl Config<Addr> {
             fee_bps: config.fee_bps,
             sale_approvals: config.sale_approvals,
             listing_denom: config.listing_denom,
+            min_listing_price: config.min_listing_price,
         })
+    }
+
+    /// Reject a sale price below the configured floor.
+    pub fn check_min_price(&self, price: &Coin) -> Result<(), ContractError> {
+        if let Some(min) = &self.min_listing_price {
+            if price.denom != min.denom || price.amount < min.amount {
+                return Err(ContractError::BelowMinimumPrice {
+                    minimum: min.clone(),
+                    actual: price.clone(),
+                });
+            }
+        }
+        Ok(())
     }
 }
 impl From<Config<Addr>> for Config<String> {
@@ -77,6 +105,7 @@ impl From<Config<Addr>> for Config<String> {
             fee_recipient: config.fee_recipient.to_string(),
             sale_approvals: config.sale_approvals,
             listing_denom: config.listing_denom,
+            min_listing_price: config.min_listing_price,
         }
     }
 }
