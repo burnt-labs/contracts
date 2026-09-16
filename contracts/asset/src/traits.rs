@@ -431,6 +431,9 @@ pub trait PluggableAsset<
                 Cw721ExecuteMsg::UpdateExtension { msg } => {
                     self.on_update_extension_plugin(msg, &mut plugin_ctx)?
                 }
+                Cw721ExecuteMsg::Burn { token_id } => {
+                    self.on_burn_plugin(token_id, &mut plugin_ctx)?
+                }
                 _ => true,
             };
             plugin_response = plugin_ctx.response;
@@ -487,6 +490,25 @@ pub trait PluggableAsset<
         _msg: &TExtensionMsg,
         _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
+        Ok(true)
+    }
+
+    /// Burning is rejected while the token is listed, same rule as transfers: a listed
+    /// token cannot leave until it is delisted.
+    fn on_burn_plugin(
+        &self,
+        token_id: &str,
+        ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
+    ) -> StdResult<bool> {
+        if AssetConfig::<TNftExtension>::default()
+            .listings
+            .may_load(ctx.deps.storage, token_id)?
+            .is_some()
+        {
+            return Err(StdError::generic_err(
+                "cannot burn a token while it is listed",
+            ));
+        }
         Ok(true)
     }
 

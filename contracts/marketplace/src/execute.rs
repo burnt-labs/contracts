@@ -18,10 +18,27 @@ use crate::state::{listings, pending_sales, Listing, ListingStatus, PendingSale,
 use crate::state::{Config, CONFIG};
 use asset::msg::ReserveMsg;
 use cosmwasm_std::{
-    ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, Timestamp,
-    WasmMsg,
+    ensure_eq, to_json_binary, Addr, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, SubMsg,
+    Timestamp, WasmMsg,
 };
-use cw_utils::maybe_addr;
+use cw_utils::{maybe_addr, nonpayable};
+
+/// Reply id for best-effort asset `Delist` cleanup. A failure here must never block a
+/// refund or a cancellation, so the reply handler swallows it.
+pub const DELIST_CLEANUP_REPLY_ID: u64 = 1;
+
+/// Best-effort asset delist: executed as a submessage whose failure is ignored.
+fn delist_cleanup_msg(collection: &Addr, token_id: String) -> Result<SubMsg, ContractError> {
+    Ok(SubMsg::reply_on_error(
+        WasmMsg::Execute {
+            contract_addr: collection.to_string(),
+            msg: to_json_binary(&asset_delist_msg(token_id))?,
+            funds: vec![],
+        },
+        DELIST_CLEANUP_REPLY_ID,
+    ))
+}
+
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn execute(
     deps: DepsMut,
@@ -30,6 +47,14 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     let api = deps.api;
+    // Every message is non-payable unless it escrows funds on purpose.
+    match &msg {
+        ExecuteMsg::BuyItem { .. }
+        | ExecuteMsg::FinalizeFor { .. }
+        | ExecuteMsg::CreateOffer { .. }
+        | ExecuteMsg::CreateCollectionOffer { .. } => {}
+        _ => nonpayable(&info)?,
+    }
     match msg {
         ExecuteMsg::ListItem {
             collection,
@@ -142,6 +167,7 @@ pub fn execute_create_listing(
             actual: price,
         });
     }
+    config.check_min_price(&price)?;
 
     ensure_eq!(
         price.denom,
@@ -226,12 +252,12 @@ pub fn execute_cancel_listing(
     let mut sub_msgs = vec![];
 
     if asset_listing.is_ok() {
-        let cancel_listing = asset_delist_msg(listing.token_id.clone());
-        sub_msgs.push(WasmMsg::Execute {
-            contract_addr: listing.collection.to_string(),
-            msg: to_json_binary(&cancel_listing)?,
-            funds: vec![],
-        });
+        // best effort: the seller may have revoked our approval, which must not block
+        // the cancellation of the marketplace listing
+        sub_msgs.push(delist_cleanup_msg(
+            &listing.collection,
+            listing.token_id.clone(),
+        )?);
     }
     Ok(Response::new()
         .add_event(cancel_listing_event(
@@ -240,7 +266,7 @@ pub fn execute_cancel_listing(
             listing.seller,
             listing.token_id,
         ))
-        .add_messages(sub_msgs))
+        .add_submessages(sub_msgs))
 }
 
 pub fn execute_buy_item(
@@ -528,14 +554,13 @@ fn remove_pending_sale(
 
     let mut sub_msgs = vec![];
 
-    // delist from asset contract only if it has a listing
+    // delist from asset contract only if it has a listing. Best effort: the token may have
+    // been burned or our approval revoked, and that must never block the buyer's refund.
     if asset_listing.is_ok() {
-        let delist_msg = asset_delist_msg(pending_sale.token_id.clone());
-        sub_msgs.push(WasmMsg::Execute {
-            contract_addr: pending_sale.collection.to_string(),
-            msg: to_json_binary(&delist_msg)?,
-            funds: vec![],
-        });
+        sub_msgs.push(delist_cleanup_msg(
+            &pending_sale.collection,
+            pending_sale.token_id.clone(),
+        )?);
     }
 
     // refund buyer
@@ -558,7 +583,7 @@ fn remove_pending_sale(
             reason,
         ))
         .add_message(refund_msg)
-        .add_messages(sub_msgs))
+        .add_submessages(sub_msgs))
 }
 
 pub fn execute_reject_sale(

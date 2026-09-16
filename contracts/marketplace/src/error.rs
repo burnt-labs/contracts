@@ -69,4 +69,10 @@ pub enum ContractError {
 
     #[error("Pending sale not yet expired: {id}")]
     PendingSaleNotExpired { id: String },
+
+    #[error("Price below minimum: minimum {minimum}, got {actual}")]
+    BelowMinimumPrice { minimum: Coin, actual: Coin },
+
+    #[error("Unknown reply id: {id}")]
+    UnknownReplyId { id: u64 },
 }
