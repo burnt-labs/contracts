@@ -326,3 +326,65 @@ fn buy_flow() {
         );
     }
 }
+
+#[test]
+fn buy_refunds_overpayment_before_paying_the_net_listing_price() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let seller = deps.api.addr_make("seller");
+    let buyer = deps.api.addr_make("buyer");
+    let price = coin(100_u128, "uxion");
+
+    expect_ok(AssetConfig::<Empty>::default().cw721_config.nft_info.save(
+        deps.as_mut().storage,
+        "token-overpaid",
+        &NftInfo {
+            owner: seller.clone(),
+            approvals: vec![],
+            token_uri: None,
+            extension: Empty {},
+        },
+    ));
+    expect_ok(AssetConfig::<Empty>::default().listings.save(
+        deps.as_mut().storage,
+        "token-overpaid",
+        &ListingInfo {
+            id: "token-overpaid".to_string(),
+            seller: seller.clone(),
+            price,
+            reserved: None,
+        },
+    ));
+
+    let response = expect_ok(buy::<Empty, Empty>(
+        deps.as_mut(),
+        &env,
+        &message_info(&buyer, &[coin(120_u128, "uxion")]),
+        "token-overpaid".to_string(),
+        None,
+        vec![(
+            "artist".to_string(),
+            coin(10_u128, "uxion"),
+            "royalty".to_string(),
+        )],
+    ));
+
+    let messages: Vec<_> = response
+        .messages
+        .into_iter()
+        .map(|message| message.msg)
+        .collect();
+    assert_eq!(
+        messages,
+        vec![
+            CosmosMsg::Bank(BankMsg::Send {
+                to_address: buyer.to_string(),
+                amount: coins(20_u128, "uxion"),
+            }),
+            CosmosMsg::Bank(BankMsg::Send {
+                to_address: seller.to_string(),
+                amount: coins(90_u128, "uxion"),
+            }),
+        ]
+    );
+}
