@@ -1,0 +1,29 @@
+[package]
+description = "Asset contract variant that accepts typed, sender-forwarded actions from trusted proxy contracts"
+edition     = "2024"
+license     = "Apache-2.0"
+name        = "asset-proxyable"
+version     = "0.1.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# enable feature if you want to disable entry points
+library = []
+
+[dependencies]
+asset           = { path = "../asset", features = ["library", "asset_base"] }
+cosmwasm-schema = { workspace = true }
+cosmwasm-std    = { workspace = true }
+cw-storage-plus = { workspace = true }
+cw-utils        = { workspace = true }
+cw2             = { workspace = true }
+cw721           = { workspace = true }
+schemars        = { workspace = true }
+serde           = { workspace = true }
+thiserror       = { workspace = true }
+
+[dev-dependencies]
+cw-multi-test = { version = "2", features = ["staking", "stargate", "cosmwasm_2_2"] }
+serde_json    = { workspace = true }

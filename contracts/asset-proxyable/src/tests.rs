@@ -1,0 +1,853 @@
+use cosmwasm_std::{
+    Addr, Coin, DepsMut, OwnedDeps, Response, coin, from_json,
+    testing::{MockApi, MockQuerier, MockStorage, message_info, mock_dependencies, mock_env},
+};
+use cw721::{
+    Action, Expiration,
+    msg::{Cw721MigrateMsg, OperatorResponse, OwnerOfResponse},
+};
+use schemars::schema::{RootSchema, Schema, SchemaObject};
+
+use crate::{
+    CONTRACT_NAME, CONTRACT_VERSION,
+    contract::{execute, instantiate, migrate, query},
+    error::ContractError,
+    msg::{
+        BaseExecuteMsg, BaseQueryMsg, InstantiateMsg, ProxyAction, ProxyMsg, ProxyQueryMsg,
+        ProxyableExecuteMsg, ProxyableQueryMsg,
+    },
+    state::TRUSTED_PROXIES,
+};
+
+type Deps = OwnedDeps<MockStorage, MockApi, MockQuerier>;
+
+struct Actors {
+    creator: Addr,
+    minter: Addr,
+    alice: Addr,
+    bob: Addr,
+    proxy: Addr,
+    marketplace: Addr,
+}
+
+fn setup() -> (Deps, Actors) {
+    let mut deps = mock_dependencies();
+    let a = Actors {
+        creator: deps.api.addr_make("creator"),
+        minter: deps.api.addr_make("minter"),
+        alice: deps.api.addr_make("alice"),
+        bob: deps.api.addr_make("bob"),
+        proxy: deps.api.addr_make("proxy"),
+        marketplace: deps.api.addr_make("marketplace"),
+    };
+    let msg = InstantiateMsg {
+        name: "Variant".to_string(),
+        symbol: "VAR".to_string(),
+        collection_info_extension: None,
+        minter: Some(a.minter.to_string()),
+        creator: Some(a.creator.to_string()),
+        withdraw_address: None,
+    };
+    instantiate(
+        deps.as_mut(),
+        mock_env(),
+        message_info(&a.creator, &[]),
+        msg,
+    )
+    .unwrap();
+    (deps, a)
+}
+
+fn exec(
+    deps: DepsMut,
+    sender: &Addr,
+    funds: &[Coin],
+    msg: ProxyableExecuteMsg,
+) -> Result<Response, ContractError> {
+    execute(deps, mock_env(), message_info(sender, funds), msg)
+}
+
+fn base(msg: BaseExecuteMsg) -> ProxyableExecuteMsg {
+    ProxyableExecuteMsg::Base(msg)
+}
+
+fn proxied(sender: &Addr, action: ProxyAction) -> ProxyableExecuteMsg {
+    ProxyableExecuteMsg::Proxy(ProxyMsg::ProxyExecute {
+        sender: sender.to_string(),
+        action,
+    })
+}
+
+fn mint(deps: DepsMut, minter: &Addr, owner: &Addr, token_id: &str) {
+    exec(
+        deps,
+        minter,
+        &[],
+        base(BaseExecuteMsg::Mint {
+            token_id: token_id.to_string(),
+            owner: owner.to_string(),
+            token_uri: None,
+            extension: None,
+        }),
+    )
+    .unwrap();
+}
+
+fn add_proxy(deps: DepsMut, creator: &Addr, proxy: &Addr) {
+    exec(
+        deps,
+        creator,
+        &[],
+        ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+            proxy: proxy.to_string(),
+        }),
+    )
+    .unwrap();
+}
+
+fn owner_of(deps: &Deps, token_id: &str) -> Option<String> {
+    let q = ProxyableQueryMsg::Base(BaseQueryMsg::OwnerOf {
+        token_id: token_id.to_string(),
+        include_expired: None,
+    });
+    query(deps.as_ref(), mock_env(), q)
+        .ok()
+        .map(|b| from_json::<OwnerOfResponse>(&b).unwrap().owner)
+}
+
+fn is_operator(deps: &Deps, owner: &Addr, operator: &Addr) -> bool {
+    let q = ProxyableQueryMsg::Base(BaseQueryMsg::Operator {
+        owner: owner.to_string(),
+        operator: operator.to_string(),
+        include_expired: None,
+    });
+    query(deps.as_ref(), mock_env(), q)
+        .map(|b| from_json::<OperatorResponse>(&b).is_ok())
+        .unwrap_or(false)
+}
+
+fn trusted_proxies(deps: &Deps) -> Vec<Addr> {
+    let b = query(
+        deps.as_ref(),
+        mock_env(),
+        ProxyableQueryMsg::Proxy(ProxyQueryMsg::GetTrustedProxies {}),
+    )
+    .unwrap();
+    from_json(&b).unwrap()
+}
+
+fn attr<'a>(r: &'a Response, key: &str) -> Option<&'a str> {
+    r.attributes
+        .iter()
+        .find(|a| a.key == key)
+        .map(|a| a.value.as_str())
+}
+
+// ---------------------------------------------------------------------------------------
+// identity
+// ---------------------------------------------------------------------------------------
+
+#[test]
+fn instantiate_records_variant_cw2_identity() {
+    let (deps, _) = setup();
+    let v = cw2::get_contract_version(deps.as_ref().storage).unwrap();
+    assert_eq!(v.contract, CONTRACT_NAME);
+    assert_eq!(v.version, CONTRACT_VERSION);
+    assert_ne!(v.contract, asset::CONTRACT_NAME);
+    assert!(trusted_proxies(&deps).is_empty());
+}
+
+// ---------------------------------------------------------------------------------------
+// proxied actions
+// ---------------------------------------------------------------------------------------
+
+#[test]
+fn proxied_actions_apply_to_the_effective_sender() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+
+    // approve_all as alice
+    let r = exec(
+        deps.as_mut(),
+        &a.proxy,
+        &[],
+        proxied(
+            &a.alice,
+            ProxyAction::ApproveAll {
+                operator: a.marketplace.to_string(),
+                expires: Some(Expiration::AtHeight(mock_env().block.height + 100)),
+            },
+        ),
+    )
+    .unwrap();
+    assert!(is_operator(&deps, &a.alice, &a.marketplace));
+    assert!(
+        !is_operator(&deps, &a.proxy, &a.marketplace),
+        "operator must not be keyed on the proxy"
+    );
+    assert_eq!(attr(&r, "proxied_by"), Some(a.proxy.as_str()));
+    assert_eq!(attr(&r, "effective_sender"), Some(a.alice.as_str()));
+    assert_eq!(attr(&r, "proxy_action"), Some("approve_all"));
+
+    // revoke_all as alice
+    exec(
+        deps.as_mut(),
+        &a.proxy,
+        &[],
+        proxied(
+            &a.alice,
+            ProxyAction::RevokeAll {
+                operator: a.marketplace.to_string(),
+            },
+        ),
+    )
+    .unwrap();
+    assert!(!is_operator(&deps, &a.alice, &a.marketplace));
+
+    // burn as alice
+    exec(
+        deps.as_mut(),
+        &a.proxy,
+        &[],
+        proxied(
+            &a.alice,
+            ProxyAction::Burn {
+                token_id: "t1".to_string(),
+            },
+        ),
+    )
+    .unwrap();
+    assert_eq!(owner_of(&deps, "t1"), None);
+}
+
+#[test]
+fn untrusted_sender_cannot_use_the_envelope() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    // bob is not registered, even though alice is the real owner
+    let err = exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        proxied(
+            &a.alice,
+            ProxyAction::Burn {
+                token_id: "t1".to_string(),
+            },
+        ),
+    )
+    .unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
+    assert_eq!(owner_of(&deps, "t1"), Some(a.alice.to_string()));
+}
+
+#[test]
+fn trusted_proxy_sending_a_plain_message_acts_as_itself() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    // a plain Burn from the proxy is just a burn by a non-owner: rejected by the base
+    let err = exec(
+        deps.as_mut(),
+        &a.proxy,
+        &[],
+        base(BaseExecuteMsg::Burn {
+            token_id: "t1".to_string(),
+        }),
+    )
+    .unwrap_err();
+    assert!(matches!(err, ContractError::Asset(_)), "{err:?}");
+    assert_eq!(owner_of(&deps, "t1"), Some(a.alice.to_string()));
+}
+
+#[test]
+fn envelope_never_accepts_funds() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    let err = exec(
+        deps.as_mut(),
+        &a.proxy,
+        &[coin(1, "uxion")],
+        proxied(
+            &a.alice,
+            ProxyAction::RevokeAll {
+                operator: a.marketplace.to_string(),
+            },
+        ),
+    )
+    .unwrap_err();
+    assert!(matches!(err, ContractError::Payment(_)), "{err:?}");
+}
+
+#[test]
+fn proxied_burn_is_owner_only_while_direct_burn_keeps_operator_authority() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    mint(deps.as_mut(), &a.minter, &a.alice, "t2");
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    // alice makes bob an operator, directly
+    exec(
+        deps.as_mut(),
+        &a.alice,
+        &[],
+        base(BaseExecuteMsg::ApproveAll {
+            operator: a.bob.to_string(),
+            expires: None,
+        }),
+    )
+    .unwrap();
+
+    // bob through the proxy: rejected, he is not the owner
+    let err = exec(
+        deps.as_mut(),
+        &a.proxy,
+        &[],
+        proxied(
+            &a.bob,
+            ProxyAction::Burn {
+                token_id: "t1".to_string(),
+            },
+        ),
+    )
+    .unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::NotTokenOwner {
+            token_id: "t1".to_string()
+        }
+    );
+    assert_eq!(owner_of(&deps, "t1"), Some(a.alice.to_string()));
+
+    // bob directly: still allowed by cw721 operator semantics (no regression)
+    exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        base(BaseExecuteMsg::Burn {
+            token_id: "t2".to_string(),
+        }),
+    )
+    .unwrap();
+    assert_eq!(owner_of(&deps, "t2"), None);
+
+    // a proxied burn of a token that does not exist surfaces the storage error, not a panic
+    let err = exec(
+        deps.as_mut(),
+        &a.proxy,
+        &[],
+        proxied(
+            &a.alice,
+            ProxyAction::Burn {
+                token_id: "nope".to_string(),
+            },
+        ),
+    )
+    .unwrap_err();
+    assert!(matches!(err, ContractError::Std(_)), "{err:?}");
+}
+
+#[test]
+fn proxied_burn_respects_the_listing_guard() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    exec(
+        deps.as_mut(),
+        &a.alice,
+        &[],
+        base(BaseExecuteMsg::UpdateExtension {
+            msg: asset::msg::AssetExtensionExecuteMsg::List {
+                token_id: "t1".to_string(),
+                price: coin(100, "uxion"),
+                reservation: None,
+            },
+        }),
+    )
+    .unwrap();
+
+    let err = exec(
+        deps.as_mut(),
+        &a.proxy,
+        &[],
+        proxied(
+            &a.alice,
+            ProxyAction::Burn {
+                token_id: "t1".to_string(),
+            },
+        ),
+    )
+    .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("cannot burn a token while it is listed"),
+        "{err}"
+    );
+    assert_eq!(owner_of(&deps, "t1"), Some(a.alice.to_string()));
+}
+
+// ---------------------------------------------------------------------------------------
+// trust management
+// ---------------------------------------------------------------------------------------
+
+#[test]
+fn trust_management_is_creator_only_capped_and_self_excluding() {
+    let (mut deps, a) = setup();
+    let add = |p: &Addr| {
+        ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+            proxy: p.to_string(),
+        })
+    };
+    let remove = |p: &Addr| {
+        ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveTrustedProxy {
+            proxy: p.to_string(),
+        })
+    };
+
+    // not the creator (the minter is a different role)
+    assert_eq!(
+        exec(deps.as_mut(), &a.minter, &[], add(&a.proxy)).unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+    assert_eq!(
+        exec(deps.as_mut(), &a.bob, &[], add(&a.proxy)).unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+    // funds rejected
+    assert!(matches!(
+        exec(
+            deps.as_mut(),
+            &a.creator,
+            &[coin(1, "uxion")],
+            add(&a.proxy)
+        )
+        .unwrap_err(),
+        ContractError::Payment(_)
+    ));
+    // self excluded
+    let me = mock_env().contract.address;
+    assert!(matches!(
+        exec(deps.as_mut(), &a.creator, &[], add(&me)).unwrap_err(),
+        ContractError::InvalidTrustedProxy { .. }
+    ));
+
+    // cap
+    let extra: Vec<Addr> = (0..4)
+        .map(|i| deps.api.addr_make(&format!("p{i}")))
+        .collect();
+    for p in &extra {
+        exec(deps.as_mut(), &a.creator, &[], add(p)).unwrap();
+    }
+    assert_eq!(trusted_proxies(&deps).len(), 4);
+    // re-adding an existing one is rejected, symmetric with removing an unknown one
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], add(&extra[0])).unwrap_err(),
+        ContractError::TrustedProxyAlreadyExists {
+            proxy: extra[0].to_string()
+        }
+    );
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], add(&a.proxy)).unwrap_err(),
+        ContractError::TooManyTrustedProxies { max: 4 }
+    );
+
+    // remove
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], remove(&a.proxy)).unwrap_err(),
+        ContractError::TrustedProxyNotFound {
+            proxy: a.proxy.to_string()
+        }
+    );
+    let r = exec(deps.as_mut(), &a.creator, &[], remove(&extra[0])).unwrap();
+    let ev = r
+        .events
+        .iter()
+        .find(|e| e.ty == "trusted_proxy_removed")
+        .unwrap();
+    assert!(ev.attributes.iter().any(|x| x.key == "collection"));
+    assert!(
+        ev.attributes
+            .iter()
+            .any(|x| x.key == "proxy" && x.value == extra[0].as_str())
+    );
+    assert_eq!(trusted_proxies(&deps).len(), 3);
+    assert!(!trusted_proxies(&deps).contains(&extra[0]));
+    // removed proxy can no longer forward
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &extra[0],
+            &[],
+            proxied(
+                &a.alice,
+                ProxyAction::RevokeAll {
+                    operator: a.marketplace.to_string()
+                }
+            )
+        )
+        .unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+}
+
+#[test]
+fn creator_cannot_renounce_while_proxies_are_registered() {
+    let (mut deps, a) = setup();
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    let renounce = base(BaseExecuteMsg::UpdateCreatorOwnership(
+        Action::RenounceOwnership,
+    ));
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], renounce.clone()).unwrap_err(),
+        ContractError::TrustedProxiesNotEmpty {}
+    );
+    // the deprecated alias targets minter ownership, so it neither orphans trust nor is it
+    // affected by the guard; the creator role stays in place
+    #[allow(deprecated)]
+    let renounce_minter = base(BaseExecuteMsg::UpdateOwnership(Action::RenounceOwnership));
+    exec(deps.as_mut(), &a.minter, &[], renounce_minter).unwrap();
+    let creator = cw721::state::CREATOR
+        .item
+        .load(deps.as_ref().storage)
+        .unwrap();
+    assert_eq!(creator.owner, Some(a.creator.clone()));
+    // a pending creator transfer does not lift the guard either
+    exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::TransferOwnership {
+                new_owner: a.bob.to_string(),
+                expiry: None,
+            },
+        )),
+    )
+    .unwrap();
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], renounce.clone()).unwrap_err(),
+        ContractError::TrustedProxiesNotEmpty {}
+    );
+    // removal is creator-only and non-payable
+    let remove = ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveTrustedProxy {
+        proxy: a.proxy.to_string(),
+    });
+    assert_eq!(
+        exec(deps.as_mut(), &a.bob, &[], remove.clone()).unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+    assert!(matches!(
+        exec(deps.as_mut(), &a.creator, &[coin(1, "uxion")], remove).unwrap_err(),
+        ContractError::Payment(_)
+    ));
+    // completing the transfer is allowed (trust stays revocable by the new creator)
+    exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap();
+    // new creator removes the proxy, then may renounce
+    exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveTrustedProxy {
+            proxy: a.proxy.to_string(),
+        }),
+    )
+    .unwrap();
+    exec(deps.as_mut(), &a.bob, &[], renounce).unwrap();
+}
+
+// ---------------------------------------------------------------------------------------
+// pass-through
+// ---------------------------------------------------------------------------------------
+
+#[test]
+fn base_messages_behave_identically_to_the_base_contract() {
+    // Differential: the same sequence through the wrapper and through asset_base directly
+    // must yield identical responses and identical owner state.
+    let (mut wrapped, a) = setup();
+    let mut direct = mock_dependencies();
+    {
+        let msg = InstantiateMsg {
+            name: "Variant".to_string(),
+            symbol: "VAR".to_string(),
+            collection_info_extension: None,
+            minter: Some(a.minter.to_string()),
+            creator: Some(a.creator.to_string()),
+            withdraw_address: None,
+        };
+        asset::contracts::asset_base::instantiate(
+            direct.as_mut(),
+            mock_env(),
+            message_info(&a.creator, &[]),
+            msg,
+        )
+        .unwrap();
+    }
+
+    let steps: Vec<(Addr, BaseExecuteMsg)> = vec![
+        (
+            a.minter.clone(),
+            BaseExecuteMsg::Mint {
+                token_id: "t1".to_string(),
+                owner: a.alice.to_string(),
+                token_uri: Some("ipfs://x".to_string()),
+                extension: None,
+            },
+        ),
+        (
+            a.alice.clone(),
+            BaseExecuteMsg::UpdateExtension {
+                msg: asset::msg::AssetExtensionExecuteMsg::List {
+                    token_id: "t1".to_string(),
+                    price: coin(100, "uxion"),
+                    reservation: None,
+                },
+            },
+        ),
+        (
+            a.alice.clone(),
+            BaseExecuteMsg::UpdateExtension {
+                msg: asset::msg::AssetExtensionExecuteMsg::Delist {
+                    token_id: "t1".to_string(),
+                },
+            },
+        ),
+        (
+            a.alice.clone(),
+            BaseExecuteMsg::TransferNft {
+                recipient: a.bob.to_string(),
+                token_id: "t1".to_string(),
+            },
+        ),
+        (
+            a.bob.clone(),
+            BaseExecuteMsg::Burn {
+                token_id: "t1".to_string(),
+            },
+        ),
+    ];
+    for (sender, msg) in steps {
+        let via_wrapper = exec(wrapped.as_mut(), &sender, &[], base(msg.clone())).unwrap();
+        let via_base = asset::contracts::asset_base::execute(
+            direct.as_mut(),
+            mock_env(),
+            message_info(&sender, &[]),
+            msg,
+        )
+        .unwrap();
+        assert_eq!(via_wrapper, via_base);
+    }
+    assert_eq!(owner_of(&wrapped, "t1"), None);
+}
+
+// ---------------------------------------------------------------------------------------
+// serde
+// ---------------------------------------------------------------------------------------
+
+#[test]
+fn untagged_dispatch_is_unambiguous() {
+    let p: ProxyableExecuteMsg =
+        from_json(r#"{"proxy_execute":{"sender":"alice","action":{"burn":{"token_id":"t1"}}}}"#)
+            .unwrap();
+    assert!(matches!(
+        p,
+        ProxyableExecuteMsg::Proxy(ProxyMsg::ProxyExecute { .. })
+    ));
+
+    let b: ProxyableExecuteMsg = from_json(r#"{"burn":{"token_id":"t1"}}"#).unwrap();
+    assert!(matches!(
+        b,
+        ProxyableExecuteMsg::Base(BaseExecuteMsg::Burn { .. })
+    ));
+
+    // mixed keys are not a valid externally tagged enum on either arm
+    assert!(
+        from_json::<ProxyableExecuteMsg>(
+            r#"{"proxy_execute":{"sender":"alice","action":{"burn":{"token_id":"t1"}}},"burn":{"token_id":"t1"}}"#
+        )
+        .is_err()
+    );
+    // unknown fields inside a proxy message are rejected
+    assert!(
+        from_json::<ProxyableExecuteMsg>(
+            r#"{"proxy_execute":{"sender":"alice","action":{"burn":{"token_id":"t1"}},"extra":1}}"#
+        )
+        .is_err()
+    );
+    assert!(
+        from_json::<ProxyableExecuteMsg>(
+            r#"{"proxy_execute":{"sender":"alice","action":{"burn":{"token_id":"t1","x":1}}}}"#
+        )
+        .is_err()
+    );
+    // wrong case is not a proxy message and not a base message
+    assert!(
+        from_json::<ProxyableExecuteMsg>(
+            r#"{"ProxyExecute":{"sender":"alice","action":{"burn":{"token_id":"t1"}}}}"#
+        )
+        .is_err()
+    );
+    // reversed mixed-key order and duplicate tags are rejected too
+    assert!(
+        from_json::<ProxyableExecuteMsg>(
+            r#"{"burn":{"token_id":"t1"},"proxy_execute":{"sender":"alice","action":{"burn":{"token_id":"t1"}}}}"#
+        )
+        .is_err()
+    );
+    assert!(
+        from_json::<ProxyableExecuteMsg>(
+            r#"{"proxy_execute":{"sender":"alice","action":{"burn":{"token_id":"t1"}}},"proxy_execute":{"sender":"bob","action":{"burn":{"token_id":"t1"}}}}"#
+        )
+        .is_err()
+    );
+    assert!(
+        from_json::<ProxyableExecuteMsg>(
+            r#"{"proxy_execute":{"sender":"alice","sender":"bob","action":{"burn":{"token_id":"t1"}}}}"#
+        )
+        .is_err()
+    );
+    // there is no nesting: an envelope is not a ProxyAction
+    assert!(
+        from_json::<ProxyableExecuteMsg>(
+            r#"{"proxy_execute":{"sender":"alice","action":{"proxy_execute":{"sender":"bob","action":{"burn":{"token_id":"t1"}}}}}}"#
+        )
+        .is_err()
+    );
+    // a base message can never be smuggled through as a proxy message
+    assert!(from_json::<ProxyMsg>(r#"{"burn":{"token_id":"t1"}}"#).is_err());
+    // and proxy names are not base variants
+    assert!(from_json::<BaseExecuteMsg>(r#"{"proxy_execute":{}}"#).is_err());
+    assert!(from_json::<BaseExecuteMsg>(r#"{"add_trusted_proxy":{"proxy":"x"}}"#).is_err());
+    assert!(from_json::<BaseExecuteMsg>(r#"{"remove_trusted_proxy":{"proxy":"x"}}"#).is_err());
+}
+
+/// Collect the externally tagged variant names of an enum schema.
+fn variant_names(root: &RootSchema) -> Vec<String> {
+    fn walk(schema: &SchemaObject, out: &mut Vec<String>) {
+        if let Some(obj) = &schema.object {
+            out.extend(obj.required.iter().cloned());
+        }
+        if let Some(e) = &schema.enum_values {
+            out.extend(e.iter().filter_map(|v| v.as_str().map(str::to_string)));
+        }
+        if let Some(sub) = &schema.subschemas {
+            for list in [&sub.one_of, &sub.any_of, &sub.all_of]
+                .into_iter()
+                .flatten()
+            {
+                for s in list {
+                    if let Schema::Object(o) = s {
+                        walk(o, out);
+                    }
+                }
+            }
+        }
+    }
+    let mut out = vec![];
+    walk(&root.schema, &mut out);
+    out
+}
+
+#[test]
+fn variant_names_are_disjoint() {
+    let base_exec = variant_names(&schemars::schema_for!(BaseExecuteMsg));
+    let proxy_exec = variant_names(&schemars::schema_for!(ProxyMsg));
+    assert!(!base_exec.is_empty() && !proxy_exec.is_empty());
+    for name in &proxy_exec {
+        assert!(!base_exec.contains(name), "execute variant clash: {name}");
+    }
+    let base_query = variant_names(&schemars::schema_for!(BaseQueryMsg));
+    let proxy_query = variant_names(&schemars::schema_for!(ProxyQueryMsg));
+    for name in &proxy_query {
+        assert!(!base_query.contains(name), "query variant clash: {name}");
+    }
+}
+
+// ---------------------------------------------------------------------------------------
+// migration
+// ---------------------------------------------------------------------------------------
+
+fn no_update() -> Cw721MigrateMsg {
+    Cw721MigrateMsg::WithUpdate {
+        minter: None,
+        creator: None,
+    }
+}
+
+#[test]
+fn migrate_from_base_asset_clears_dormant_proxies() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    // pretend this storage came from a base `asset` 0.2.0 that once was proxyable
+    cw2::set_contract_version(deps.as_mut().storage, "asset", "0.2.0").unwrap();
+    TRUSTED_PROXIES
+        .save(deps.as_mut().storage, &a.proxy, &cosmwasm_std::Empty {})
+        .unwrap();
+
+    let r = migrate(deps.as_mut(), mock_env(), no_update()).unwrap();
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("1"));
+    assert!(trusted_proxies(&deps).is_empty());
+    let v = cw2::get_contract_version(deps.as_ref().storage).unwrap();
+    assert_eq!(
+        (v.contract.as_str(), v.version.as_str()),
+        (CONTRACT_NAME, CONTRACT_VERSION)
+    );
+    // tokens and roles intact
+    assert_eq!(owner_of(&deps, "t1"), Some(a.alice.to_string()));
+    let creator = cw721::state::CREATOR
+        .item
+        .load(deps.as_ref().storage)
+        .unwrap();
+    assert_eq!(creator.owner, Some(a.creator.clone()));
+}
+
+#[test]
+fn migrate_from_base_asset_clears_oversized_imported_state() {
+    // more entries than the registration API can ever create; all must go
+    let (mut deps, _) = setup();
+    cw2::set_contract_version(deps.as_mut().storage, "asset", "0.1.0").unwrap();
+    for i in 0..9 {
+        let p = deps.api.addr_make(&format!("dormant{i}"));
+        TRUSTED_PROXIES
+            .save(deps.as_mut().storage, &p, &cosmwasm_std::Empty {})
+            .unwrap();
+    }
+    let r = migrate(deps.as_mut(), mock_env(), no_update()).unwrap();
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("9"));
+    assert!(!crate::state::has_trusted_proxies(deps.as_ref().storage));
+}
+
+#[test]
+fn migrate_between_variant_versions_keeps_proxies() {
+    let (mut deps, a) = setup();
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    let r = migrate(deps.as_mut(), mock_env(), no_update()).unwrap();
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("0"));
+    assert_eq!(trusted_proxies(&deps), vec![a.proxy.clone()]);
+}
+
+#[test]
+fn migrate_rejects_unknown_sources() {
+    let (mut deps, _) = setup();
+    cw2::set_contract_version(deps.as_mut().storage, "something-else", "0.1.0").unwrap();
+    assert_eq!(
+        migrate(deps.as_mut(), mock_env(), no_update()).unwrap_err(),
+        ContractError::InvalidMigration {
+            contract: "something-else".to_string(),
+            version: "0.1.0".to_string()
+        }
+    );
+    cw2::set_contract_version(deps.as_mut().storage, "asset", "9.9.9").unwrap();
+    assert!(matches!(
+        migrate(deps.as_mut(), mock_env(), no_update()).unwrap_err(),
+        ContractError::InvalidMigration { .. }
+    ));
+}
