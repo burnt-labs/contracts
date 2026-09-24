@@ -70,25 +70,68 @@ pub fn execute(
         ProxyableExecuteMsg::Proxy(ProxyMsg::ProxyExecute { sender, action }) => {
             execute_proxied(deps, env, info, sender, action)
         }
-        ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy { proxy }) => {
-            add_trusted_proxy(deps, env, info, proxy)
-        }
+        ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+            proxy,
+            require_immutable,
+        }) => add_trusted_proxy(deps, env, info, proxy, require_immutable),
         ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveTrustedProxy { proxy }) => {
             remove_trusted_proxy(deps, env, info, proxy)
         }
-        ProxyableExecuteMsg::Base(base) => {
-            // Proxy trust must always stay revocable: the creator cannot walk away while
-            // any proxy is registered.
-            if matches!(
-                base,
-                BaseExecuteMsg::UpdateCreatorOwnership(Action::RenounceOwnership)
-            ) && has_trusted_proxies(deps.storage)
-            {
-                return Err(ContractError::TrustedProxiesNotEmpty {});
-            }
-            Ok(asset_base::execute(deps, env, info, base)?)
-        }
+        ProxyableExecuteMsg::Base(base) => execute_base(deps, env, info, base),
     }
+}
+
+/// Delegate a base message, guarding the creator-ownership transitions that interact with
+/// proxy trust:
+/// - renouncing is refused while any proxy is registered, so trust stays revocable;
+/// - accepting ownership from a *different* previous creator clears every registered
+///   proxy, so an outgoing creator cannot leave (or sneak in during the pending window) an
+///   address that keeps collection-wide power after control has changed hands. The new
+///   creator re-registers what they trust. A self-accept (the cw-ownable idiom for
+///   cancelling a proposal) changes no control and clears nothing.
+fn execute_base(
+    mut deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    base: BaseExecuteMsg,
+) -> ContractResult<Response> {
+    match &base {
+        BaseExecuteMsg::UpdateCreatorOwnership(Action::RenounceOwnership)
+            if has_trusted_proxies(deps.storage) =>
+        {
+            Err(ContractError::TrustedProxiesNotEmpty {})
+        }
+        BaseExecuteMsg::UpdateCreatorOwnership(Action::AcceptOwnership) => {
+            let previous = CREATOR.item.load(deps.storage)?.owner;
+            let response = asset_base::execute(deps.branch(), env, info, base)?;
+            let current = CREATOR.item.load(deps.storage)?.owner;
+            let cleared = if previous != current {
+                clear_trusted_proxies(deps.storage)?
+            } else {
+                0
+            };
+            Ok(response.add_attribute("trusted_proxies_cleared", cleared.to_string()))
+        }
+        _ => Ok(asset_base::execute(deps, env, info, base)?),
+    }
+}
+
+/// A creator transfer is live when someone other than the current creator could still
+/// accept it. Expired proposals cannot be accepted (cw-ownable rejects them) and a
+/// proposal to the current creator is the cancel idiom, so neither blocks anything.
+fn creator_transfer_is_live(deps: Deps, env: &Env) -> ContractResult<bool> {
+    let ownership = CREATOR.item.load(deps.storage)?;
+    let Some(pending) = ownership.pending_owner else {
+        return Ok(false);
+    };
+    if ownership.owner.as_ref() == Some(&pending) {
+        return Ok(false);
+    }
+    let expired = ownership
+        .pending_expiry
+        .map(|e| e.is_expired(&env.block))
+        .unwrap_or(false);
+    Ok(!expired)
 }
 
 /// Run one of the closed set of `ProxyAction`s as `sender`, on behalf of a trusted proxy.
@@ -149,14 +192,38 @@ fn assert_creator(deps: Deps, sender: &Addr) -> ContractResult<()> {
         .map_err(|_| ContractError::Unauthorized {})
 }
 
+/// What x/wasm knows about a prospective proxy. Best effort: an externally owned account
+/// has no contract info at all.
+enum ProxyKind {
+    Account,
+    Contract { code_id: u64, admin: Option<Addr> },
+}
+
+fn inspect_proxy(deps: Deps, proxy: &Addr) -> ProxyKind {
+    match deps.querier.query_wasm_contract_info(proxy) {
+        Ok(info) => ProxyKind::Contract {
+            code_id: info.code_id,
+            admin: info.admin,
+        },
+        Err(_) => ProxyKind::Account,
+    }
+}
+
 fn add_trusted_proxy(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     proxy: String,
+    require_immutable: bool,
 ) -> ContractResult<Response> {
     nonpayable(&info)?;
     assert_creator(deps.as_ref(), &info.sender)?;
+    // While a handover is live the trusted set may only shrink: the incoming creator
+    // must be able to rely on what they see before accepting.
+    ensure!(
+        !creator_transfer_is_live(deps.as_ref(), &env)?,
+        ContractError::CreatorTransferPending {}
+    );
     let proxy = deps.api.addr_validate(&proxy)?;
     ensure!(
         proxy != env.contract.address,
@@ -176,11 +243,44 @@ fn add_trusted_proxy(
             max: MAX_TRUSTED_PROXIES
         }
     );
+    // Always record what was registered; enforce immutability only when asked.
+    let kind = inspect_proxy(deps.as_ref(), &proxy);
+    let (kind_attr, code_id_attr, admin_attr) = match &kind {
+        ProxyKind::Account => (
+            "account".to_string(),
+            "none".to_string(),
+            "none".to_string(),
+        ),
+        ProxyKind::Contract { code_id, admin } => (
+            "contract".to_string(),
+            code_id.to_string(),
+            admin.as_ref().map_or("none".to_string(), |a| a.to_string()),
+        ),
+    };
+    if require_immutable {
+        match &kind {
+            ProxyKind::Contract { admin: None, .. } => {}
+            ProxyKind::Contract { admin: Some(_), .. } => {
+                return Err(ContractError::InvalidTrustedProxy {
+                    reason: "proxy has a wasm admin and can be migrated".to_string(),
+                });
+            }
+            ProxyKind::Account => {
+                return Err(ContractError::InvalidTrustedProxy {
+                    reason: "proxy is not a contract".to_string(),
+                });
+            }
+        }
+    }
     TRUSTED_PROXIES.save(deps.storage, &proxy, &cosmwasm_std::Empty {})?;
     Ok(Response::new().add_event(
         Event::new("trusted_proxy_added")
             .add_attribute("collection", env.contract.address)
             .add_attribute("proxy", proxy)
+            .add_attribute("proxy_kind", kind_attr)
+            .add_attribute("proxy_code_id", code_id_attr)
+            .add_attribute("proxy_admin", admin_attr)
+            .add_attribute("require_immutable", require_immutable.to_string())
             .add_attribute("by", info.sender),
     ))
 }

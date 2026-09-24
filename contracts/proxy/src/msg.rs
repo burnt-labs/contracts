@@ -1,0 +1,106 @@
+use cosmwasm_schema::{QueryResponses, cw_serde};
+use cosmwasm_std::Addr;
+use cw721::Expiration;
+
+pub use asset_proxyable::msg::ProxyAction;
+
+#[cw_serde]
+pub struct InstantiateMsg {
+    /// Manages the collection allowlist and may remove operators. Multisig recommended.
+    pub admin: String,
+    /// Operators `ApproveAll` may name (the marketplace). `RevokeAll` is not restricted.
+    /// Fixed at instantiation; removal-only afterwards. Max 4.
+    pub allowed_operators: Vec<String>,
+    /// If set, `ApproveAll.expires` must be a concrete timestamp no further than this many
+    /// seconds in the future (`Never` and height-based expiries are rejected).
+    pub max_approval_seconds: Option<u64>,
+    /// Initial collection allowlist. Whether a collection honours forwarded actions is the
+    /// collection's own decision (`add_trusted_proxy` on the collection); this list only
+    /// bounds where sponsored calls may be sent.
+    pub collections: Vec<String>,
+}
+
+/// Approval actions a sponsored session may relay. Deliberately separate from
+/// `ProxyAction` so `Burn` can never be smuggled in under the approval authz key.
+#[cw_serde]
+#[serde(deny_unknown_fields)]
+pub enum ApprovalAction {
+    ApproveAll {
+        operator: String,
+        expires: Option<Expiration>,
+    },
+    RevokeAll {
+        operator: String,
+    },
+}
+
+impl From<ApprovalAction> for ProxyAction {
+    fn from(value: ApprovalAction) -> Self {
+        match value {
+            ApprovalAction::ApproveAll { operator, expires } => {
+                ProxyAction::ApproveAll { operator, expires }
+            }
+            ApprovalAction::RevokeAll { operator } => ProxyAction::RevokeAll { operator },
+        }
+    }
+}
+
+#[cw_serde]
+#[serde(deny_unknown_fields)]
+pub enum ExecuteMsg {
+    /// Burn `token_id` on `collection` as `info.sender`. Owner-only at the collection.
+    SponsoredBurn {
+        collection: String,
+        token_id: String,
+    },
+    /// Approve a currently allowed operator, or revoke any operator, on `collection` as
+    /// `info.sender`.
+    SponsoredApproval {
+        collection: String,
+        action: ApprovalAction,
+    },
+    /// Admin: allowlist a collection.
+    AddCollection { collection: String },
+    /// Admin: remove a collection from the allowlist.
+    RemoveCollection { collection: String },
+    /// Admin: remove an operator. There is deliberately no way to add one. Removal is
+    /// prospective: it stops new sponsored approvals for that operator, leaves approvals
+    /// already stored on collections in place until they expire or are revoked, and never
+    /// blocks sponsored `RevokeAll`, which stays available for any operator.
+    RemoveAllowedOperator { operator: String },
+    /// Admin: hand over administration.
+    UpdateAdmin { admin: String },
+}
+
+#[cw_serde]
+pub struct ConfigResponse {
+    pub admin: Addr,
+    pub allowed_operators: Vec<Addr>,
+    pub max_approval_seconds: Option<u64>,
+}
+
+#[cw_serde]
+pub struct IsAllowedResponse {
+    pub allowed: bool,
+    /// Why not, when `allowed` is false.
+    pub reason: Option<String>,
+}
+
+#[cw_serde]
+#[derive(QueryResponses)]
+pub enum QueryMsg {
+    #[returns(ConfigResponse)]
+    Config {},
+    #[returns(Vec<Addr>)]
+    Collections {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
+    /// Evaluate the proxy-side policy for an action without executing it. Does not check
+    /// whether the collection trusts this proxy, which only the collection knows.
+    #[returns(IsAllowedResponse)]
+    IsAllowed {
+        collection: String,
+        action: ProxyAction,
+    },
+}

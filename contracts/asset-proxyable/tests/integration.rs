@@ -125,6 +125,7 @@ fn end_to_end_proxied_flow() {
         collection.clone(),
         &ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
             proxy: proxy.to_string(),
+            require_immutable: false,
         }),
         &[],
     )
@@ -275,6 +276,7 @@ fn base_collection_migrates_onto_the_variant() {
         collection.clone(),
         &ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
             proxy: proxy.to_string(),
+            require_immutable: false,
         }),
         &[],
     )
@@ -319,5 +321,185 @@ fn base_collection_migrates_onto_the_variant() {
         variant_code_2,
     )
     .unwrap();
-    assert_eq!(trusted_proxies(&app, &collection), vec![proxy]);
+    assert_eq!(trusted_proxies(&app, &collection), vec![proxy.clone()]);
+
+    // rollback: variant -> base. The proxy surface disappears with the code; the dormant
+    // trusted_proxies entry is invisible to the base and never consulted.
+    mint(&mut app, &collection, &creator, &alice, "t2");
+    let base_code_2 = app.store_code(base_asset_contract());
+    app.migrate_contract(
+        creator.clone(),
+        collection.clone(),
+        &MigrateMsg::WithUpdate {
+            minter: None,
+            creator: None,
+        },
+        base_code_2,
+    )
+    .unwrap();
+    assert_eq!(cw2_version(&app, &collection).contract, "asset");
+    assert_eq!(owner_of(&app, &collection, "t2"), Some(alice.to_string()));
+    assert!(
+        app.wrap()
+            .query_wasm_smart::<Vec<Addr>>(
+                &collection,
+                &ProxyableQueryMsg::Proxy(ProxyQueryMsg::GetTrustedProxies {}),
+            )
+            .is_err(),
+        "proxy queries must not exist on base code"
+    );
+    let err = app
+        .execute_contract(
+            proxy.clone(),
+            collection.clone(),
+            &ProxyableExecuteMsg::Proxy(ProxyMsg::ProxyExecute {
+                sender: alice.to_string(),
+                action: ProxyAction::Burn {
+                    token_id: "t2".to_string(),
+                },
+            }),
+            &[],
+        )
+        .unwrap_err();
+    assert!(
+        err.root_cause().to_string().contains("unknown variant"),
+        "{err:#}"
+    );
+    assert_eq!(owner_of(&app, &collection, "t2"), Some(alice.to_string()));
+    // base messages keep working
+    app.execute_contract(
+        alice.clone(),
+        collection.clone(),
+        &BaseExecuteMsg::Burn {
+            token_id: "t2".to_string(),
+        },
+        &[],
+    )
+    .unwrap();
+
+    // and forward again: base -> variant clears the dormant entry
+    let variant_code_3 = app.store_code(proxyable_contract());
+    app.migrate_contract(
+        creator.clone(),
+        collection.clone(),
+        &MigrateMsg::WithUpdate {
+            minter: None,
+            creator: None,
+        },
+        variant_code_3,
+    )
+    .unwrap();
+    assert_eq!(cw2_version(&app, &collection).contract, "asset-proxyable");
+    assert!(trusted_proxies(&app, &collection).is_empty());
+}
+
+#[test]
+fn require_immutable_distinguishes_real_contracts_and_accounts() {
+    let mut app = App::default();
+    let creator = app.api().addr_make("creator");
+    let upgrader = app.api().addr_make("upgrader");
+    let wallet = app.api().addr_make("wallet");
+    let code_id = app.store_code(proxyable_contract());
+    let collection = app
+        .instantiate_contract(
+            code_id,
+            creator.clone(),
+            &instantiate_msg(&creator),
+            &[],
+            "collection",
+            None,
+        )
+        .unwrap();
+    // any contract works as a stand-in proxy address for the registration check
+    let immutable = app
+        .instantiate_contract(
+            code_id,
+            creator.clone(),
+            &instantiate_msg(&creator),
+            &[],
+            "imm",
+            None,
+        )
+        .unwrap();
+    let mutable = app
+        .instantiate_contract(
+            code_id,
+            creator.clone(),
+            &instantiate_msg(&creator),
+            &[],
+            "mut",
+            Some(upgrader.to_string()),
+        )
+        .unwrap();
+    let strict = |p: &Addr| {
+        ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+            proxy: p.to_string(),
+            require_immutable: true,
+        })
+    };
+    let res = app
+        .execute_contract(
+            creator.clone(),
+            collection.clone(),
+            &strict(&immutable),
+            &[],
+        )
+        .unwrap();
+    let added = res
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-trusted_proxy_added")
+        .expect("event");
+    assert!(
+        added
+            .attributes
+            .iter()
+            .any(|a| a.key == "proxy_kind" && a.value == "contract")
+    );
+    assert!(
+        added
+            .attributes
+            .iter()
+            .any(|a| a.key == "proxy_admin" && a.value == "none")
+    );
+
+    let err = app
+        .execute_contract(creator.clone(), collection.clone(), &strict(&mutable), &[])
+        .unwrap_err();
+    assert!(
+        err.root_cause().to_string().contains("wasm admin"),
+        "{err:#}"
+    );
+    let err = app
+        .execute_contract(creator.clone(), collection.clone(), &strict(&wallet), &[])
+        .unwrap_err();
+    assert!(
+        err.root_cause().to_string().contains("not a contract"),
+        "{err:#}"
+    );
+    assert_eq!(trusted_proxies(&app, &collection), vec![immutable]);
+
+    // non-strict still accepts the mutable one and labels it
+    let res = app
+        .execute_contract(
+            creator.clone(),
+            collection.clone(),
+            &ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+                proxy: mutable.to_string(),
+                require_immutable: false,
+            }),
+            &[],
+        )
+        .unwrap();
+    let added = res
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-trusted_proxy_added")
+        .expect("event");
+    assert!(
+        added
+            .attributes
+            .iter()
+            .any(|a| a.key == "proxy_admin" && a.value == upgrader.as_str())
+    );
 }

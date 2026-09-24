@@ -1,0 +1,31 @@
+[package]
+description = "Fixed-address sponsorship proxy: relays a closed set of typed user actions to allowlisted asset-proxyable collections"
+edition     = "2024"
+license     = "Apache-2.0"
+name        = "xion-asset-proxy"
+version     = "0.1.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# enable feature if you want to disable entry points
+library = []
+
+[dependencies]
+asset-proxyable = { path = "../asset-proxyable", features = ["library"] }
+cosmwasm-schema = { workspace = true }
+cosmwasm-std    = { workspace = true }
+cw-storage-plus = { workspace = true }
+cw-utils        = { workspace = true }
+cw2             = { workspace = true }
+cw721           = { workspace = true }
+schemars        = { workspace = true }
+serde           = { workspace = true }
+thiserror       = { workspace = true }
+
+[dev-dependencies]
+asset                = { path = "../asset", features = ["library", "asset_base"] }
+cw-multi-test        = { version = "2", features = ["staking", "stargate", "cosmwasm_2_2"] }
+serde_json           = { workspace = true }
+xion-nft-marketplace = { path = "../marketplace", features = ["library"] }

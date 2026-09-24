@@ -50,7 +50,16 @@ pub enum ProxyMsg {
     /// Register a proxy contract. cw721 `CREATOR` only. Granting this is equivalent to
     /// giving the proxy the power to burn and to set operators for every token owner in
     /// the collection, limited to what those owners could do themselves.
-    AddTrustedProxy { proxy: String },
+    ///
+    /// `require_immutable` (default false) additionally requires `proxy` to be a contract
+    /// with no x/wasm admin, checked on-chain at registration. Because a cleared admin can
+    /// never be set again, that property is durable. Leave it off while the proxy is still
+    /// being upgraded under an admin.
+    AddTrustedProxy {
+        proxy: String,
+        #[serde(default)]
+        require_immutable: bool,
+    },
     /// Remove a proxy contract. cw721 `CREATOR` only.
     RemoveTrustedProxy { proxy: String },
 }
@@ -84,6 +93,7 @@ pub enum ProxyableQueryMsg {
 
 #[cw_serde]
 #[derive(QueryResponses)]
+#[serde(deny_unknown_fields)]
 pub enum ProxyQueryMsg {
     #[returns(Vec<Addr>)]
     GetTrustedProxies {},

@@ -55,6 +55,51 @@ fn migrate_from_previous_version_updates_metadata() {
 }
 
 #[test]
+fn migrate_accepts_the_proxyable_variant_as_a_rollback_source() {
+    let mut deps = mock_dependencies();
+    expect_ok(cw2::set_contract_version(
+        deps.as_mut().storage,
+        "asset-proxyable",
+        "0.1.0",
+    ));
+    expect_ok(
+        cw721::state::Cw721Config::<cosmwasm_std::Empty>::default()
+            .collection_info
+            .save(
+                deps.as_mut().storage,
+                &cw721::state::CollectionInfo {
+                    name: "test".to_string(),
+                    symbol: "TEST".to_string(),
+                    updated_at: mock_env().block.time,
+                },
+            ),
+    );
+    let creator = deps.api.addr_make("creator");
+    {
+        let api = deps.api;
+        let storage = deps.as_mut().storage;
+        expect_ok(cw721::state::CREATOR.initialize_owner(storage, &api, Some(creator.as_str())));
+        expect_ok(cw721::state::MINTER.initialize_owner(storage, &api, Some(creator.as_str())));
+    }
+    let r = expect_ok(migrate(deps.as_mut(), mock_env(), no_update()));
+    assert!(
+        r.attributes
+            .iter()
+            .any(|a| a.key == "from_contract" && a.value == "asset-proxyable")
+    );
+    let version = expect_ok(cw2::get_contract_version(deps.as_ref().storage));
+    assert_eq!(version.contract, CONTRACT_NAME);
+    assert_eq!(version.version, CONTRACT_VERSION);
+    // an unknown variant version is still refused
+    expect_ok(cw2::set_contract_version(
+        deps.as_mut().storage,
+        "asset-proxyable",
+        "9.9.9",
+    ));
+    expect_err(migrate(deps.as_mut(), mock_env(), no_update()));
+}
+
+#[test]
 fn migrate_rejects_foreign_contract_or_unknown_version() {
     let mut deps = mock_dependencies();
     expect_ok(cw2::set_contract_version(

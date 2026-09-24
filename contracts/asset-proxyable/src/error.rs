@@ -35,6 +35,9 @@ pub enum ContractError {
     #[error("Cannot renounce creator ownership while trusted proxies are registered")]
     TrustedProxiesNotEmpty {},
 
+    #[error("Cannot add a trusted proxy while a creator ownership transfer is pending")]
+    CreatorTransferPending {},
+
     #[error("Cannot migrate from {contract} {version}")]
     InvalidMigration { contract: String, version: String },
 }

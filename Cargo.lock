@@ -1470,6 +1470,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea2f10b9bb0928dfb1b42b65e1f9e36f7f54dbdf08457afefb38afcdec4fa2bb"
 
 [[package]]
+name = "xion-asset-proxy"
+version = "0.1.0"
+dependencies = [
+ "asset",
+ "asset-proxyable",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2",
+ "cw721",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "xion-nft-marketplace",
+]
+
+[[package]]
 name = "xion-nft-marketplace"
 version = "0.3.0"
 dependencies = [

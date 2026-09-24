@@ -14,8 +14,15 @@ use cw721::{
     DefaultOptionalCollectionExtension, DefaultOptionalCollectionExtensionMsg,
     DefaultOptionalNftExtension, DefaultOptionalNftExtensionMsg, traits::Cw721Execute,
 };
-/// Stored cw2 versions this code can be migrated from. Extend when releasing.
-pub const MIGRATABLE_VERSIONS: &[&str] = &["0.1.0", "0.2.0"];
+/// `(cw2 name, cw2 version)` pairs this code can be migrated from. Extend when releasing.
+/// `asset-proxyable` is accepted so a collection can roll back to the base line; the base
+/// never reads the variant's `trusted_proxies` storage, which stays dormant and is cleared
+/// by the variant's own migrate if the collection ever moves back.
+pub const MIGRATABLE_FROM: &[(&str, &str)] = &[
+    (CONTRACT_NAME, "0.1.0"),
+    (CONTRACT_NAME, "0.2.0"),
+    ("asset-proxyable", "0.1.0"),
+];
 
 type AssetBaseContract<'a> = DefaultAssetContract<
     'a,
@@ -74,7 +81,7 @@ pub fn migrate(
     use crate::error::ContractError;
 
     let stored = cw2::get_contract_version(deps.storage)?;
-    if stored.contract != CONTRACT_NAME || !MIGRATABLE_VERSIONS.contains(&stored.version.as_str()) {
+    if !MIGRATABLE_FROM.contains(&(stored.contract.as_str(), stored.version.as_str())) {
         return Err(ContractError::InvalidMigration {
             contract: stored.contract,
             version: stored.version,
@@ -82,9 +89,8 @@ pub fn migrate(
     }
 
     let contract: AssetBaseContract<'static> = DefaultAssetContract::default();
-    contract
-        .migrate(deps, env, msg, CONTRACT_NAME, CONTRACT_VERSION)
-        .map_err(Into::into)
+    let response = contract.migrate(deps, env, msg, CONTRACT_NAME, CONTRACT_VERSION)?;
+    Ok(response.add_attribute("from_contract", stored.contract))
 }
 
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]

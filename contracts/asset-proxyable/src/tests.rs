@@ -100,6 +100,7 @@ fn add_proxy(deps: DepsMut, creator: &Addr, proxy: &Addr) {
         &[],
         ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
             proxy: proxy.to_string(),
+            require_immutable: false,
         }),
     )
     .unwrap();
@@ -397,6 +398,7 @@ fn trust_management_is_creator_only_capped_and_self_excluding() {
     let add = |p: &Addr| {
         ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
             proxy: p.to_string(),
+            require_immutable: false,
         })
     };
     let remove = |p: &Addr| {
@@ -541,8 +543,9 @@ fn creator_cannot_renounce_while_proxies_are_registered() {
         exec(deps.as_mut(), &a.creator, &[coin(1, "uxion")], remove).unwrap_err(),
         ContractError::Payment(_)
     ));
-    // completing the transfer is allowed (trust stays revocable by the new creator)
-    exec(
+    // completing the transfer is allowed and clears every registered proxy, so the new
+    // creator starts from a clean slate and may renounce right away
+    let r = exec(
         deps.as_mut(),
         &a.bob,
         &[],
@@ -551,7 +554,126 @@ fn creator_cannot_renounce_while_proxies_are_registered() {
         )),
     )
     .unwrap();
-    // new creator removes the proxy, then may renounce
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("1"));
+    assert!(trusted_proxies(&deps).is_empty());
+    exec(deps.as_mut(), &a.bob, &[], renounce).unwrap();
+}
+
+#[test]
+fn creator_handover_cannot_leave_or_sneak_in_a_trusted_proxy() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    let sneaky = deps.api.addr_make("sneaky");
+
+    // creator proposes a handover to bob
+    exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::TransferOwnership {
+                new_owner: a.bob.to_string(),
+                expiry: None,
+            },
+        )),
+    )
+    .unwrap();
+
+    // while pending: adding is refused, removing is still allowed, existing proxies keep working
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.creator,
+            &[],
+            ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+                proxy: sneaky.to_string(),
+                require_immutable: false,
+            }),
+        )
+        .unwrap_err(),
+        ContractError::CreatorTransferPending {}
+    );
+    exec(
+        deps.as_mut(),
+        &a.proxy,
+        &[],
+        proxied(
+            &a.alice,
+            ProxyAction::ApproveAll {
+                operator: a.marketplace.to_string(),
+                expires: None,
+            },
+        ),
+    )
+    .unwrap();
+    assert!(is_operator(&deps, &a.alice, &a.marketplace));
+    let second = deps.api.addr_make("second");
+    // seed a second entry directly to prove clearing handles more than one
+    TRUSTED_PROXIES
+        .save(deps.as_mut().storage, &second, &cosmwasm_std::Empty {})
+        .unwrap();
+    assert_eq!(trusted_proxies(&deps).len(), 2);
+
+    // bob accepts: everything the old creator registered is gone
+    let r = exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap();
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("2"));
+    assert!(trusted_proxies(&deps).is_empty());
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.proxy,
+            &[],
+            proxied(
+                &a.alice,
+                ProxyAction::Burn {
+                    token_id: "t1".to_string()
+                }
+            ),
+        )
+        .unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+    assert_eq!(owner_of(&deps, "t1"), Some(a.alice.to_string()));
+
+    // the old creator has no say any more; bob re-registers what he trusts
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.creator,
+            &[],
+            ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+                proxy: a.proxy.to_string(),
+                require_immutable: false,
+            }),
+        )
+        .unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+    add_proxy(deps.as_mut(), &a.bob, &a.proxy);
+    assert_eq!(trusted_proxies(&deps), vec![a.proxy.clone()]);
+
+    // an accepted transfer with nothing registered is a no-op clear
+    exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::TransferOwnership {
+                new_owner: a.creator.to_string(),
+                expiry: None,
+            },
+        )),
+    )
+    .unwrap();
     exec(
         deps.as_mut(),
         &a.bob,
@@ -561,7 +683,278 @@ fn creator_cannot_renounce_while_proxies_are_registered() {
         }),
     )
     .unwrap();
-    exec(deps.as_mut(), &a.bob, &[], renounce).unwrap();
+    let r = exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap();
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("0"));
+}
+
+fn propose(deps: DepsMut, from: &Addr, to: &Addr, expiry: Option<Expiration>) {
+    exec(
+        deps,
+        from,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::TransferOwnership {
+                new_owner: to.to_string(),
+                expiry,
+            },
+        )),
+    )
+    .unwrap();
+}
+
+fn add_proxy_msg(p: &Addr) -> ProxyableExecuteMsg {
+    ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+        proxy: p.to_string(),
+        require_immutable: false,
+    })
+}
+
+#[test]
+fn expired_transfer_does_not_block_adds_and_keeps_proxies() {
+    let (mut deps, a) = setup();
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    let extra = deps.api.addr_make("extra");
+    let height = mock_env().block.height;
+
+    propose(
+        deps.as_mut(),
+        &a.creator,
+        &a.bob,
+        Some(Expiration::AtHeight(height + 10)),
+    );
+    // live: blocked
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], add_proxy_msg(&extra)).unwrap_err(),
+        ContractError::CreatorTransferPending {}
+    );
+
+    // past the deadline: the proposal is dead, adds work again, nothing was cleared
+    let mut env = mock_env();
+    env.block.height = height + 10;
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info(&a.creator, &[]),
+        add_proxy_msg(&extra),
+    )
+    .unwrap();
+    assert_eq!(trusted_proxies(&deps).len(), 2);
+    // and bob can no longer accept, so the proxies stay
+    execute(
+        deps.as_mut(),
+        env,
+        message_info(&a.bob, &[]),
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap_err();
+    assert_eq!(trusted_proxies(&deps).len(), 2);
+    let owner = cw721::state::CREATOR
+        .item
+        .load(deps.as_ref().storage)
+        .unwrap()
+        .owner;
+    assert_eq!(owner, Some(a.creator.clone()));
+}
+
+#[test]
+fn cancelling_a_transfer_keeps_proxies_and_reenables_adds() {
+    let (mut deps, a) = setup();
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    let extra = deps.api.addr_make("extra");
+
+    propose(deps.as_mut(), &a.creator, &a.bob, None);
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], add_proxy_msg(&extra)).unwrap_err(),
+        ContractError::CreatorTransferPending {}
+    );
+
+    // cw-ownable has no cancel action: proposing to yourself is the cancel idiom.
+    // bob is no longer the pending owner, so adds are allowed immediately ...
+    propose(deps.as_mut(), &a.creator, &a.creator, None);
+    exec(deps.as_mut(), &a.creator, &[], add_proxy_msg(&extra)).unwrap();
+    assert_eq!(trusted_proxies(&deps).len(), 2);
+    exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap_err();
+    // ... and self-accepting to tidy up changes no control, so nothing is cleared
+    let r = exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap();
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("0"));
+    assert_eq!(trusted_proxies(&deps).len(), 2);
+}
+
+#[test]
+fn replaced_transfer_stays_blocked_until_the_final_acceptor_takes_over() {
+    let (mut deps, a) = setup();
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    let carol = deps.api.addr_make("carol");
+    let extra = deps.api.addr_make("extra");
+
+    propose(deps.as_mut(), &a.creator, &a.bob, None);
+    // overwrite with a proposal to carol: still live, still blocked
+    propose(deps.as_mut(), &a.creator, &carol, None);
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], add_proxy_msg(&extra)).unwrap_err(),
+        ContractError::CreatorTransferPending {}
+    );
+    // bob was superseded
+    exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap_err();
+    // the pending owner is not the creator yet and cannot add either
+    assert_eq!(
+        exec(deps.as_mut(), &carol, &[], add_proxy_msg(&extra)).unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+    // carol accepts: control changes, proxies cleared
+    let r = exec(
+        deps.as_mut(),
+        &carol,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap();
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("1"));
+    assert!(trusted_proxies(&deps).is_empty());
+}
+
+#[test]
+fn renounce_with_pending_transfer_follows_the_proxy_guard() {
+    let (mut deps, a) = setup();
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    propose(deps.as_mut(), &a.creator, &a.bob, None);
+    let renounce = base(BaseExecuteMsg::UpdateCreatorOwnership(
+        Action::RenounceOwnership,
+    ));
+    // proxies registered: refused regardless of the pending transfer
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], renounce.clone()).unwrap_err(),
+        ContractError::TrustedProxiesNotEmpty {}
+    );
+    // removal is allowed during the window; then renouncing cancels the transfer too
+    exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveTrustedProxy {
+            proxy: a.proxy.to_string(),
+        }),
+    )
+    .unwrap();
+    exec(deps.as_mut(), &a.creator, &[], renounce).unwrap();
+    let ownership = cw721::state::CREATOR
+        .item
+        .load(deps.as_ref().storage)
+        .unwrap();
+    assert_eq!(ownership.owner, None);
+    assert_eq!(ownership.pending_owner, None);
+    exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap_err();
+}
+
+#[test]
+fn failed_acceptance_changes_nothing() {
+    let (mut deps, a) = setup();
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    // nothing pending: acceptance fails at the base and no clearing happens
+    exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap_err();
+    assert_eq!(trusted_proxies(&deps), vec![a.proxy.clone()]);
+    // pending to bob, but a stranger tries to accept
+    propose(deps.as_mut(), &a.creator, &a.bob, None);
+    let stranger = deps.api.addr_make("stranger");
+    exec(
+        deps.as_mut(),
+        &stranger,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap_err();
+    assert_eq!(trusted_proxies(&deps), vec![a.proxy.clone()]);
+    let owner = cw721::state::CREATOR
+        .item
+        .load(deps.as_ref().storage)
+        .unwrap()
+        .owner;
+    assert_eq!(owner, Some(a.creator.clone()));
+}
+
+#[test]
+fn minter_ownership_changes_do_not_touch_proxy_trust() {
+    let (mut deps, a) = setup();
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    let extra = deps.api.addr_make("extra");
+    // a pending *minter* transfer is unrelated to creator trust
+    exec(
+        deps.as_mut(),
+        &a.minter,
+        &[],
+        base(BaseExecuteMsg::UpdateMinterOwnership(
+            Action::TransferOwnership {
+                new_owner: a.bob.to_string(),
+                expiry: None,
+            },
+        )),
+    )
+    .unwrap();
+    exec(deps.as_mut(), &a.creator, &[], add_proxy_msg(&extra)).unwrap();
+    exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        base(BaseExecuteMsg::UpdateMinterOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap();
+    assert_eq!(trusted_proxies(&deps).len(), 2);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -729,6 +1122,50 @@ fn untagged_dispatch_is_unambiguous() {
     assert!(from_json::<BaseExecuteMsg>(r#"{"remove_trusted_proxy":{"proxy":"x"}}"#).is_err());
 }
 
+#[test]
+fn query_envelope_is_unambiguous_and_fail_closed() {
+    let p: ProxyableQueryMsg = from_json(r#"{"get_trusted_proxies":{}}"#).unwrap();
+    assert!(matches!(
+        p,
+        ProxyableQueryMsg::Proxy(ProxyQueryMsg::GetTrustedProxies {})
+    ));
+    let b: ProxyableQueryMsg =
+        from_json(r#"{"owner_of":{"token_id":"t1","include_expired":null}}"#).unwrap();
+    assert!(matches!(
+        b,
+        ProxyableQueryMsg::Base(BaseQueryMsg::OwnerOf { .. })
+    ));
+
+    // mixed proxy and base keys, either order
+    assert!(
+        from_json::<ProxyableQueryMsg>(
+            r#"{"get_trusted_proxies":{},"owner_of":{"token_id":"t1"}}"#
+        )
+        .is_err()
+    );
+    assert!(
+        from_json::<ProxyableQueryMsg>(
+            r#"{"owner_of":{"token_id":"t1"},"get_trusted_proxies":{}}"#
+        )
+        .is_err()
+    );
+    // unknown field inside the proxy query, wrong case, duplicate tag
+    assert!(from_json::<ProxyableQueryMsg>(r#"{"get_trusted_proxies":{"x":1}}"#).is_err());
+    assert!(from_json::<ProxyableQueryMsg>(r#"{"GetTrustedProxies":{}}"#).is_err());
+    assert!(
+        from_json::<ProxyableQueryMsg>(r#"{"get_trusted_proxies":{},"get_trusted_proxies":{}}"#)
+            .is_err()
+    );
+    // a base query name is never a proxy query and vice versa
+    assert!(from_json::<ProxyQueryMsg>(r#"{"owner_of":{"token_id":"t1"}}"#).is_err());
+    assert!(from_json::<BaseQueryMsg>(r#"{"get_trusted_proxies":{}}"#).is_err());
+    // the proxy query behaves at the entrypoint
+    let (deps, _) = setup();
+    let raw: ProxyableQueryMsg = from_json(r#"{"get_trusted_proxies":{}}"#).unwrap();
+    let out: Vec<Addr> = from_json(query(deps.as_ref(), mock_env(), raw).unwrap()).unwrap();
+    assert!(out.is_empty());
+}
+
 /// Collect the externally tagged variant names of an enum schema.
 fn variant_names(root: &RootSchema) -> Vec<String> {
     fn walk(schema: &SchemaObject, out: &mut Vec<String>) {
@@ -850,4 +1287,137 @@ fn migrate_rejects_unknown_sources() {
         migrate(deps.as_mut(), mock_env(), no_update()).unwrap_err(),
         ContractError::InvalidMigration { .. }
     ));
+}
+
+// ---------------------------------------------------------------------------------------
+// optional immutability check (audit item I)
+// ---------------------------------------------------------------------------------------
+
+/// Make the mock querier describe some addresses as contracts.
+fn describe_contracts(deps: &mut Deps, infos: Vec<(Addr, u64, Option<Addr>)>) {
+    deps.querier.update_wasm(move |q| match q {
+        cosmwasm_std::WasmQuery::ContractInfo { contract_addr } => {
+            match infos.iter().find(|(a, _, _)| a.as_str() == contract_addr) {
+                Some((_, code_id, admin)) => {
+                    cosmwasm_std::SystemResult::Ok(cosmwasm_std::ContractResult::Ok(
+                        cosmwasm_std::to_json_binary(&serde_json::json!({
+                            "code_id": code_id,
+                            "creator": "creator",
+                            "admin": admin.as_ref().map(|a| a.to_string()),
+                            "pinned": false,
+                            "ibc_port": null,
+                        }))
+                        .unwrap(),
+                    ))
+                }
+                None => {
+                    cosmwasm_std::SystemResult::Err(cosmwasm_std::SystemError::NoSuchContract {
+                        addr: contract_addr.clone(),
+                    })
+                }
+            }
+        }
+        _ => cosmwasm_std::SystemResult::Err(cosmwasm_std::SystemError::UnsupportedRequest {
+            kind: "only contract info".to_string(),
+        }),
+    });
+}
+
+fn event_attr<'a>(r: &'a Response, ty: &str, key: &str) -> Option<&'a str> {
+    r.events
+        .iter()
+        .find(|e| e.ty == ty)?
+        .attributes
+        .iter()
+        .find(|a| a.key == key)
+        .map(|a| a.value.as_str())
+}
+
+#[test]
+fn require_immutable_is_opt_in_and_checks_the_chain() {
+    let (mut deps, a) = setup();
+    let immutable = deps.api.addr_make("immutable_proxy");
+    let mutable = deps.api.addr_make("mutable_proxy");
+    let eoa = deps.api.addr_make("some_wallet");
+    let upgrader = deps.api.addr_make("upgrader");
+    describe_contracts(
+        &mut deps,
+        vec![
+            (immutable.clone(), 42, None),
+            (mutable.clone(), 43, Some(upgrader.clone())),
+        ],
+    );
+    let add = |p: &Addr, strict: bool| {
+        ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+            proxy: p.to_string(),
+            require_immutable: strict,
+        })
+    };
+
+    // strict: only an admin-less contract passes
+    let r = exec(deps.as_mut(), &a.creator, &[], add(&immutable, true)).unwrap();
+    assert_eq!(
+        event_attr(&r, "trusted_proxy_added", "proxy_kind"),
+        Some("contract")
+    );
+    assert_eq!(
+        event_attr(&r, "trusted_proxy_added", "proxy_code_id"),
+        Some("42")
+    );
+    assert_eq!(
+        event_attr(&r, "trusted_proxy_added", "proxy_admin"),
+        Some("none")
+    );
+    assert_eq!(
+        event_attr(&r, "trusted_proxy_added", "require_immutable"),
+        Some("true")
+    );
+    assert!(matches!(
+        exec(deps.as_mut(), &a.creator, &[], add(&mutable, true)).unwrap_err(),
+        ContractError::InvalidTrustedProxy { reason } if reason.contains("wasm admin")
+    ));
+    assert!(matches!(
+        exec(deps.as_mut(), &a.creator, &[], add(&eoa, true)).unwrap_err(),
+        ContractError::InvalidTrustedProxy { reason } if reason.contains("not a contract")
+    ));
+    assert_eq!(trusted_proxies(&deps), vec![immutable.clone()]);
+
+    // non-strict: everything is accepted, but the event still tells indexers what it is
+    let r = exec(deps.as_mut(), &a.creator, &[], add(&mutable, false)).unwrap();
+    assert_eq!(
+        event_attr(&r, "trusted_proxy_added", "proxy_kind"),
+        Some("contract")
+    );
+    assert_eq!(
+        event_attr(&r, "trusted_proxy_added", "proxy_admin"),
+        Some(upgrader.as_str())
+    );
+    assert_eq!(
+        event_attr(&r, "trusted_proxy_added", "require_immutable"),
+        Some("false")
+    );
+    let r = exec(deps.as_mut(), &a.creator, &[], add(&eoa, false)).unwrap();
+    assert_eq!(
+        event_attr(&r, "trusted_proxy_added", "proxy_kind"),
+        Some("account")
+    );
+    assert_eq!(trusted_proxies(&deps).len(), 3);
+
+    // the flag is optional on the wire and defaults to off
+    let legacy: ProxyableExecuteMsg = from_json(format!(
+        r#"{{"add_trusted_proxy":{{"proxy":"{}"}}}}"#,
+        a.proxy
+    ))
+    .unwrap();
+    assert!(matches!(
+        legacy,
+        ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+            require_immutable: false,
+            ..
+        })
+    ));
+    // a strict failure leaves no trace
+    let strict_fail = exec(deps.as_mut(), &a.creator, &[], add(&a.bob, true));
+    assert!(strict_fail.is_err());
+    assert_eq!(trusted_proxies(&deps).len(), 3);
 }
