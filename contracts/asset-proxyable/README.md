@@ -46,6 +46,17 @@ All base messages and queries keep their exact JSON shape.
 Read this before registering a proxy, and before acquiring or inheriting a collection that
 runs this code.
 
+### Wasm admin
+
+The collection's x/wasm admin decides which code the collection runs and on what terms it
+migrates. It is therefore the strongest authority over the contract, and everything below
+describes guarantees about proxies, creators and users rather than about that account.
+
+A collection cannot give it up and stay upgradeable, since the admin is what allows moving
+onto this code and onward to later releases. Hold it in a multisig. Clearing it is a
+reasonable alternative and freezes the collection's code for good, because a cleared admin
+can never be set again.
+
 ### What registering a proxy actually grants
 
 `add_trusted_proxy` tells this collection: *this address may assert who the sender is.*
