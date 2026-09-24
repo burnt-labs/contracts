@@ -75,6 +75,35 @@ pub enum QueryMsg {
     Config {},
     #[returns(Listing)]
     Listing { listing_id: String },
+    /// Returns all stored listings in ascending listing ID order.
+    ///
+    /// Listing IDs are deterministic hashes, so the order is stable but not chronological.
+    /// Both active and reserved listings are included.
+    #[returns(Vec<Listing>)]
+    Listings {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
+    /// Returns a seller's stored listings in ascending listing ID order.
+    ///
+    /// Listing IDs are deterministic hashes, so the order is stable but not chronological.
+    /// Both active and reserved listings are included.
+    #[returns(Vec<Listing>)]
+    ListingsBySeller {
+        seller: String,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
+    /// Returns a collection's stored listings in ascending listing ID order.
+    ///
+    /// Listing IDs are deterministic hashes, so the order is stable but not chronological.
+    /// Both active and reserved listings are included.
+    #[returns(Vec<Listing>)]
+    ListingsByCollection {
+        collection: String,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
     #[returns(Offer)]
     Offer { offer_id: String },
     #[returns(CollectionOffer)]
