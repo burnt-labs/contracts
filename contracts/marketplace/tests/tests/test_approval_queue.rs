@@ -1292,6 +1292,244 @@ fn test_reject_sale_leaves_replacement_listing_alone() {
     );
 }
 
+/// Drive the best-effort cleanup into its failure branch and return the
+/// pending sale id plus the buyer's balance before the sale.
+///
+/// The asset contract refuses transfers of a listed token but not burns, so a
+/// seller can burn the NFT mid-escrow. The listing and its reservation remain
+/// on the asset side, so `remove_pending_sale` still sends its `UnReserve`
+/// submessage — which then fails on the missing token. That is the one
+/// reachable way to make the cleanup submessage error today.
+fn setup_pending_sale_with_burned_token(
+    app: &mut cw_multi_test::App,
+    asset_contract: &cosmwasm_std::Addr,
+    marketplace_contract: &cosmwasm_std::Addr,
+    seller: &cosmwasm_std::Addr,
+    buyer: &cosmwasm_std::Addr,
+    listing_id: &str,
+    price: &cosmwasm_std::Coin,
+) -> (String, cosmwasm_std::Uint128) {
+    let buyer_balance_before = app.wrap().query_balance(buyer, "uxion").unwrap().amount;
+
+    let buy_msg = ExecuteMsg::BuyItem {
+        listing_id: listing_id.to_string(),
+        price: price.clone(),
+    };
+    let buy_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &buy_msg,
+        std::slice::from_ref(price),
+    );
+    assert!(buy_result.is_ok(), "{:?}", buy_result.err());
+
+    let pending_sale_id = buy_result
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "wasm-xion-nft-marketplace/pending-sale-created")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "id")
+        .unwrap()
+        .value
+        .clone();
+
+    let burn_msg: cw721_base::msg::ExecuteMsg = cw721_base::msg::ExecuteMsg::Burn {
+        token_id: "token1".to_string(),
+    };
+    let burn_result = app.execute_contract(seller.clone(), asset_contract.clone(), &burn_msg, &[]);
+    assert!(
+        burn_result.is_ok(),
+        "seller can burn a listed token: {:?}",
+        burn_result.err()
+    );
+    // The asset listing (and the sale's reservation) outlive the token.
+    assert!(
+        query_listing(&app.wrap(), asset_contract, "token1").is_ok(),
+        "asset listing must survive the burn for the cleanup submessage to fire"
+    );
+
+    (pending_sale_id, buyer_balance_before)
+}
+
+fn assert_cleanup_failed_but_buyer_whole(
+    app: &cw_multi_test::App,
+    result: cw_multi_test::AppResponse,
+    marketplace_contract: &cosmwasm_std::Addr,
+    buyer: &cosmwasm_std::Addr,
+    buyer_balance_before: cosmwasm_std::Uint128,
+    pending_sale_id: String,
+    listing_id: String,
+) {
+    let attrs: Vec<(&str, &str)> = result
+        .events
+        .iter()
+        .flat_map(|e| e.attributes.iter())
+        .map(|a| (a.key.as_str(), a.value.as_str()))
+        .collect();
+    assert!(
+        attrs.contains(&("unreserve_status", "failed_best_effort")),
+        "reply handler must record the failed cleanup, got {attrs:?}"
+    );
+    assert!(
+        attrs.contains(&("listing_removed", listing_id.as_str())),
+        "reply handler must remove the restored listing, got {attrs:?}"
+    );
+
+    let buyer_balance_after = app.wrap().query_balance(buyer, "uxion").unwrap().amount;
+    assert_eq!(
+        buyer_balance_after, buyer_balance_before,
+        "buyer must be made whole even though the asset cleanup failed"
+    );
+
+    let pending_sale_query = app.wrap().query_wasm_smart::<PendingSale>(
+        marketplace_contract.clone(),
+        &QueryMsg::PendingSale {
+            id: pending_sale_id,
+        },
+    );
+    assert!(pending_sale_query.is_err(), "pending sale must be removed");
+
+    let listing_query = app.wrap().query_wasm_smart::<Listing>(
+        marketplace_contract.clone(),
+        &QueryMsg::Listing { listing_id },
+    );
+    assert!(
+        listing_query.is_err(),
+        "listing must not be advertised as Active when the asset side cannot honor it"
+    );
+}
+
+#[test]
+fn test_reject_sale_refunds_when_asset_cleanup_fails() {
+    // The UnReserve submessage errors (token burned mid-escrow). The reply
+    // handler must swallow the error so the refund lands, and must remove the
+    // marketplace listing it restored a moment earlier.
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    let (pending_sale_id, buyer_balance_before) = setup_pending_sale_with_burned_token(
+        &mut app,
+        &asset_contract,
+        &marketplace_contract,
+        &seller,
+        &buyer,
+        &listing_id,
+        &price,
+    );
+
+    let reject_msg = ExecuteMsg::RejectSale {
+        id: pending_sale_id.clone(),
+    };
+    let reject_result = app.execute_contract(
+        manager.clone(),
+        marketplace_contract.clone(),
+        &reject_msg,
+        &[],
+    );
+    assert!(
+        reject_result.is_ok(),
+        "reject must succeed despite failed asset cleanup: {:?}",
+        reject_result.err()
+    );
+
+    assert_cleanup_failed_but_buyer_whole(
+        &app,
+        reject_result.unwrap(),
+        &marketplace_contract,
+        &buyer,
+        buyer_balance_before,
+        pending_sale_id,
+        listing_id,
+    );
+}
+
+#[test]
+fn test_reclaim_expired_sale_refunds_when_asset_cleanup_fails() {
+    // Same failure, reached through the buyer's own reclaim after expiry —
+    // the path a buyer depends on when the manager never acts.
+    let mut app = setup_app_with_balances();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_with_approvals(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let price = coin(100, "uxion");
+    let listing_id = create_listing_helper(
+        &mut app,
+        &marketplace_contract,
+        &asset_contract,
+        &seller,
+        "token1",
+        price.clone(),
+    );
+
+    let (pending_sale_id, buyer_balance_before) = setup_pending_sale_with_burned_token(
+        &mut app,
+        &asset_contract,
+        &marketplace_contract,
+        &seller,
+        &buyer,
+        &listing_id,
+        &price,
+    );
+
+    // Past the 24h sale expiration, but the reservation deadline is the same
+    // instant, so the sale's claim is still identifiable (equality, not
+    // liveness, is what remove_pending_sale checks).
+    app.update_block(|b| b.time = b.time.plus_seconds(86401));
+
+    let reclaim_msg = ExecuteMsg::ReclaimExpiredSale {
+        id: pending_sale_id.clone(),
+    };
+    let reclaim_result = app.execute_contract(
+        buyer.clone(),
+        marketplace_contract.clone(),
+        &reclaim_msg,
+        &[],
+    );
+    assert!(
+        reclaim_result.is_ok(),
+        "reclaim must succeed despite failed asset cleanup: {:?}",
+        reclaim_result.err()
+    );
+
+    assert_cleanup_failed_but_buyer_whole(
+        &app,
+        reclaim_result.unwrap(),
+        &marketplace_contract,
+        &buyer,
+        buyer_balance_before,
+        pending_sale_id,
+        listing_id,
+    );
+}
+
 #[test]
 fn test_reject_sale_unauthorized() {
     let mut app = setup_app_with_balances();

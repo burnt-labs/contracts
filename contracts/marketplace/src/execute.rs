@@ -624,7 +624,7 @@ fn remove_pending_sale(
     }
 
     // refund buyer — this is a top-level message so it always executes
-    // regardless of whether the delist SubMsg succeeds or fails
+    // regardless of whether the unreserve SubMsg succeeds or fails
     let refund_msg = BankMsg::Send {
         to_address: pending_sale.buyer.to_string(),
         amount: vec![pending_sale.price.clone()],
