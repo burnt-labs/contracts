@@ -116,6 +116,7 @@ type CollectionOfferId = String;
 #[index_list(Listing)]
 pub struct ListingIndices<'a> {
     pub by_seller: MultiIndex<'a, Addr, Listing, ListingId>,
+    pub by_collection: MultiIndex<'a, Addr, Listing, ListingId>,
 }
 
 pub fn listings<'a>() -> IndexedMap<ListingId, Listing, ListingIndices<'a>> {
@@ -124,6 +125,11 @@ pub fn listings<'a>() -> IndexedMap<ListingId, Listing, ListingIndices<'a>> {
             |_pk: &[u8], listing: &Listing| listing.seller.clone(),
             "l",
             "ls",
+        ),
+        by_collection: MultiIndex::new(
+            |_pk: &[u8], listing: &Listing| listing.collection.clone(),
+            "l",
+            "lc",
         ),
     };
     IndexedMap::new("l", listing_indices)
