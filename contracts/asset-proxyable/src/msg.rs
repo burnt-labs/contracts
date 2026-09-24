@@ -33,6 +33,9 @@ pub type MigrateMsg = cw721::msg::Cw721MigrateMsg;
 /// `remove_trusted_proxy`, and no proxy variant shares a name with a base one (see the
 /// `variant_names_are_disjoint` test). The `Proxy` arm is tried first and fails fast on any
 /// base message with a cheap tag mismatch; serde buffers the input once.
+// The base variant dwarfs the proxy one; boxing it would add an allocation to every
+// message parse for a value that lives only for the duration of one entrypoint call.
+#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(untagged)]
 pub enum ProxyableExecuteMsg {
@@ -83,6 +86,7 @@ pub enum ProxyAction {
 }
 
 /// Top-level query message, same untagged shape as the execute message.
+#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, QueryResponses)]
 #[serde(untagged)]
 #[query_responses(nested)]
