@@ -46,7 +46,9 @@ pub fn execute(
             token_id,
             maybe_addr(api, reserved_for)?,
         ),
-        ExecuteMsg::CancelListing { listing_id } => execute_cancel_listing(deps, info, listing_id),
+        ExecuteMsg::CancelListing { listing_id } => {
+            execute_cancel_listing(deps, env, info, listing_id)
+        }
         ExecuteMsg::BuyItem { listing_id, price } => {
             execute_buy_item(deps, env, info.clone(), listing_id, price, info.sender)
         }
@@ -199,6 +201,7 @@ pub fn execute_create_listing(
 
 pub fn execute_cancel_listing(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     listing_id: String,
 ) -> Result<Response, ContractError> {
@@ -226,8 +229,21 @@ pub fn execute_cancel_listing(
 
     let mut sub_msgs = vec![];
 
-    if asset_listing.is_ok() {
-        let cancel_listing = asset_delist_msg(listing.token_id.clone());
+    if let Ok(asset_listing) = asset_listing {
+        // A reserved_for listing carries the marketplace's own reservation,
+        // which the asset contract only lets the reserver clear while it is
+        // live. Remove it under that reserver authority rather than through
+        // Delist, which also needs the seller's CW721 approval: a seller who
+        // revoked the approval could otherwise not cancel until expiry.
+        let held_by_marketplace = asset_listing
+            .reserved
+            .as_ref()
+            .is_some_and(|r| r.reserver == env.contract.address);
+        let cancel_listing = if held_by_marketplace {
+            asset_unreserve_msg(listing.token_id.clone(), true)
+        } else {
+            asset_delist_msg(listing.token_id.clone())
+        };
         sub_msgs.push(WasmMsg::Execute {
             contract_addr: listing.collection.to_string(),
             msg: to_json_binary(&cancel_listing)?,

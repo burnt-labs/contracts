@@ -136,3 +136,73 @@ fn test_cancel_listing_nonexistent() {
     assert!(result.is_err());
     result.unwrap_err().to_string().contains("not found");
 }
+
+#[test]
+fn test_cancel_reserved_listing_after_approval_revoked() {
+    // A reserved_for listing holds the marketplace's own reservation on the
+    // asset side, which only the reserver may clear while it is live. The
+    // seller must still be able to cancel after revoking the marketplace's
+    // CW721 approval, so cancellation acts as the reserver instead of
+    // relying on that approval.
+    let mut app = setup_app();
+    let minter = app.api().addr_make("minter");
+    let seller = app.api().addr_make("seller");
+    let buyer = app.api().addr_make("buyer");
+    let manager = app.api().addr_make("manager");
+
+    let asset_contract = setup_asset_contract(&mut app, &minter);
+    let marketplace_contract = setup_marketplace_contract(&mut app, &manager);
+
+    mint_nft(&mut app, &asset_contract, &minter, &seller, "token1");
+
+    let approve_msg = cw721_base::msg::ExecuteMsg::Approve {
+        spender: marketplace_contract.to_string(),
+        token_id: "token1".to_string(),
+        expires: None,
+    };
+    app.execute_contract(seller.clone(), asset_contract.clone(), &approve_msg, &[])
+        .unwrap();
+    let list_msg = ExecuteMsg::ListItem {
+        collection: asset_contract.to_string(),
+        price: coin(100, "uxion"),
+        token_id: "token1".to_string(),
+        reserved_for: Some(buyer.to_string()),
+    };
+    let list_result =
+        app.execute_contract(seller.clone(), marketplace_contract.clone(), &list_msg, &[]);
+    assert!(list_result.is_ok(), "{:?}", list_result.err());
+    let listing_id = xion_nft_marketplace::helpers::generate_id(vec![
+        asset_contract.as_bytes(),
+        "token1".as_bytes(),
+    ]);
+
+    let revoke_msg = cw721_base::msg::ExecuteMsg::Revoke {
+        spender: marketplace_contract.to_string(),
+        token_id: "token1".to_string(),
+    };
+    app.execute_contract(seller.clone(), asset_contract.clone(), &revoke_msg, &[])
+        .unwrap();
+
+    let cancel_msg = ExecuteMsg::CancelListing {
+        listing_id: listing_id.clone(),
+    };
+    let result = app.execute_contract(
+        seller.clone(),
+        marketplace_contract.clone(),
+        &cancel_msg,
+        &[],
+    );
+    assert!(
+        result.is_ok(),
+        "seller must be able to cancel a reserved listing: {:?}",
+        result.err()
+    );
+
+    let asset_listing = query_listing(&app.wrap(), &asset_contract, "token1");
+    assert!(asset_listing.is_err(), "asset listing must be removed");
+
+    let listing_resp = app
+        .wrap()
+        .query_wasm_smart::<Listing>(marketplace_contract, &QueryMsg::Listing { listing_id });
+    assert!(listing_resp.is_err(), "marketplace listing must be removed");
+}
