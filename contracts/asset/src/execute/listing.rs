@@ -1,5 +1,5 @@
 use cosmwasm_std::{Coin, CustomMsg, DepsMut, Env, MessageInfo, Response};
-use cw721::traits::Cw721State;
+use cw721::{Expiration, traits::Cw721State};
 
 use crate::{
     error::ContractError,
@@ -101,6 +101,18 @@ where
     check_can_list(deps.as_ref(), env, info.sender.as_ref(), &nft_info)?;
     if listing.seller != nft_info.owner {
         return Err(ContractError::StaleListing {});
+    }
+
+    // Same rule as unreserve: while a third party (e.g. the marketplace)
+    // holds a live reservation, only the reserver may delist. Removing the
+    // listing also removes the reservation stored inside it, so an unguarded
+    // delist would reopen the pending-sale escrow griefing path.
+    if let Some(reserved) = &listing.reserved {
+        if reserved.reserver != info.sender
+            && !Expiration::AtTime(reserved.reserved_until).is_expired(&env.block)
+        {
+            return Err(ContractError::ReservedAsset { id: id.clone() });
+        }
     }
 
     asset_config.listings.remove(deps.storage, &id)?;

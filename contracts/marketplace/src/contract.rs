@@ -1,10 +1,11 @@
 use std::env;
 
 use crate::error::ContractError;
+use crate::execute::{reply_unreserve_best_effort, REPLY_UNRESERVE_BEST_EFFORT};
 use crate::msg::{InstantiateMsg, MigrateMsg};
 use crate::state::init_auto_increment;
 use crate::state::Config;
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Reply, Response};
 use cw2::set_contract_version;
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
@@ -52,5 +53,15 @@ mod tests {
         let version = get_contract_version(deps.as_ref().storage).unwrap();
         assert_eq!(version.contract, CONTRACT_NAME);
         assert_eq!(version.version, CONTRACT_VERSION);
+    }
+}
+
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
+pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+    match msg.id {
+        REPLY_UNRESERVE_BEST_EFFORT => reply_unreserve_best_effort(deps, msg),
+        id => Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+            format!("unknown reply id: {id}"),
+        ))),
     }
 }
