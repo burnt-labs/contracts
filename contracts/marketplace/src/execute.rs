@@ -213,10 +213,11 @@ pub fn execute_cancel_listing(
             message: "sender is not the seller".to_string(),
         }
     );
-    // can't cancel a list that is pending approval if sale approvals are enabled
-    // listings that are in pending status have already been placed a matching buy order
-    // but it's not yet been accepted by the manager
-    if CONFIG.load(deps.storage)?.sale_approvals && listing.status != ListingStatus::Active {
+    // can't cancel a listing that is pending approval: it already has a
+    // matching buy order whose funds are escrowed here. Checked regardless of
+    // the current sale_approvals value — the manager may have switched it off
+    // after the sale was created, and the escrow still depends on the listing.
+    if listing.status != ListingStatus::Active {
         return Err(ContractError::InvalidListingStatus {
             expected: ListingStatus::Active.to_string(),
             actual: listing.status.to_string(),
