@@ -51,6 +51,10 @@ roles. Requires a wasm admin on the collection.
 
 Fresh instantiations record cw2 name `asset-proxyable`, never `asset`.
 
+A migration that rotates the creator (`with_update { creator: Some(..) }`) clears the
+trusted-proxy set exactly like an accepted handover does, so a new creator always starts
+with no proxies regardless of the route by which they took over.
+
 Rollback is supported: base `asset` 0.2.0 accepts `asset-proxyable` 0.1.0 as a migration
 source. After rolling back, the proxy messages and queries no longer exist (base code does
 not know them) and the dormant `trusted_proxies` storage is never read; moving forward to

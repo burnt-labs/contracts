@@ -1272,6 +1272,66 @@ fn migrate_between_variant_versions_keeps_proxies() {
 }
 
 #[test]
+fn migrate_that_rotates_the_creator_clears_proxies() {
+    // WithUpdate { creator: Some(..) } changes the creator through cw721 directly, bypassing
+    // AcceptOwnership; it must apply the same handover rule
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    let r = migrate(
+        deps.as_mut(),
+        mock_env(),
+        Cw721MigrateMsg::WithUpdate {
+            minter: None,
+            creator: Some(a.bob.to_string()),
+        },
+    )
+    .unwrap();
+    assert_eq!(attr(&r, "creator_changed"), Some("true"));
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("1"));
+    assert!(trusted_proxies(&deps).is_empty());
+    let owner = cw721::state::CREATOR
+        .item
+        .load(deps.as_ref().storage)
+        .unwrap()
+        .owner;
+    assert_eq!(owner, Some(a.bob.clone()));
+    // the former proxy is locked out
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.proxy,
+            &[],
+            proxied(
+                &a.alice,
+                ProxyAction::Burn {
+                    token_id: "t1".to_string()
+                }
+            )
+        )
+        .unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+    assert_eq!(owner_of(&deps, "t1"), Some(a.alice.to_string()));
+
+    // rotating the creator to the same address is not a change; a minter rotation is
+    // unrelated to proxy trust
+    add_proxy(deps.as_mut(), &a.bob, &a.proxy);
+    let r = migrate(
+        deps.as_mut(),
+        mock_env(),
+        Cw721MigrateMsg::WithUpdate {
+            minter: Some(a.alice.to_string()),
+            creator: Some(a.bob.to_string()),
+        },
+    )
+    .unwrap();
+    assert_eq!(attr(&r, "creator_changed"), Some("false"));
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("0"));
+    assert_eq!(trusted_proxies(&deps), vec![a.proxy.clone()]);
+}
+
+#[test]
 fn migrate_rejects_unknown_sources() {
     let (mut deps, _) = setup();
     cw2::set_contract_version(deps.as_mut().storage, "something-else", "0.1.0").unwrap();

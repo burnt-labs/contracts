@@ -399,7 +399,7 @@ fn allowlisting_a_base_code_collection_is_harmless() {
             &[],
         )
         .unwrap();
-    let listed: Vec<Addr> = w
+    let listed: Vec<xion_asset_proxy::msg::CollectionEntry> = w
         .app
         .wrap()
         .query_wasm_smart(
@@ -816,7 +816,7 @@ fn proxy_policy_bounds_a_compromised_session() {
     w.app
         .execute_contract(w.alice.clone(), w.proxy.clone(), &revoke, &[])
         .unwrap();
-    // ... and a malformed operator is rejected by the collection, not silently accepted
+    // ... and an operator this proxy never configured is refused before anything is relayed
     let err = w
         .app
         .execute_contract(
@@ -831,6 +831,114 @@ fn proxy_policy_bounds_a_compromised_session() {
             &[],
         )
         .unwrap_err();
-    assert!(!err.root_cause().to_string().is_empty());
+    assert!(
+        err.root_cause()
+            .to_string()
+            .contains("Operator is not allowed"),
+        "{err:#}"
+    );
     assert!(is_operator(&w, &w.buyer, &w.marketplace));
+    let cfg: xion_asset_proxy::msg::ConfigResponse = w
+        .app
+        .wrap()
+        .query_wasm_smart(&w.proxy, &QueryMsg::Config {})
+        .unwrap();
+    assert_eq!(cfg.former_operators, vec![w.marketplace.clone()]);
+}
+
+#[test]
+fn quarantined_collection_keeps_sponsored_revocation_only() {
+    let mut w = world();
+    let alice = w.alice.clone();
+    mint(&mut w, &alice, "t1");
+    w.app
+        .execute_contract(
+            alice.clone(),
+            w.proxy.clone(),
+            &ExecuteMsg::SponsoredApproval {
+                collection: w.collection.to_string(),
+                action: ApprovalAction::ApproveAll {
+                    operator: w.marketplace.to_string(),
+                    expires: Some(in_a_week(&w)),
+                },
+            },
+            &[],
+        )
+        .unwrap();
+    assert!(is_operator(&w, &alice, &w.marketplace));
+
+    // incident: admin quarantines the collection
+    w.app
+        .execute_contract(
+            w.admin.clone(),
+            w.proxy.clone(),
+            &ExecuteMsg::RemoveCollection {
+                collection: w.collection.to_string(),
+            },
+            &[],
+        )
+        .unwrap();
+    // burn and approve are refused ...
+    let err = w
+        .app
+        .execute_contract(
+            alice.clone(),
+            w.proxy.clone(),
+            &ExecuteMsg::SponsoredBurn {
+                collection: w.collection.to_string(),
+                token_id: "t1".to_string(),
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert!(
+        err.root_cause().to_string().contains("quarantined"),
+        "{err:#}"
+    );
+    // ... but revocation still reaches the collection
+    w.app
+        .execute_contract(
+            alice.clone(),
+            w.proxy.clone(),
+            &ExecuteMsg::SponsoredApproval {
+                collection: w.collection.to_string(),
+                action: ApprovalAction::RevokeAll {
+                    operator: w.marketplace.to_string(),
+                },
+            },
+            &[],
+        )
+        .unwrap();
+    assert!(!is_operator(&w, &alice, &w.marketplace));
+    assert_eq!(owner_of(&w, "t1"), Some(alice.to_string()));
+
+    // purge ends sponsorship for the collection completely
+    w.app
+        .execute_contract(
+            w.admin.clone(),
+            w.proxy.clone(),
+            &ExecuteMsg::PurgeCollection {
+                collection: w.collection.to_string(),
+            },
+            &[],
+        )
+        .unwrap();
+    let err = w
+        .app
+        .execute_contract(
+            alice.clone(),
+            w.proxy.clone(),
+            &ExecuteMsg::SponsoredApproval {
+                collection: w.collection.to_string(),
+                action: ApprovalAction::RevokeAll {
+                    operator: w.marketplace.to_string(),
+                },
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert!(
+        err.root_cause().to_string().contains("not allowlisted"),
+        "{err:#}"
+    );
 }

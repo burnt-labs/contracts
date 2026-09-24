@@ -14,9 +14,10 @@ The effective sender forwarded to a collection is always this contract's own
 |---|---|---|
 | `sponsored_burn { collection, token_id }` | any user | Burn `token_id` as the caller. The collection enforces owner-only. |
 | `sponsored_approval { collection, action }` | any user | `approve_all` a currently allowed operator, or `revoke_all` any operator, as the caller. |
-| `add_collection { collection }` | admin | Allowlist a collection as a target for sponsored calls. |
-| `remove_collection { collection }` | admin | Remove from the allowlist. |
-| `remove_allowed_operator { operator }` | admin | Remove an operator. There is no way to add one after instantiation. Prospective only: existing approvals persist until expiry or revocation. |
+| `add_collection { collection }` | admin | Allowlist a collection as a target for sponsored calls, or reactivate a quarantined one. |
+| `remove_collection { collection }` | admin | Quarantine: only `revoke_all` is relayed to it afterwards, so users keep a sponsored way out after an incident. Still counts against the cap. |
+| `purge_collection { collection }` | admin | Delete a quarantined entry entirely. Sponsored revocation for it stops; do this only once outstanding approvals have expired or been revoked. |
+| `remove_allowed_operator { operator }` | admin | Remove an operator. There is no way to add one after instantiation. Prospective only: existing approvals persist until expiry or revocation, and `revoke_all` keeps working for the removed operator. |
 | `update_admin { admin }` | admin | Hand over administration (never to the proxy itself). |
 
 Burn and approval are separate top-level keys on purpose: an authz
@@ -32,11 +33,12 @@ collection knows that (`get_trusted_proxies` on the collection).
 
 - Every message is non-payable. Forwarded calls attach no funds.
 - The collection must be allowlisted and must not be this contract.
-- `approve_all.operator` must be one of the operators fixed at instantiation.
-  `revoke_all` is accepted for any operator, so a user can withdraw authority through the
-  sponsored path even from an operator the admin has since removed, subject to the same
-  collection allowlist, proxy trust and grant budget as every other sponsored call.
-  Revocation is also always available directly on the collection, unsponsored.
+- `approve_all.operator` must be one of the operators currently allowed.
+  `revoke_all.operator` may be any operator that is or ever was allowed here, so a user can
+  withdraw authority through the sponsored path even after the admin removed that operator,
+  while a stolen session cannot disturb approvals the user granted to unrelated operators.
+  Revocation is also relayed to quarantined collections, and is always available directly
+  on the collection, unsponsored.
 - With `max_approval_seconds` set, `approve_all.expires` must be a timestamp within
   `(now, now + cap]`. `never`, height-based and missing expiries are rejected because cw721
   treats a missing expiry as permanent.
@@ -73,6 +75,14 @@ exceed what the caller could do directly, and a relayed burn is stricter (owner-
   funds-accepting path and no withdraw.
 - Each new collection needs two admin transactions: `add_trusted_proxy` on the collection
   by its creator, and `add_collection` here.
+
+## For redemption backends
+
+A sponsored burn is confirmed by the token no longer existing, not by events. The proxy
+relays one message and does not verify what the target did; an allowlisted contract that
+is not a genuine `asset-proxyable` collection could emit burn-like attributes and return
+success without burning. Before treating a redemption as final, query `owner_of` (or
+`nft_info`) on the collection after finality and require a not-found result.
 
 ## Treasury shape (summary)
 

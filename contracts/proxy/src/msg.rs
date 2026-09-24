@@ -2,6 +2,7 @@ use cosmwasm_schema::{QueryResponses, cw_serde};
 use cosmwasm_std::Addr;
 use cw721::Expiration;
 
+pub use crate::state::{CollectionEntry, CollectionStatus};
 pub use asset_proxyable::msg::ProxyAction;
 
 #[cw_serde]
@@ -59,14 +60,19 @@ pub enum ExecuteMsg {
         collection: String,
         action: ApprovalAction,
     },
-    /// Admin: allowlist a collection.
+    /// Admin: allowlist a collection (or reactivate a quarantined one).
     AddCollection { collection: String },
-    /// Admin: remove a collection from the allowlist.
+    /// Admin: quarantine a collection. Only `RevokeAll` is relayed to it afterwards, so
+    /// users keep a sponsored way to withdraw authority from an operator after an
+    /// incident. The entry still counts against the collection cap.
     RemoveCollection { collection: String },
+    /// Admin: delete a quarantined collection entirely. Sponsored revocation for it stops;
+    /// use only once outstanding approvals have expired or been revoked.
+    PurgeCollection { collection: String },
     /// Admin: remove an operator. There is deliberately no way to add one. Removal is
-    /// prospective: it stops new sponsored approvals for that operator, leaves approvals
-    /// already stored on collections in place until they expire or are revoked, and never
-    /// blocks sponsored `RevokeAll`, which stays available for any operator.
+    /// prospective: it stops new sponsored approvals for that operator and leaves approvals
+    /// already stored on collections in place until they expire or are revoked. Sponsored
+    /// `RevokeAll` stays available for every operator that is or ever was allowed.
     RemoveAllowedOperator { operator: String },
     /// Admin: hand over administration.
     UpdateAdmin { admin: String },
@@ -76,6 +82,8 @@ pub enum ExecuteMsg {
 pub struct ConfigResponse {
     pub admin: Addr,
     pub allowed_operators: Vec<Addr>,
+    /// Operators removed from the allowlist. Sponsored `RevokeAll` still works for them.
+    pub former_operators: Vec<Addr>,
     pub max_approval_seconds: Option<u64>,
 }
 
@@ -91,7 +99,8 @@ pub struct IsAllowedResponse {
 pub enum QueryMsg {
     #[returns(ConfigResponse)]
     Config {},
-    #[returns(Vec<Addr>)]
+    /// Allowlisted collections with their status (active or revocation-only).
+    #[returns(Vec<CollectionEntry>)]
     Collections {
         start_after: Option<String>,
         limit: Option<u32>,

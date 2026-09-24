@@ -321,10 +321,14 @@ pub fn query(deps: Deps, env: Env, msg: ProxyableQueryMsg) -> StdResult<Binary> 
 
 /// Migrate from a base `asset` contract or an earlier `asset-proxyable` version. The stored
 /// cw2 identity is checked first because cw721's migrate rewrites it unconditionally.
-/// Coming from `asset`, the trusted-proxy map is cleared: a map does not empty itself on a
-/// code migration, and dormant entries from an earlier proxyable life must not wake up.
+/// The trusted-proxy map is cleared when either:
+/// - the source is the base contract (a map does not empty itself on a code migration, and
+///   dormant entries from an earlier proxyable life must not wake up), or
+/// - the migration changed the creator (`WithUpdate { creator: Some(..) }` rotates the role
+///   directly through cw721, bypassing the `AcceptOwnership` handover path, and must apply
+///   the same rule: a new creator starts with no trusted proxies).
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
-pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> ContractResult<Response> {
+pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> ContractResult<Response> {
     let stored = cw2::get_contract_version(deps.storage)?;
     if !MIGRATABLE_FROM.contains(&(stored.contract.as_str(), stored.version.as_str())) {
         return Err(ContractError::InvalidMigration {
@@ -332,15 +336,20 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> ContractResult<Respo
             version: stored.version,
         });
     }
-
-    let mut cleared = 0;
-    if stored.contract != CONTRACT_NAME {
-        cleared = clear_trusted_proxies(deps.storage)?;
-    }
+    let previous_creator = CREATOR.item.may_load(deps.storage)?.and_then(|o| o.owner);
 
     let contract: BaseContract<'static> = DefaultAssetContract::default();
-    let response = contract.migrate(deps, env, msg, CONTRACT_NAME, CONTRACT_VERSION)?;
+    let response = contract.migrate(deps.branch(), env, msg, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    let current_creator = CREATOR.item.may_load(deps.storage)?.and_then(|o| o.owner);
+    let creator_changed = previous_creator != current_creator;
+    let cleared = if stored.contract != CONTRACT_NAME || creator_changed {
+        clear_trusted_proxies(deps.storage)?
+    } else {
+        0
+    };
     Ok(response
         .add_attribute("from_contract", stored.contract)
+        .add_attribute("creator_changed", creator_changed.to_string())
         .add_attribute("trusted_proxies_cleared", cleared.to_string()))
 }
