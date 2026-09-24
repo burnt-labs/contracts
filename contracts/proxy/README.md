@@ -76,6 +76,38 @@ exceed what the caller could do directly, and a relayed burn is stricter (owner-
 - Each new collection needs two admin transactions: `add_trusted_proxy` on the collection
   by its creator, and `add_collection` here.
 
+## Trust model and constraints
+
+This contract is one specific instance of the authority described in
+[`asset-proxyable`'s trust model](../asset-proxyable/README.md#trust-model-design-decisions-and-constraints).
+A collection that registers it is granting it the power to assert who the sender is, so
+the guarantees below are what make that grant defensible. They are properties of this
+deployment, not of the pattern.
+
+- **The effective sender is never a parameter.** It is always this contract's own
+  `info.sender`, derived in one place. No message accepts a sender field.
+- **The action set is closed.** Burn, approve-all, revoke-all. New actions require a
+  release on both sides, so the authority cannot widen by configuration.
+- **Proxied burn is owner-only**, stricter than a direct burn, which honours operator and
+  approval authority.
+- **Approvals are bounded by policy.** Only configured operators, and with a cap set, only
+  finite expiries. This is what distinguishes the canonical proxy from an arbitrary
+  trusted address: a collection that registers some other proxy gets none of it.
+- **No funds.** Every message rejects them and forwarded calls attach none.
+- **Immutable in production.** Deployed without a wasm admin, so the sender derivation
+  cannot be changed afterwards. See the deployment rules above.
+
+Constraints that follow from the design, and are not defects:
+
+- Removing an operator, or quarantining a collection, is prospective. It stops new
+  approvals but cannot revoke approvals already stored on collections. Users withdraw
+  those themselves, through this contract or directly.
+- The operator set can only shrink. Adding one later would widen every grant users already
+  signed, so recovery from a marketplace redeploy is a proxy redeployment, not a config
+  change.
+- Allowlisting a collection bounds only where sponsored gas may be spent. It makes no
+  claim about what that collection's code does; see the redemption note below.
+
 ## For redemption backends
 
 A sponsored burn is confirmed by the token no longer existing, not by events. The proxy

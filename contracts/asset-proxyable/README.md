@@ -41,6 +41,80 @@ wrapper and collections on the base code id have no proxy surface at all.
 
 All base messages and queries keep their exact JSON shape.
 
+## Trust model, design decisions and constraints
+
+Read this before registering a proxy, and before acquiring or inheriting a collection that
+runs this code.
+
+### What registering a proxy actually grants
+
+`add_trusted_proxy` tells this collection: *this address may assert who the sender is.*
+Every proxied action then runs with whatever sender the proxy names, checked only against
+that claimed identity. Within the closed action set that means the proxy can burn any
+token whose owner it names, and can create operator approvals on behalf of any owner.
+
+That is custodial-equivalent authority over the collection, limited to what each owner
+could do themselves. It is a deliberate design decision, not an oversight: the whole point
+of the pattern is that the collection stops asking "did the caller sign this?" and starts
+asking "do I trust the caller to tell me who did?". Treat registering a proxy as handing
+out a collection-wide operator role, and register only proxies whose code you have
+reviewed.
+
+The grant is public. Anyone can read `GetTrustedProxies`, and every registration emits
+`trusted_proxy_added` with the proxy's kind, code id, admin and whether the strict check
+was applied. Users of a collection inherit the creator's judgement here, so make it
+visible in your own interfaces.
+
+### Constraint: proxy-created approvals outlive the proxy and the creator
+
+Clearing trust does not clear its consequences. When a proxy creates an operator approval,
+cw721 stores it in its own map, keyed by owner and operator. Nothing records that the
+approval came through a proxy. So:
+
+- removing a proxy stops it acting, but leaves every approval it already created;
+- a creator handover (accepted transfer, or a migration that rotates the creator) clears
+  the trusted-proxy set, and still leaves those approvals;
+- the approvals persist until they expire or each owner revokes them individually.
+
+**Accepted residual (2026-09-24).** A creator can register a proxy they control, seed
+operator approvals from every holder to an address they control, and then hand the
+collection over. The new creator sees an empty trusted-proxy set and may reasonably
+conclude the collection is clean while those approvals are still live. This is inherent to
+the forwarder pattern: no on-chain mechanism can distinguish a proxy-created approval from
+one the owner made directly, and revoking other users' approvals from any single key would
+break the effective-sender model the design rests on.
+
+The elimination path, deliberately out of scope, is to stop trusting the proxy's word:
+have each user sign the intended payload and verify that signature here against the
+claimed sender, so a proxy can only relay actions users actually authorized. That is a
+meta-transaction design and needs a signed payload format, per-user nonces for replay
+protection, and client support for the extra signature.
+
+### Checklist when acquiring or inheriting a collection
+
+An empty `trusted_proxies` set is not by itself evidence that a collection is clean.
+Before treating a handover as complete:
+
+1. Enumerate live operator approvals for holders you care about, either with per-holder
+   `AllOperators` queries or by reconstructing them from historical
+   `trusted_proxy_added` and `proxied_by` event attributes. Approvals with no expiry
+   deserve particular attention.
+2. Check `withdraw_address`. It is creator-set, survives handover, and is not cleared by
+   any of the handover paths, so stray-fund recovery keeps routing to the previous
+   creator's address until you overwrite it.
+3. Re-register only the proxies you intend to trust, preferably with `require_immutable`
+   set, and confirm the resulting `trusted_proxy_added` events show a contract with no
+   wasm admin.
+
+### Why the immutability check is opt-in
+
+`require_immutable` is off by default because a proxy kept under a wasm admin is a
+legitimate setup while the proxy itself is still being iterated on: a hard rule would
+block it. Turn it on once the proxy deployment is final. It does not defend against a
+malicious creator, who can register a hostile immutable contract just as easily, but for
+an honest deployment it converts "trust this address" into "trust this audited code that
+cannot change". Recommended for production.
+
 ## Migration
 
 `migrate` accepts an explicit table of cw2 `(name, version)` sources: base `asset` 0.1.0 and
