@@ -29,10 +29,16 @@ env:
   # with "`let` expressions in this position are unstable", and the contracts could
   # not be built for release at all.
   #
+  # cosmwasm-check also fails to build on current stable (undefined symbol
+  # `__rust_probestack`, from the wasmer version it pulls in), so the same pin is
+  # what lets the artifacts job install it.
+  #
   # When bumping the optimizer image, bump this in the same change: read the new
   # version with the command above, update OPTIMIZER_VERSION in Release.yml and the
   # justfile to match, and keep all three in step.
   RUST_VERSION: "1.86.0"
+
+  OPTIMIZER_VERSION: "0.17.0"
 
   # Validates that a built artifact is a real, instantiable CosmWasm contract.
   # Tracks the cosmwasm-std version in Cargo.toml.
@@ -79,42 +85,74 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --all-features --locked -- -D warnings
 
-  wasm:
-    name: Wasm build
+  artifacts:
+    name: Contract artifacts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
 
+      # Build the way a release does, for two reasons.
+      #
+      # First, never `cargo build --workspace`: that unifies features across members,
+      # so the `library` feature that asset-proxy and the marketplace request on their
+      # dependencies also gets enabled on asset and asset-proxyable, compiling their
+      # entry points out and yielding a ~20 KB artifact that cannot be instantiated.
+      # The optimizer builds each package on its own, so it is immune to this.
+      #
+      # Second, rustc 1.82 and later emit wasm using the reference-types proposal,
+      # which the CosmWasm VM rejects: cosmwasm-check reports "reference-types not
+      # enabled: zero byte expected". `-C target-cpu=mvp` does not help, because the
+      # precompiled std in the toolchain already carries it. What removes it is the
+      # `wasm-opt` pass the optimizer runs, so raw `cargo build` output cannot be
+      # validated at all and there is no point checking it here.
+      - name: Cache optimizer state
+        uses: actions/cache@v4
+        with:
+          path: |
+            .optimizer/target
+            .optimizer/registry
+          key: optimizer-${{ env.OPTIMIZER_VERSION }}-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            optimizer-${{ env.OPTIMIZER_VERSION }}-${{ runner.os }}-
+
+      - name: Build optimized artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p .optimizer/target .optimizer/registry
+          docker run --rm \
+            -v "$(pwd)":/code \
+            -v "$(pwd)/.optimizer/target":/target \
+            -v "$(pwd)/.optimizer/registry":/usr/local/cargo/registry \
+            cosmwasm/optimizer:${{ env.OPTIMIZER_VERSION }}
+
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          targets: wasm32-unknown-unknown
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache cosmwasm-check
+        id: check-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cosmwasm-check
+          key: cosmwasm-check-${{ env.COSMWASM_CHECK_VERSION }}-${{ env.RUST_VERSION }}-${{ runner.os }}
 
       - name: Install cosmwasm-check
+        if: steps.check-cache.outputs.cache-hit != 'true'
         run: cargo install cosmwasm-check --version ${{ env.COSMWASM_CHECK_VERSION }} --locked
 
-      # One build per package, never `--workspace`. A workspace-wide build unifies
-      # features across members, so the `library` feature that `asset-proxy` and the
-      # marketplace request on their dependencies also gets enabled on `asset` and
-      # `asset-proxyable`, which compiles their entry points out and produces a ~20 KB
-      # artifact that cannot be instantiated.
-      - name: Build each contract separately
+      - name: Validate artifacts
         run: |
           set -euo pipefail
-          packages=$(cargo metadata --no-deps --format-version 1 \
-            | jq -r '.packages[] | select(any(.targets[]; any(.crate_types[]; . == "cdylib"))) | .name')
-          echo "Building: $(echo "$packages" | tr '\n' ' ')"
-          for pkg in $packages; do
-            cargo build --locked --release --lib --target wasm32-unknown-unknown -p "$pkg"
-          done
-        env:
-          RUSTFLAGS: "-C link-arg=-s"
+          ls -la artifacts/
+          cat artifacts/checksums.txt
+          cosmwasm-check artifacts/*.wasm
 
-      # Rejects anything that is not a valid, instantiable CosmWasm contract, which is
-      # what the workspace-wide build used to produce silently.
-      - name: Validate artifacts
-        run: cosmwasm-check target/wasm32-unknown-unknown/release/*.wasm
+      - name: Upload artifacts for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts
+          path: |
+            artifacts/*.wasm
+            artifacts/checksums.txt

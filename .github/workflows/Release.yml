@@ -13,6 +13,11 @@ env:
   # it (1.86.0 for 0.17.0). Bump all three together: here, the justfile, and
   # RUST_VERSION in Basic.yml.
   OPTIMIZER_VERSION: "0.17.0"
+
+  # cosmwasm-check does not build on current stable (undefined symbol
+  # `__rust_probestack`, from the wasmer version it depends on), so it is installed
+  # with the same toolchain the optimizer uses.
+  RUST_VERSION: "1.86.0"
   COSMWASM_CHECK_VERSION: "2.2.2"
 
 jobs:
@@ -36,16 +41,22 @@ jobs:
             cosmwasm/optimizer:${{ env.OPTIMIZER_VERSION }}
 
       - name: Install toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
 
       - name: Install cosmwasm-check
         run: cargo install cosmwasm-check --version ${{ env.COSMWASM_CHECK_VERSION }} --locked
 
       # Fail the release rather than publish an artifact that cannot be instantiated.
+      # Only the optimizer's output can pass this: rustc 1.82 and later emit wasm using
+      # the reference-types proposal, which the VM rejects, and the optimizer's wasm-opt
+      # pass is what lowers it back out.
       - name: Validate artifacts
         run: |
           set -euo pipefail
           ls -la artifacts/
+          cat artifacts/checksums.txt
           cosmwasm-check artifacts/*.wasm
 
       - name: Upload artifacts to the release
