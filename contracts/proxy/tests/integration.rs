@@ -2,6 +2,7 @@
 //! plain addresses playing the sponsored users. Covers the flow Objectify sponsors:
 //! approve_all via proxy, list on the marketplace directly, buy, burn via proxy.
 
+use asset_proxy::msg::{ApprovalAction, ExecuteMsg, InstantiateMsg, QueryMsg};
 use asset_proxyable::msg::{
     BaseExecuteMsg, BaseQueryMsg, InstantiateMsg as CollectionInstantiateMsg, ProxyMsg,
     ProxyableExecuteMsg,
@@ -13,7 +14,6 @@ use cw721::{
     msg::{OperatorResponse, OwnerOfResponse},
 };
 use serde_json::json;
-use xion_asset_proxy::msg::{ApprovalAction, ExecuteMsg, InstantiateMsg, QueryMsg};
 use xion_nft_marketplace::msg::{
     ExecuteMsg as MarketExecuteMsg, InstantiateMsg as MarketInstantiateMsg,
 };
@@ -39,9 +39,9 @@ fn base_asset_contract() -> Box<dyn Contract<Empty>> {
 
 fn proxy_contract() -> Box<dyn Contract<Empty>> {
     Box::new(ContractWrapper::new_with_empty(
-        xion_asset_proxy::contract::execute,
-        xion_asset_proxy::contract::instantiate,
-        xion_asset_proxy::contract::query,
+        asset_proxy::contract::execute,
+        asset_proxy::contract::instantiate,
+        asset_proxy::contract::query,
     ))
 }
 
@@ -743,7 +743,7 @@ fn proxy_policy_bounds_a_compromised_session() {
             &[],
         )
         .unwrap();
-    let cfg: xion_asset_proxy::msg::ConfigResponse = w
+    let cfg: asset_proxy::msg::ConfigResponse = w
         .app
         .wrap()
         .query_wasm_smart(&w.proxy, &QueryMsg::Config {})
@@ -774,14 +774,14 @@ fn proxy_policy_bounds_a_compromised_session() {
         "{err:#}"
     );
     // ... the policy query agrees ...
-    let q: xion_asset_proxy::msg::IsAllowedResponse = w
+    let q: asset_proxy::msg::IsAllowedResponse = w
         .app
         .wrap()
         .query_wasm_smart(
             &w.proxy,
             &QueryMsg::IsAllowed {
                 collection: w.collection.to_string(),
-                action: xion_asset_proxy::msg::ProxyAction::RevokeAll {
+                action: asset_proxy::msg::ProxyAction::RevokeAll {
                     operator: w.marketplace.to_string(),
                 },
             },
@@ -838,7 +838,7 @@ fn proxy_policy_bounds_a_compromised_session() {
         "{err:#}"
     );
     assert!(is_operator(&w, &w.buyer, &w.marketplace));
-    let cfg: xion_asset_proxy::msg::ConfigResponse = w
+    let cfg: asset_proxy::msg::ConfigResponse = w
         .app
         .wrap()
         .query_wasm_smart(&w.proxy, &QueryMsg::Config {})

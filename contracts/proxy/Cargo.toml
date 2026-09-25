@@ -2,7 +2,7 @@
 description = "Fixed-address sponsorship proxy: relays a closed set of typed user actions to allowlisted asset-proxyable collections"
 edition     = "2024"
 license     = "Apache-2.0"
-name        = "xion-asset-proxy"
+name        = "asset-proxy"
 version     = "0.1.0"
 
 [lib]

@@ -1,4 +1,4 @@
-# xion-asset-proxy
+# asset-proxy
 
 A fixed-address sponsorship proxy. Treasury `authz` and `feegrant` configurations name this
 one contract once; it relays a closed set of user actions to allowlisted

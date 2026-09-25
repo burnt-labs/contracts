@@ -40,8 +40,10 @@ where
         });
     }
 
-    if let Some(reserved) = &listing.reserved
-        && !Expiration::AtTime(reserved.reserved_until).is_expired(&env.block)
+    if listing
+        .reserved
+        .as_ref()
+        .is_some_and(|reserved| !Expiration::AtTime(reserved.reserved_until).is_expired(&env.block))
     {
         return Err(ContractError::ReservedAsset { id: id.clone() });
     }

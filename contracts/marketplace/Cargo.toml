@@ -11,8 +11,6 @@ crate-type = ["cdylib", "rlib"]
 library = []
 
 [dependencies]
-anyhow.workspace = true
-
 asset           = { path = "../asset", features = ["library", "asset_base"] }
 blake2          = "0.10.6"
 cosmwasm-schema = { workspace = true }
