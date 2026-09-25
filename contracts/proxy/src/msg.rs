@@ -8,8 +8,13 @@ pub use asset_proxyable::msg::ProxyAction;
 pub struct InstantiateMsg {
     /// Manages the collection allowlist and may remove operators. Multisig recommended.
     pub admin: String,
-    /// Operators `ApproveAll` may name (the marketplace). `RevokeAll` is not restricted.
-    /// Fixed at instantiation; removal-only afterwards. Max 4.
+    /// Operators that `ApproveAll` may name (the marketplace). Fixed at instantiation;
+    /// removal-only afterwards. Max 4.
+    ///
+    /// `RevokeAll` accepts any operator that is or ever was in this set, so a user can
+    /// still withdraw authority from one the admin has since removed. It does not accept
+    /// an operator this proxy never configured: those approvals are none of its business
+    /// and a stolen session must not be able to disturb them.
     pub allowed_operators: Vec<String>,
     /// If set, `ApproveAll.expires` must be a concrete timestamp no further than this many
     /// seconds in the future (`Never` and height-based expiries are rejected).
@@ -53,8 +58,8 @@ pub enum ExecuteMsg {
         collection: String,
         token_id: String,
     },
-    /// Approve a currently allowed operator, or revoke any operator, on `collection` as
-    /// `info.sender`.
+    /// Approve a currently allowed operator, or revoke one that is or ever was allowed
+    /// here, on `collection` as `info.sender`.
     SponsoredApproval {
         collection: String,
         action: ApprovalAction,

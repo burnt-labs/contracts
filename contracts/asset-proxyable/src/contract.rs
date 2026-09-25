@@ -32,7 +32,19 @@ type BaseContract<'a> = DefaultAssetContract<
     DefaultOptionalCollectionExtensionMsg,
 >;
 
-/// `(cw2 name, cw2 version)` pairs this code can be migrated from. Extend when releasing.
+/// `(cw2 name, cw2 version)` pairs this code accepts as a migration source.
+///
+/// The current version is listed deliberately, so migrating onto the code a contract
+/// already runs is accepted rather than rejected. That is a no-op in practice: the
+/// delegated cw721 migration rewrites the cw2 metadata to the same values and its legacy
+/// steps do nothing once minter and creator are set. Allowing it keeps a redeploy of the
+/// same code id, or a re-run of a migration that was interrupted, from needing a contract
+/// change, and it costs nothing because a migration is already gated on the x/wasm admin.
+/// Entries are added, never removed, so an older contract can always reach the newest code.
+///
+/// Both base versions are listed so a collection can move onto this variant from either,
+/// and the variant's own version so a variant-to-variant migration keeps its trusted-proxy
+/// set (a base source clears it instead; see `migrate`).
 pub const MIGRATABLE_FROM: &[(&str, &str)] = &[
     ("asset", "0.1.0"),
     ("asset", "0.2.0"),

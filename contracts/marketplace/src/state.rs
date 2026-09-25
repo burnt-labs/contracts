@@ -85,6 +85,15 @@ impl Config<Addr> {
     }
 
     /// Reject a sale price below the configured floor.
+    ///
+    /// The floor is a seller-side commitment check, applied at every point where a seller
+    /// fixes a price: creating a listing, and accepting a token or collection offer. It is
+    /// deliberately not re-checked when a buyer pays, because the buyer does not choose the
+    /// price and re-checking there would strand listings that were valid when created if
+    /// the manager later raises the floor. Raising the floor is therefore prospective: it
+    /// governs new commitments, not ones already made. This is enough for the case the
+    /// floor exists for, a stolen session listing at dust for an accomplice to buy, since
+    /// that listing is refused at creation.
     pub fn check_min_price(&self, price: &Coin) -> Result<(), ContractError> {
         if let Some(min) = &self.min_listing_price {
             if price.denom != min.denom || price.amount < min.amount {

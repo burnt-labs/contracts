@@ -13,7 +13,7 @@ The effective sender forwarded to a collection is always this contract's own
 | Message | Who | Effect |
 |---|---|---|
 | `sponsored_burn { collection, token_id }` | any user | Burn `token_id` as the caller. The collection enforces owner-only. |
-| `sponsored_approval { collection, action }` | any user | `approve_all` a currently allowed operator, or `revoke_all` any operator, as the caller. |
+| `sponsored_approval { collection, action }` | any user | `approve_all` a currently allowed operator, or `revoke_all` an operator that is or ever was allowed here, as the caller. |
 | `add_collection { collection }` | admin | Allowlist a collection as a target for sponsored calls. |
 | `remove_collection { collection }` | admin | Remove it. Nothing is relayed there afterwards, revocation included; users revoke directly on the collection. |
 | `remove_allowed_operator { operator }` | admin | Remove an operator. There is no way to add one after instantiation. Prospective only: existing approvals persist until expiry or revocation, and `revoke_all` keeps working for the removed operator. |
