@@ -8,7 +8,7 @@ use cw721::Expiration;
 use crate::{
     error::ContractError,
     msg::ProxyAction,
-    state::{ALLOWED_OPERATORS, COLLECTIONS, CollectionStatus, Config, FORMER_OPERATORS},
+    state::{ALLOWED_OPERATORS, COLLECTIONS, Config, FORMER_OPERATORS},
 };
 
 /// Check a resolved (validated) collection and action against the stored policy.
@@ -22,24 +22,19 @@ pub fn check(
     if *collection == env.contract.address {
         return Err(ContractError::SelfTarget {});
     }
-    let status = COLLECTIONS.may_load(storage, collection)?.ok_or_else(|| {
-        ContractError::CollectionNotAllowed {
+    if !COLLECTIONS.has(storage, collection) {
+        return Err(ContractError::CollectionNotAllowed {
             collection: collection.to_string(),
-        }
-    })?;
-    match (status, action) {
-        // Revocation only removes authority the effective sender granted. It must stay
-        // available after an incident: on a quarantined collection, and for an operator
-        // the admin has since removed. It is still bounded to operators this proxy ever
-        // allowed, so a stolen session cannot disturb approvals the user granted elsewhere.
-        (_, ProxyAction::RevokeAll { operator }) => {
-            check_operator_current_or_former(storage, operator)
-        }
-        (CollectionStatus::RevocationOnly, _) => Err(ContractError::CollectionQuarantined {
-            collection: collection.to_string(),
-        }),
-        (CollectionStatus::Active, ProxyAction::Burn { .. }) => Ok(()),
-        (CollectionStatus::Active, ProxyAction::ApproveAll { operator, expires }) => {
+        });
+    }
+    match action {
+        ProxyAction::Burn { .. } => Ok(()),
+        // Revocation only removes authority the effective sender granted, so it stays
+        // available for an operator the admin has since removed. It is still bounded to
+        // operators this proxy ever allowed, so a stolen session cannot disturb approvals
+        // the user granted to unrelated operators.
+        ProxyAction::RevokeAll { operator } => check_operator_current_or_former(storage, operator),
+        ProxyAction::ApproveAll { operator, expires } => {
             check_operator(storage, operator)?;
             check_expiry(env, config, expires)
         }

@@ -20,12 +20,6 @@ pub enum ContractError {
     #[error("Collection is already allowlisted: {collection}")]
     CollectionAlreadyAllowed { collection: String },
 
-    #[error("Collection is quarantined (revocation only): {collection}")]
-    CollectionQuarantined { collection: String },
-
-    #[error("Collection is not quarantined: {collection}")]
-    CollectionNotQuarantined { collection: String },
-
     #[error("Too many collections (max {max})")]
     TooManyCollections { max: usize },
 

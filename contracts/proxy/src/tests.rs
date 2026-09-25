@@ -13,6 +13,7 @@ use crate::{
         ApprovalAction, ConfigResponse, ExecuteMsg, InstantiateMsg, IsAllowedResponse, ProxyAction,
         QueryMsg,
     },
+    state::count_collections,
     state::{COLLECTIONS, MAX_COLLECTIONS},
 };
 
@@ -124,11 +125,7 @@ fn config(deps: &Deps) -> ConfigResponse {
     from_json(query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap()).unwrap()
 }
 
-fn collection_entries(
-    deps: &Deps,
-    start_after: Option<&Addr>,
-    limit: Option<u32>,
-) -> Vec<crate::state::CollectionEntry> {
+fn collections(deps: &Deps, start_after: Option<&Addr>, limit: Option<u32>) -> Vec<Addr> {
     from_json(
         query(
             deps.as_ref(),
@@ -141,13 +138,6 @@ fn collection_entries(
         .unwrap(),
     )
     .unwrap()
-}
-
-fn collections(deps: &Deps, start_after: Option<&Addr>, limit: Option<u32>) -> Vec<Addr> {
-    collection_entries(deps, start_after, limit)
-        .into_iter()
-        .map(|e| e.address)
-        .collect()
 }
 
 // ---------------------------------------------------------------------------------------
@@ -515,15 +505,6 @@ fn admin_manages_collections() {
     let unknown = deps.api.addr_make("unknown_contract");
     exec(deps.as_mut(), &a.admin, &[], add(&unknown)).unwrap();
     exec(deps.as_mut(), &a.admin, &[], remove(&unknown)).unwrap();
-    exec(
-        deps.as_mut(),
-        &a.admin,
-        &[],
-        ExecuteMsg::PurgeCollection {
-            collection: unknown.to_string(),
-        },
-    )
-    .unwrap();
     let me = mock_env().contract.address;
     assert_eq!(
         exec(deps.as_mut(), &a.admin, &[], add(&me)).unwrap_err(),
@@ -540,104 +521,42 @@ fn admin_manages_collections() {
     assert_eq!(rest.len(), 1);
     assert_ne!(rest[0], page[0]);
 
-    // removal quarantines: only revocation of a configured operator is still relayed
+    // removal is a plain delete: the collection simply stops being a sponsored target
     let r = exec(deps.as_mut(), &a.admin, &[], remove(&a.good2)).unwrap();
     assert!(r.events.iter().any(|e| e.ty == "collection_removed"));
     assert_eq!(
         exec(deps.as_mut(), &a.admin, &[], remove(&a.good2)).unwrap_err(),
-        ContractError::CollectionQuarantined {
+        ContractError::CollectionNotAllowed {
             collection: a.good2.to_string()
         }
     );
-    assert!(matches!(
-        exec(deps.as_mut(), &a.alice, &[], burn(&a.good2, "t1")).unwrap_err(),
-        ContractError::CollectionQuarantined { .. }
-    ));
-    assert!(matches!(
-        exec(
-            deps.as_mut(),
-            &a.alice,
-            &[],
-            approve(&a.good2, &a.marketplace, None)
-        )
-        .unwrap_err(),
-        ContractError::CollectionQuarantined { .. }
-    ));
-    exec(
-        deps.as_mut(),
-        &a.alice,
-        &[],
+    assert_eq!(collections(&deps, None, None), vec![a.good.clone()]);
+    // nothing is relayed there any more, revocation included: users revoke directly
+    for msg in [
+        burn(&a.good2, "t1"),
+        approve(&a.good2, &a.marketplace, None),
         ExecuteMsg::SponsoredApproval {
             collection: a.good2.to_string(),
             action: ApprovalAction::RevokeAll {
                 operator: a.marketplace.to_string(),
             },
         },
-    )
-    .unwrap();
-    let entries = collection_entries(&deps, None, None);
-    assert!(entries.iter().any(
-        |e| e.address == a.good2 && e.status == crate::state::CollectionStatus::RevocationOnly
-    ));
-    // quarantined entries still occupy the cap
-    assert_eq!(entries.len(), 2);
-    // re-adding reactivates in place
-    let r = exec(deps.as_mut(), &a.admin, &[], add(&a.good2)).unwrap();
-    assert!(r.events.iter().any(|e| {
-        e.ty == "collection_added"
-            && e.attributes
-                .iter()
-                .any(|x| x.key == "reactivated" && x.value == "true")
-    }));
+    ] {
+        assert!(matches!(
+            exec(deps.as_mut(), &a.alice, &[], msg).unwrap_err(),
+            ContractError::CollectionNotAllowed { .. }
+        ));
+    }
+    // re-adding restores it
+    exec(deps.as_mut(), &a.admin, &[], add(&a.good2)).unwrap();
     exec(deps.as_mut(), &a.alice, &[], burn(&a.good2, "t1")).unwrap();
-    // purge requires quarantine first, then removes the entry entirely
-    let purge = |c: &Addr| ExecuteMsg::PurgeCollection {
-        collection: c.to_string(),
-    };
-    assert_eq!(
-        exec(deps.as_mut(), &a.admin, &[], purge(&a.good2)).unwrap_err(),
-        ContractError::CollectionNotQuarantined {
-            collection: a.good2.to_string()
-        }
-    );
     exec(deps.as_mut(), &a.admin, &[], remove(&a.good2)).unwrap();
-    assert_eq!(
-        exec(deps.as_mut(), &a.bob, &[], purge(&a.good2)).unwrap_err(),
-        ContractError::Unauthorized {}
-    );
-    exec(deps.as_mut(), &a.admin, &[], purge(&a.good2)).unwrap();
-    assert_eq!(collections(&deps, None, None), vec![a.good.clone()]);
-    assert!(matches!(
-        exec(
-            deps.as_mut(),
-            &a.alice,
-            &[],
-            ExecuteMsg::SponsoredApproval {
-                collection: a.good2.to_string(),
-                action: ApprovalAction::RevokeAll {
-                    operator: a.marketplace.to_string(),
-                },
-            },
-        )
-        .unwrap_err(),
-        ContractError::CollectionNotAllowed { .. }
-    ));
-    assert_eq!(
-        exec(deps.as_mut(), &a.admin, &[], purge(&a.good2)).unwrap_err(),
-        ContractError::CollectionNotAllowed {
-            collection: a.good2.to_string()
-        }
-    );
 
     // cap
     for i in 0..(MAX_COLLECTIONS - 1) {
         let c = deps.api.addr_make(&format!("filler{i}"));
         COLLECTIONS
-            .save(
-                deps.as_mut().storage,
-                &c,
-                &crate::state::CollectionStatus::Active,
-            )
+            .save(deps.as_mut().storage, &c, &cosmwasm_std::Empty {})
             .unwrap();
     }
     assert_eq!(
@@ -792,6 +711,148 @@ fn burn_cannot_be_smuggled_under_the_approval_key() {
     let ok: ExecuteMsg =
         from_json(r#"{"sponsored_burn":{"collection":"c","token_id":"t"}}"#).unwrap();
     assert!(matches!(ok, ExecuteMsg::SponsoredBurn { .. }));
+}
+
+#[test]
+fn former_operator_revocation_survives_an_admin_handover() {
+    // the incident lever must keep working after the admin address changes: both operator
+    // sets are config state, not admin state, so a handover must not disturb them
+    let (mut deps, a) = setup(None);
+    exec(
+        deps.as_mut(),
+        &a.admin,
+        &[],
+        ExecuteMsg::RemoveAllowedOperator {
+            operator: a.marketplace.to_string(),
+        },
+    )
+    .unwrap();
+    exec(
+        deps.as_mut(),
+        &a.admin,
+        &[],
+        ExecuteMsg::UpdateAdmin {
+            admin: a.bob.to_string(),
+        },
+    )
+    .unwrap();
+
+    let cfg = config(&deps);
+    assert_eq!(cfg.admin, a.bob);
+    assert!(cfg.allowed_operators.is_empty());
+    assert_eq!(cfg.former_operators, vec![a.marketplace.clone()]);
+
+    // a user can still revoke the removed operator through the sponsored path
+    let revoke = ExecuteMsg::SponsoredApproval {
+        collection: a.good.to_string(),
+        action: ApprovalAction::RevokeAll {
+            operator: a.marketplace.to_string(),
+        },
+    };
+    let r = exec(deps.as_mut(), &a.alice, &[], revoke).unwrap();
+    let (_, envelope, _) = forwarded(&r);
+    assert_eq!(
+        envelope,
+        ProxyableExecuteMsg::Proxy(ProxyMsg::ProxyExecute {
+            sender: a.alice.to_string(),
+            action: ProxyAction::RevokeAll {
+                operator: a.marketplace.to_string()
+            },
+        })
+    );
+    // approving it is still refused, and an operator never configured here still is too
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.alice,
+            &[],
+            approve(&a.good, &a.marketplace, None)
+        )
+        .unwrap_err(),
+        ContractError::OperatorNotAllowed {
+            operator: a.marketplace.to_string()
+        }
+    );
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.alice,
+            &[],
+            ExecuteMsg::SponsoredApproval {
+                collection: a.good.to_string(),
+                action: ApprovalAction::RevokeAll {
+                    operator: a.other_operator.to_string()
+                },
+            }
+        )
+        .unwrap_err(),
+        ContractError::OperatorNotAllowed {
+            operator: a.other_operator.to_string()
+        }
+    );
+    // the old admin has no authority left
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.admin,
+            &[],
+            ExecuteMsg::RemoveCollection {
+                collection: a.good.to_string()
+            }
+        )
+        .unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+}
+
+#[test]
+fn removing_a_collection_frees_exactly_one_slot() {
+    let (mut deps, a) = setup(None);
+    // fill to the cap: the seeded `good` plus fillers
+    for i in 0..(MAX_COLLECTIONS - 1) {
+        let c = deps.api.addr_make(&format!("filler{i}"));
+        COLLECTIONS
+            .save(deps.as_mut().storage, &c, &cosmwasm_std::Empty {})
+            .unwrap();
+    }
+    assert_eq!(count_collections(deps.as_ref().storage), MAX_COLLECTIONS);
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.admin,
+            &[],
+            ExecuteMsg::AddCollection {
+                collection: a.good2.to_string()
+            }
+        )
+        .unwrap_err(),
+        ContractError::TooManyCollections {
+            max: MAX_COLLECTIONS
+        }
+    );
+    exec(
+        deps.as_mut(),
+        &a.admin,
+        &[],
+        ExecuteMsg::RemoveCollection {
+            collection: a.good.to_string(),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        count_collections(deps.as_ref().storage),
+        MAX_COLLECTIONS - 1
+    );
+    exec(
+        deps.as_mut(),
+        &a.admin,
+        &[],
+        ExecuteMsg::AddCollection {
+            collection: a.good2.to_string(),
+        },
+    )
+    .unwrap();
+    assert_eq!(count_collections(deps.as_ref().storage), MAX_COLLECTIONS);
 }
 
 #[test]

@@ -16,9 +16,9 @@ use crate::{
     },
     policy,
     state::{
-        ALLOWED_OPERATORS, COLLECTIONS, CONFIG, CollectionStatus, Config, FORMER_OPERATORS,
-        MAX_ALLOWED_OPERATORS, MAX_APPROVAL_CAP_SECONDS, MAX_COLLECTIONS, count_collections,
-        list_collections, list_former_operators, list_operators,
+        ALLOWED_OPERATORS, COLLECTIONS, CONFIG, Config, FORMER_OPERATORS, MAX_ALLOWED_OPERATORS,
+        MAX_APPROVAL_CAP_SECONDS, MAX_COLLECTIONS, count_collections, list_collections,
+        list_former_operators, list_operators,
     },
 };
 
@@ -86,7 +86,7 @@ pub fn instantiate(
     );
     for c in &collections {
         ensure!(*c != env.contract.address, ContractError::SelfTarget {});
-        COLLECTIONS.save(deps.storage, c, &CollectionStatus::Active)?;
+        COLLECTIONS.save(deps.storage, c, &Empty {})?;
     }
 
     Ok(Response::new()
@@ -127,7 +127,6 @@ pub fn execute(
         ),
         ExecuteMsg::AddCollection { collection } => add_collection(deps, env, info, collection),
         ExecuteMsg::RemoveCollection { collection } => remove_collection(deps, info, collection),
-        ExecuteMsg::PurgeCollection { collection } => purge_collection(deps, info, collection),
         ExecuteMsg::RemoveAllowedOperator { operator } => remove_operator(deps, info, operator),
         ExecuteMsg::UpdateAdmin { admin } => update_admin(deps, env, info, admin),
     }
@@ -186,28 +185,22 @@ fn add_collection(
         collection != env.contract.address,
         ContractError::SelfTarget {}
     );
-    let reactivated = match COLLECTIONS.may_load(deps.storage, &collection)? {
-        Some(CollectionStatus::Active) => {
-            return Err(ContractError::CollectionAlreadyAllowed {
-                collection: collection.to_string(),
-            });
+    ensure!(
+        !COLLECTIONS.has(deps.storage, &collection),
+        ContractError::CollectionAlreadyAllowed {
+            collection: collection.to_string()
         }
-        Some(CollectionStatus::RevocationOnly) => true,
-        None => {
-            ensure!(
-                count_collections(deps.storage) < MAX_COLLECTIONS,
-                ContractError::TooManyCollections {
-                    max: MAX_COLLECTIONS
-                }
-            );
-            false
+    );
+    ensure!(
+        count_collections(deps.storage) < MAX_COLLECTIONS,
+        ContractError::TooManyCollections {
+            max: MAX_COLLECTIONS
         }
-    };
-    COLLECTIONS.save(deps.storage, &collection, &CollectionStatus::Active)?;
+    );
+    COLLECTIONS.save(deps.storage, &collection, &Empty {})?;
     Ok(Response::new().add_event(
         Event::new("collection_added")
             .add_attribute("collection", collection)
-            .add_attribute("reactivated", reactivated.to_string())
             .add_attribute("by", info.sender),
     ))
 }
@@ -219,52 +212,15 @@ fn remove_collection(
 ) -> ContractResult<Response> {
     assert_admin(deps.as_ref(), &info.sender)?;
     let collection = deps.api.addr_validate(&collection)?;
-    match COLLECTIONS.may_load(deps.storage, &collection)? {
-        Some(CollectionStatus::Active) => {}
-        Some(CollectionStatus::RevocationOnly) => {
-            return Err(ContractError::CollectionQuarantined {
-                collection: collection.to_string(),
-            });
+    ensure!(
+        COLLECTIONS.has(deps.storage, &collection),
+        ContractError::CollectionNotAllowed {
+            collection: collection.to_string()
         }
-        None => {
-            return Err(ContractError::CollectionNotAllowed {
-                collection: collection.to_string(),
-            });
-        }
-    }
-    // Quarantine rather than delete: users keep a sponsored path to revoke approvals.
-    COLLECTIONS.save(deps.storage, &collection, &CollectionStatus::RevocationOnly)?;
-    Ok(Response::new().add_event(
-        Event::new("collection_removed")
-            .add_attribute("collection", collection)
-            .add_attribute("status", "revocation_only")
-            .add_attribute("by", info.sender),
-    ))
-}
-
-fn purge_collection(
-    deps: DepsMut,
-    info: MessageInfo,
-    collection: String,
-) -> ContractResult<Response> {
-    assert_admin(deps.as_ref(), &info.sender)?;
-    let collection = deps.api.addr_validate(&collection)?;
-    match COLLECTIONS.may_load(deps.storage, &collection)? {
-        Some(CollectionStatus::RevocationOnly) => {}
-        Some(CollectionStatus::Active) => {
-            return Err(ContractError::CollectionNotQuarantined {
-                collection: collection.to_string(),
-            });
-        }
-        None => {
-            return Err(ContractError::CollectionNotAllowed {
-                collection: collection.to_string(),
-            });
-        }
-    }
+    );
     COLLECTIONS.remove(deps.storage, &collection);
     Ok(Response::new().add_event(
-        Event::new("collection_purged")
+        Event::new("collection_removed")
             .add_attribute("collection", collection)
             .add_attribute("by", info.sender),
     ))

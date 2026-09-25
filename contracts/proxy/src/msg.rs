@@ -2,7 +2,6 @@ use cosmwasm_schema::{QueryResponses, cw_serde};
 use cosmwasm_std::Addr;
 use cw721::Expiration;
 
-pub use crate::state::{CollectionEntry, CollectionStatus};
 pub use asset_proxyable::msg::ProxyAction;
 
 #[cw_serde]
@@ -60,15 +59,12 @@ pub enum ExecuteMsg {
         collection: String,
         action: ApprovalAction,
     },
-    /// Admin: allowlist a collection (or reactivate a quarantined one).
+    /// Admin: allowlist a collection as a target for sponsored calls.
     AddCollection { collection: String },
-    /// Admin: quarantine a collection. Only `RevokeAll` is relayed to it afterwards, so
-    /// users keep a sponsored way to withdraw authority from an operator after an
-    /// incident. The entry still counts against the collection cap.
+    /// Admin: remove a collection from the allowlist. Prospective only: it stops sponsored
+    /// calls being relayed there and leaves approvals already stored on that collection
+    /// untouched. Users revoke those directly on the collection.
     RemoveCollection { collection: String },
-    /// Admin: delete a quarantined collection entirely. Sponsored revocation for it stops;
-    /// use only once outstanding approvals have expired or been revoked.
-    PurgeCollection { collection: String },
     /// Admin: remove an operator. There is deliberately no way to add one. Removal is
     /// prospective: it stops new sponsored approvals for that operator and leaves approvals
     /// already stored on collections in place until they expire or are revoked. Sponsored
@@ -99,8 +95,8 @@ pub struct IsAllowedResponse {
 pub enum QueryMsg {
     #[returns(ConfigResponse)]
     Config {},
-    /// Allowlisted collections with their status (active or revocation-only).
-    #[returns(Vec<CollectionEntry>)]
+    /// Allowlisted collections.
+    #[returns(Vec<Addr>)]
     Collections {
         start_after: Option<String>,
         limit: Option<u32>,

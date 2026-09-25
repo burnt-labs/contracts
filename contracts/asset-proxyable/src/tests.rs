@@ -1332,6 +1332,103 @@ fn migrate_that_rotates_the_creator_clears_proxies() {
 }
 
 #[test]
+fn migrate_creator_comparison_handles_absent_and_renounced_creators() {
+    // a renounced creator leaves no owner. Nothing "changed", and renouncing already
+    // requires an empty proxy set, so this is only reachable with no proxies registered.
+    let (mut deps, a) = setup();
+    exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::RenounceOwnership,
+        )),
+    )
+    .unwrap();
+    assert!(
+        cw721::state::CREATOR
+            .item
+            .load(deps.as_ref().storage)
+            .unwrap()
+            .owner
+            .is_none()
+    );
+    let r = migrate(deps.as_mut(), mock_env(), no_update()).unwrap();
+    assert_eq!(attr(&r, "creator_changed"), Some("false"));
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("0"));
+
+    // installing a creator where there was none counts as a change
+    let r = migrate(
+        deps.as_mut(),
+        mock_env(),
+        Cw721MigrateMsg::WithUpdate {
+            minter: None,
+            creator: Some(a.bob.to_string()),
+        },
+    )
+    .unwrap();
+    assert_eq!(attr(&r, "creator_changed"), Some("true"));
+    assert_eq!(
+        cw721::state::CREATOR
+            .item
+            .load(deps.as_ref().storage)
+            .unwrap()
+            .owner,
+        Some(a.bob.clone())
+    );
+}
+
+#[test]
+fn migrate_with_minter_only_update_keeps_proxies() {
+    // rotating the minter is unrelated to proxy trust and must not clear anything
+    let (mut deps, a) = setup();
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    let r = migrate(
+        deps.as_mut(),
+        mock_env(),
+        Cw721MigrateMsg::WithUpdate {
+            minter: Some(a.bob.to_string()),
+            creator: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(attr(&r, "creator_changed"), Some("false"));
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("0"));
+    assert_eq!(trusted_proxies(&deps), vec![a.proxy.clone()]);
+    assert_eq!(
+        cw721::state::MINTER
+            .item
+            .load(deps.as_ref().storage)
+            .unwrap()
+            .owner,
+        Some(a.bob.clone())
+    );
+    // the creator is untouched and the proxy still works
+    assert_eq!(
+        cw721::state::CREATOR
+            .item
+            .load(deps.as_ref().storage)
+            .unwrap()
+            .owner,
+        Some(a.creator.clone())
+    );
+    mint(deps.as_mut(), &a.bob, &a.alice, "t1");
+    exec(
+        deps.as_mut(),
+        &a.proxy,
+        &[],
+        proxied(
+            &a.alice,
+            ProxyAction::Burn {
+                token_id: "t1".to_string(),
+            },
+        ),
+    )
+    .unwrap();
+    assert_eq!(owner_of(&deps, "t1"), None);
+}
+
+#[test]
 fn migrate_rejects_unknown_sources() {
     let (mut deps, _) = setup();
     cw2::set_contract_version(deps.as_mut().storage, "something-else", "0.1.0").unwrap();

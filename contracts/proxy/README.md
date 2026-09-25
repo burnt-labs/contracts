@@ -14,9 +14,8 @@ The effective sender forwarded to a collection is always this contract's own
 |---|---|---|
 | `sponsored_burn { collection, token_id }` | any user | Burn `token_id` as the caller. The collection enforces owner-only. |
 | `sponsored_approval { collection, action }` | any user | `approve_all` a currently allowed operator, or `revoke_all` any operator, as the caller. |
-| `add_collection { collection }` | admin | Allowlist a collection as a target for sponsored calls, or reactivate a quarantined one. |
-| `remove_collection { collection }` | admin | Quarantine: only `revoke_all` is relayed to it afterwards, so users keep a sponsored way out after an incident. Still counts against the cap. |
-| `purge_collection { collection }` | admin | Delete a quarantined entry entirely. Sponsored revocation for it stops; do this only once outstanding approvals have expired or been revoked. |
+| `add_collection { collection }` | admin | Allowlist a collection as a target for sponsored calls. |
+| `remove_collection { collection }` | admin | Remove it. Nothing is relayed there afterwards, revocation included; users revoke directly on the collection. |
 | `remove_allowed_operator { operator }` | admin | Remove an operator. There is no way to add one after instantiation. Prospective only: existing approvals persist until expiry or revocation, and `revoke_all` keeps working for the removed operator. |
 | `update_admin { admin }` | admin | Hand over administration (never to the proxy itself). |
 
@@ -37,8 +36,8 @@ collection knows that (`get_trusted_proxies` on the collection).
   `revoke_all.operator` may be any operator that is or ever was allowed here, so a user can
   withdraw authority through the sponsored path even after the admin removed that operator,
   while a stolen session cannot disturb approvals the user granted to unrelated operators.
-  Revocation is also relayed to quarantined collections, and is always available directly
-  on the collection, unsponsored.
+  Revocation is always available directly on the collection, unsponsored, which is the
+  path users take once a collection leaves the allowlist.
 - With `max_approval_seconds` set, `approve_all.expires` must be a timestamp within
   `(now, now + cap]`. `never`, height-based and missing expiries are rejected because cw721
   treats a missing expiry as permanent.
@@ -52,6 +51,13 @@ exceed what the caller could do directly, and a relayed burn is stricter (owner-
   `migrate` entrypoint, but that alone does not prevent migration: wasmd runs the
   destination code's migrate. Only the absence of a wasm admin makes the sender
   derivation immutable.
+- **What the allowlist is for.** It bounds where Treasury money can be spent, not who may
+  act. Authorization is decided by each collection, which honours this proxy only if its
+  creator registered it, so the allowlist adds nothing there and removing an entry revokes
+  nothing. Its one job is to stop a sponsored call *succeeding* against a contract the admin
+  never chose: a failing call costs only the fee, but a successful one also consumes the
+  grant's call budget, and a contract written to burn gas would drain both. Keep the list to
+  collections you operate.
 - The proxy does not inspect what an allowlisted collection runs. Whether a genuine
   `asset-proxyable` collection honours forwarded actions is decided by its creator with
   `add_trusted_proxy`; a base-code collection rejects the envelope outright. An arbitrary
@@ -99,9 +105,10 @@ deployment, not of the pattern.
 
 Constraints that follow from the design, and are not defects:
 
-- Removing an operator, or quarantining a collection, is prospective. It stops new
-  approvals but cannot revoke approvals already stored on collections. Users withdraw
-  those themselves, through this contract or directly.
+- Removing an operator, or removing a collection, is prospective. It stops this contract
+  relaying, but cannot revoke approvals already stored on collections. Users withdraw those
+  themselves, through this contract while the collection is still allowlisted, or directly
+  on the collection at any time.
 - The operator set can only shrink. Adding one later would widen every grant users already
   signed, so recovery from a marketplace redeploy is a proxy redeployment, not a config
   change.
