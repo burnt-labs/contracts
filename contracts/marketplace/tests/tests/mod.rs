@@ -10,3 +10,4 @@ mod test_create_offer;
 mod test_helpers;
 mod test_listing_queries;
 mod test_reserved_listing_buy;
+mod test_safeguards;

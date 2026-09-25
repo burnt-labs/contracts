@@ -1,4 +1,4 @@
-# Based on https://github.com/actions-rs/example/blob/master/.github/workflows/quickstart.yml
+name: Basic
 
 on:
   push:
@@ -9,7 +9,40 @@ on:
 
   pull_request:
 
-name: Basic
+env:
+  # Why 1.86.0, and not "stable".
+  #
+  # Releases are built by the cosmwasm/optimizer image (see Release.yml and the
+  # `optimize` recipe in the justfile), and that image ships its own Rust. Today:
+  #
+  #     $ docker run --rm cosmwasm/optimizer:0.17.0 cargo --version
+  #     1.86.0-x86_64-unknown-linux-musl
+  #
+  # The optimizer is therefore the real lower bound for this repository: code that
+  # only compiles on something newer cannot be released, however green CI looks.
+  # Pinning the check jobs to that exact version makes the cheap jobs fail first,
+  # on the pull request, instead of at release time.
+  #
+  # This is not hypothetical. CI previously ran 1.88.0 and accepted `let` chains
+  # (`if let Some(a) = x && let Some(b) = y`), stabilised in 1.88 for edition 2024.
+  # Tests and clippy passed; `just optimize` then failed outright on five of them
+  # with "`let` expressions in this position are unstable", and the contracts could
+  # not be built for release at all.
+  #
+  # cosmwasm-check also fails to build on current stable (undefined symbol
+  # `__rust_probestack`, from the wasmer version it pulls in), so the same pin is
+  # what lets the artifacts job install it.
+  #
+  # When bumping the optimizer image, bump this in the same change: read the new
+  # version with the command above, update OPTIMIZER_VERSION in Release.yml and the
+  # justfile to match, and keep all three in step.
+  RUST_VERSION: "1.86.0"
+
+  OPTIMIZER_VERSION: "0.17.0"
+
+  # Validates that a built artifact is a real, instantiable CosmWasm contract.
+  # Tracks the cosmwasm-std version in Cargo.toml.
+  COSMWASM_CHECK_VERSION: "2.2.2"
 
 jobs:
   test:
@@ -19,18 +52,15 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: 1.88.0
-          target: wasm32-unknown-unknown
-          override: true
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run unit tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test --locked
         env:
           RUST_BACKTRACE: 1
 
@@ -41,36 +71,88 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: 1.88.0
-          override: true
+          toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt, clippy
 
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
-  build:
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+
+  artifacts:
+    name: Contract artifacts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      # Build the way a release does, for two reasons.
+      #
+      # First, never `cargo build --workspace`: that unifies features across members,
+      # so the `library` feature that asset-proxy and the marketplace request on their
+      # dependencies also gets enabled on asset and asset-proxyable, compiling their
+      # entry points out and yielding a ~20 KB artifact that cannot be instantiated.
+      # The optimizer builds each package on its own, so it is immune to this.
+      #
+      # Second, rustc 1.82 and later emit wasm using the reference-types proposal,
+      # which the CosmWasm VM rejects: cosmwasm-check reports "reference-types not
+      # enabled: zero byte expected". `-C target-cpu=mvp` does not help, because the
+      # precompiled std in the toolchain already carries it. What removes it is the
+      # `wasm-opt` pass the optimizer runs, so raw `cargo build` output cannot be
+      # validated at all and there is no point checking it here.
+      - name: Cache optimizer state
+        uses: actions/cache@v4
         with:
-          profile: minimal
-          toolchain: 1.88.0
-          target: wasm32-unknown-unknown
-          override: true
-      - name: Build development contracts
-        run: cargo build --workspace --release --locked --target wasm32-unknown-unknown
+          path: |
+            .optimizer/target
+            .optimizer/registry
+          key: optimizer-${{ env.OPTIMIZER_VERSION }}-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            optimizer-${{ env.OPTIMIZER_VERSION }}-${{ runner.os }}-
+
+      - name: Build optimized artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p .optimizer/target .optimizer/registry
+          docker run --rm \
+            -v "$(pwd)":/code \
+            -v "$(pwd)/.optimizer/target":/target \
+            -v "$(pwd)/.optimizer/registry":/usr/local/cargo/registry \
+            cosmwasm/optimizer:${{ env.OPTIMIZER_VERSION }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Cache cosmwasm-check
+        id: check-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cosmwasm-check
+          key: cosmwasm-check-${{ env.COSMWASM_CHECK_VERSION }}-${{ env.RUST_VERSION }}-${{ runner.os }}
+
+      - name: Install cosmwasm-check
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        run: cargo install cosmwasm-check --version ${{ env.COSMWASM_CHECK_VERSION }} --locked
+
+      - name: Validate artifacts
+        run: |
+          set -euo pipefail
+          ls -la artifacts/
+          cat artifacts/checksums.txt
+          cosmwasm-check artifacts/*.wasm
+
+      - name: Upload artifacts for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts
+          path: |
+            artifacts/*.wasm
+            artifacts/checksums.txt

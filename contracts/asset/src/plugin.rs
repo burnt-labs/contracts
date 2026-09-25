@@ -246,6 +246,9 @@ where
                 Cw721ExecuteMsg::UpdateExtension { msg } => {
                     self.on_update_extension_plugin(msg, &mut plugin_ctx)?
                 }
+                Cw721ExecuteMsg::Burn { token_id } => {
+                    self.on_burn_plugin(token_id, &mut plugin_ctx)?
+                }
                 _ => true,
             };
             plugin_response = plugin_ctx.response;

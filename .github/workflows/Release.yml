@@ -4,36 +4,64 @@ on:
   release:
     types: [created]
 
+env:
+  # Keep in step with the `optimize` recipe in the justfile, so a local run and a
+  # release produce byte-identical artifacts.
+  #
+  # This image also fixes the Rust version the contracts must compile under, which
+  # is why Basic.yml pins its toolchain to whatever `cargo --version` reports inside
+  # it (1.86.0 for 0.17.0). Bump all three together: here, the justfile, and
+  # RUST_VERSION in Basic.yml.
+  OPTIMIZER_VERSION: "0.17.0"
+
+  # cosmwasm-check does not build on current stable (undefined symbol
+  # `__rust_probestack`, from the wasmer version it depends on), so it is installed
+  # with the same toolchain the optimizer uses.
+  RUST_VERSION: "1.86.0"
+  COSMWASM_CHECK_VERSION: "2.2.2"
+
 jobs:
   release:
+    name: Build and publish artifacts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions/checkout@v4
+
+      # The optimizer builds each contract in its own pass and strips and optimises the
+      # result, so it avoids the feature unification that a workspace-wide `cargo wasm`
+      # runs into. It also emits artifacts/checksums.txt, which is what makes a release
+      # reproducible.
+      - name: Build optimized artifacts
+        run: |
+          docker run --rm \
+            -v "$(pwd)":/code \
+            --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
+            --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+            cosmwasm/optimizer:${{ env.OPTIMIZER_VERSION }}
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          override: true
-      - name: Compile WASM contract
-        uses: actions-rs/cargo@v1
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Install cosmwasm-check
+        run: cargo install cosmwasm-check --version ${{ env.COSMWASM_CHECK_VERSION }} --locked
+
+      # Fail the release rather than publish an artifact that cannot be instantiated.
+      # Only the optimizer's output can pass this: rustc 1.82 and later emit wasm using
+      # the reference-types proposal, which the VM rejects, and the optimizer's wasm-opt
+      # pass is what lowers it back out.
+      - name: Validate artifacts
+        run: |
+          set -euo pipefail
+          ls -la artifacts/
+          cat artifacts/checksums.txt
+          cosmwasm-check artifacts/*.wasm
+
+      - name: Upload artifacts to the release
+        uses: softprops/action-gh-release@v2
         with:
-          command: wasm
-          args: --locked
-        env:
-          RUSTFLAGS: "-C link-arg=-s"
-      - name: Get release ID
-        id: get_release
-        uses: bruceadams/get-release@v1.2.3
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: Upload optimized wasm
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ github.token }}
-          file: ./target/wasm32-unknown-unknown/release/*.wasm
-          tag: ${{ github.ref }}
-          overwrite: true
-          file_glob: true
+          files: |
+            artifacts/*.wasm
+            artifacts/checksums.txt

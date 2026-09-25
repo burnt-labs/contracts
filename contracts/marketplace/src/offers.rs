@@ -103,6 +103,7 @@ pub fn execute_accept_offer(
     if offer.buyer == info.sender {
         return Err(ContractError::InvalidSeller {});
     }
+    config.check_min_price(&offer.price)?;
 
     // Calculate asset price (seller proceeds) and marketplace fee
     // This ensures offer acceptance matches the immediate buy path
@@ -263,6 +264,7 @@ pub fn execute_accept_collection_offer(
     if offer.buyer == info.sender {
         return Err(ContractError::InvalidSeller {});
     }
+    config.check_min_price(&offer.price)?;
 
     // Calculate asset price (seller proceeds) and marketplace fee
     // This ensures collection offer acceptance matches the immediate buy path

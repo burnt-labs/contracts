@@ -19,11 +19,46 @@ pub fn asset_contract() -> Box<dyn Contract<Empty>> {
 }
 
 pub fn marketplace_contract() -> Box<dyn Contract<Empty>> {
-    Box::new(ContractWrapper::new_with_empty(
-        xion_nft_marketplace::execute::execute,
-        xion_nft_marketplace::contract::instantiate,
-        xion_nft_marketplace::query::query,
-    ))
+    Box::new(
+        ContractWrapper::new_with_empty(
+            xion_nft_marketplace::execute::execute,
+            xion_nft_marketplace::contract::instantiate,
+            xion_nft_marketplace::query::query,
+        )
+        .with_reply_empty(xion_nft_marketplace::contract::reply),
+    )
+}
+
+pub fn setup_marketplace_with_config(
+    app: &mut App,
+    manager: &Addr,
+    sale_approvals: bool,
+    min_listing_price: Option<cosmwasm_std::Coin>,
+) -> Addr {
+    let marketplace_code_id = app.store_code(marketplace_contract());
+
+    let config_json = json!({
+        "manager": manager.to_string(),
+        "fee_recipient": manager.to_string(),
+        "sale_approvals": sale_approvals,
+        "fee_bps": 250,
+        "listing_denom": "uxion",
+        "min_listing_price": min_listing_price,
+    });
+
+    let instantiate_msg = InstantiateMsg {
+        config: serde_json::from_value(config_json).unwrap(),
+    };
+
+    app.instantiate_contract(
+        marketplace_code_id,
+        manager.clone(),
+        &instantiate_msg,
+        &[],
+        "test-marketplace-config",
+        None,
+    )
+    .unwrap()
 }
 
 pub fn setup_app() -> App {

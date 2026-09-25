@@ -12,6 +12,10 @@ pub struct Config<T: AddressLike> {
     pub sale_approvals: bool,
     pub fee_bps: u64,
     pub listing_denom: String,
+    /// Floor for every sale path (listing, offer and collection-offer acceptance).
+    /// Denominated in `listing_denom`. `None` means no floor.
+    #[serde(default)]
+    pub min_listing_price: Option<Coin>,
 }
 
 // Maximum fee bps allowed.
@@ -46,6 +50,15 @@ impl Config<String> {
             !self.fee_recipient.is_empty(),
             ContractError::InvalidFeeRecipient {}
         );
+        if let Some(min) = &self.min_listing_price {
+            ensure!(
+                min.denom == self.listing_denom,
+                ContractError::InvalidListingDenom {
+                    expected: self.listing_denom.clone(),
+                    actual: min.denom.clone(),
+                }
+            );
+        }
         Ok(())
     }
     pub fn to_addr(&self, api: &dyn Api) -> Result<Config<Addr>, ContractError> {
@@ -55,6 +68,7 @@ impl Config<String> {
             fee_bps: self.fee_bps,
             sale_approvals: self.sale_approvals,
             listing_denom: self.listing_denom.clone(),
+            min_listing_price: self.min_listing_price.clone(),
         })
     }
 }
@@ -66,7 +80,30 @@ impl Config<Addr> {
             fee_bps: config.fee_bps,
             sale_approvals: config.sale_approvals,
             listing_denom: config.listing_denom,
+            min_listing_price: config.min_listing_price,
         })
+    }
+
+    /// Reject a sale price below the configured floor.
+    ///
+    /// The floor is a seller-side commitment check, applied at every point where a seller
+    /// fixes a price: creating a listing, and accepting a token or collection offer. It is
+    /// deliberately not re-checked when a buyer pays, because the buyer does not choose the
+    /// price and re-checking there would strand listings that were valid when created if
+    /// the manager later raises the floor. Raising the floor is therefore prospective: it
+    /// governs new commitments, not ones already made. This is enough for the case the
+    /// floor exists for, a stolen session listing at dust for an accomplice to buy, since
+    /// that listing is refused at creation.
+    pub fn check_min_price(&self, price: &Coin) -> Result<(), ContractError> {
+        if let Some(min) = &self.min_listing_price {
+            if price.denom != min.denom || price.amount < min.amount {
+                return Err(ContractError::BelowMinimumPrice {
+                    minimum: min.clone(),
+                    actual: price.clone(),
+                });
+            }
+        }
+        Ok(())
     }
 }
 impl From<Config<Addr>> for Config<String> {
@@ -77,6 +114,7 @@ impl From<Config<Addr>> for Config<String> {
             fee_recipient: config.fee_recipient.to_string(),
             sale_approvals: config.sale_approvals,
             listing_denom: config.listing_denom,
+            min_listing_price: config.min_listing_price,
         }
     }
 }

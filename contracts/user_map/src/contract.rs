@@ -5,12 +5,11 @@ use crate::msg::{ExecuteMsg, MigrateMsg, QueryMsg};
 use crate::state::{DEFAULT_QUERY_LIMIT, MAX_QUERY_LIMIT, MAX_VALUE_LEN, USER_MAP};
 use crate::{CONTRACT_NAME, CONTRACT_VERSION};
 use cosmwasm_std::{
-    entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response,
-    StdResult,
+    to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult,
 };
 use cw_storage_plus::Bound;
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -23,11 +22,11 @@ pub fn instantiate(
         .add_attribute("owner", info.sender))
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> ContractResult<Response> {
     Ok(Response::default())
 }
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn execute(
     deps: DepsMut,
     _: Env,
@@ -50,7 +49,7 @@ pub fn execute(
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetValueByUser { address } => {
