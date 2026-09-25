@@ -1,4 +1,4 @@
-# Based on https://github.com/actions-rs/example/blob/master/.github/workflows/quickstart.yml
+name: Basic
 
 on:
   push:
@@ -9,7 +9,34 @@ on:
 
   pull_request:
 
-name: Basic
+env:
+  # Why 1.86.0, and not "stable".
+  #
+  # Releases are built by the cosmwasm/optimizer image (see Release.yml and the
+  # `optimize` recipe in the justfile), and that image ships its own Rust. Today:
+  #
+  #     $ docker run --rm cosmwasm/optimizer:0.17.0 cargo --version
+  #     1.86.0-x86_64-unknown-linux-musl
+  #
+  # The optimizer is therefore the real lower bound for this repository: code that
+  # only compiles on something newer cannot be released, however green CI looks.
+  # Pinning the check jobs to that exact version makes the cheap jobs fail first,
+  # on the pull request, instead of at release time.
+  #
+  # This is not hypothetical. CI previously ran 1.88.0 and accepted `let` chains
+  # (`if let Some(a) = x && let Some(b) = y`), stabilised in 1.88 for edition 2024.
+  # Tests and clippy passed; `just optimize` then failed outright on five of them
+  # with "`let` expressions in this position are unstable", and the contracts could
+  # not be built for release at all.
+  #
+  # When bumping the optimizer image, bump this in the same change: read the new
+  # version with the command above, update OPTIMIZER_VERSION in Release.yml and the
+  # justfile to match, and keep all three in step.
+  RUST_VERSION: "1.86.0"
+
+  # Validates that a built artifact is a real, instantiable CosmWasm contract.
+  # Tracks the cosmwasm-std version in Cargo.toml.
+  COSMWASM_CHECK_VERSION: "2.2.2"
 
 jobs:
   test:
@@ -19,18 +46,15 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: 1.88.0
-          target: wasm32-unknown-unknown
-          override: true
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run unit tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test --locked
         env:
           RUST_BACKTRACE: 1
 
@@ -41,36 +65,56 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: 1.88.0
-          override: true
+          toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt, clippy
 
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
-  build:
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+
+  wasm:
+    name: Wasm build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: 1.88.0
-          target: wasm32-unknown-unknown
-          override: true
-      - name: Build development contracts
-        run: cargo build --workspace --release --locked --target wasm32-unknown-unknown
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cosmwasm-check
+        run: cargo install cosmwasm-check --version ${{ env.COSMWASM_CHECK_VERSION }} --locked
+
+      # One build per package, never `--workspace`. A workspace-wide build unifies
+      # features across members, so the `library` feature that `asset-proxy` and the
+      # marketplace request on their dependencies also gets enabled on `asset` and
+      # `asset-proxyable`, which compiles their entry points out and produces a ~20 KB
+      # artifact that cannot be instantiated.
+      - name: Build each contract separately
+        run: |
+          set -euo pipefail
+          packages=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(any(.targets[]; any(.crate_types[]; . == "cdylib"))) | .name')
+          echo "Building: $(echo "$packages" | tr '\n' ' ')"
+          for pkg in $packages; do
+            cargo build --locked --release --lib --target wasm32-unknown-unknown -p "$pkg"
+          done
+        env:
+          RUSTFLAGS: "-C link-arg=-s"
+
+      # Rejects anything that is not a valid, instantiable CosmWasm contract, which is
+      # what the workspace-wide build used to produce silently.
+      - name: Validate artifacts
+        run: cosmwasm-check target/wasm32-unknown-unknown/release/*.wasm
