@@ -866,3 +866,354 @@ fn transfer_and_send_disabled_while_listed() {
             .to_string()
     );
 }
+
+type TestDeps = cosmwasm_std::OwnedDeps<
+    cosmwasm_std::testing::MockStorage,
+    cosmwasm_std::testing::MockApi,
+    cosmwasm_std::testing::MockQuerier,
+>;
+type TestContract = DefaultAssetContract<'static, Empty, Empty, Empty, Empty>;
+
+/// Helpers for the validation tests: a collection whose creator is set, and a save that
+/// goes through the real creator-gated path rather than writing storage directly.
+fn contract_with_creator() -> (TestDeps, TestContract, Addr) {
+    let mut deps = mock_dependencies();
+    let contract: TestContract = Default::default();
+    let creator = deps.api.addr_make("creator");
+    {
+        let deps_mut = deps.as_mut();
+        CREATOR
+            .initialize_owner(deps_mut.storage, deps_mut.api, Some(creator.as_str()))
+            .unwrap();
+    }
+    (deps, contract, creator)
+}
+
+#[test]
+fn save_plugin_rejects_a_royalty_that_would_freeze_the_collection() {
+    let (mut deps, contract, creator) = contract_with_creator();
+    let recipient = deps.api.addr_make("recipient");
+    let env = env_at(1_000);
+    let info = message_info(&creator, &[]);
+
+    // At 100% the royalty consumes the whole payment and the seller is sent a zero coin;
+    // above it the deduction exceeds the payment outright. Either way every buy in the
+    // collection fails, and because a configured royalty also disables raw transfers,
+    // nothing can move until the creator removes the plugin. An honest typo, so it is
+    // refused at save time rather than discovered by the first buyer.
+    for bps in [10_000u16, 10_001, u16::MAX] {
+        let err = contract
+            .save_plugin(
+                deps.as_mut(),
+                &env,
+                &info,
+                &[Plugin::Royalty {
+                    bps,
+                    recipient: recipient.clone(),
+                }],
+            )
+            .expect_err("royalty at or above 100% must be refused");
+        assert!(err.to_string().contains("must be below 10000"), "{err}");
+    }
+
+    // The boundary is inclusive on the legal side: 99.99% still stores.
+    contract
+        .save_plugin(
+            deps.as_mut(),
+            &env,
+            &info,
+            &[Plugin::Royalty {
+                bps: 9_999,
+                recipient: recipient.clone(),
+            }],
+        )
+        .unwrap();
+    assert!(
+        contract
+            .config
+            .collection_plugins
+            .has(deps.as_ref().storage, "Royalty")
+    );
+}
+
+#[test]
+fn save_plugin_rejects_unusable_addresses_and_denoms() {
+    let (mut deps, contract, creator) = contract_with_creator();
+    let env = env_at(1_000);
+    let info = message_info(&creator, &[]);
+    let save = |deps: cosmwasm_std::DepsMut, p: Plugin| {
+        contract.save_plugin(deps, &env, &info, &[p]).map(|_| ())
+    };
+
+    // `Addr` is not validated by deserialization, so without this the bad recipient would
+    // surface only as a failed bank send on the first buy.
+    assert!(
+        save(
+            deps.as_mut(),
+            Plugin::Royalty {
+                bps: 500,
+                recipient: Addr::unchecked("not-a-bech32-address"),
+            }
+        )
+        .is_err()
+    );
+    assert!(
+        save(
+            deps.as_mut(),
+            Plugin::AllowedMarketplaces {
+                marketplaces: vec![Addr::unchecked("nope")],
+            }
+        )
+        .is_err()
+    );
+
+    // Denoms end up in bank messages, which reject anything outside the SDK's rule.
+    // cosmwasm_std has no denom validator, so this mirrors `[a-zA-Z][a-zA-Z0-9/:._-]{2,127}`.
+    let too_long = "x".repeat(129);
+    for denom in [
+        "",
+        "ab",
+        too_long.as_str(),
+        "1uxion", // must start with a letter
+        "uxion!", // charset
+        "uxion денег",
+    ] {
+        assert!(
+            save(
+                deps.as_mut(),
+                Plugin::ExactPrice {
+                    amount: Coin::new(1u128, denom),
+                }
+            )
+            .is_err(),
+            "denom {denom:?} should be refused"
+        );
+        assert!(
+            save(
+                deps.as_mut(),
+                Plugin::MinimumPrice {
+                    amount: Coin::new(1u128, denom),
+                }
+            )
+            .is_err()
+        );
+        assert!(
+            save(
+                deps.as_mut(),
+                Plugin::AllowedCurrencies {
+                    denoms: vec![Coin::new(0u128, denom)],
+                }
+            )
+            .is_err()
+        );
+    }
+
+    // Nothing above was stored.
+    assert_eq!(
+        contract
+            .config
+            .collection_plugins
+            .range(
+                deps.as_ref().storage,
+                None,
+                None,
+                cosmwasm_std::Order::Ascending
+            )
+            .count(),
+        0
+    );
+
+    // Denoms that occur in practice must still be accepted: IBC hashes and token-factory
+    // denoms both carry slashes, and the SDK's rule allows them.
+    // Exactly 128 is the last legal length, one more was refused above.
+    let max_len = format!("u{}", "x".repeat(127));
+    assert_eq!(max_len.len(), 128);
+    for denom in [
+        "uxion",
+        "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
+        "factory/xion1jc5kqgv7d0n2l3n2gd5xjy8qd0r6l8x9m7p4wzq/uslx",
+        "gamm/pool/1",
+        "erc20:0x0000",
+        "abc",
+        max_len.as_str(),
+    ] {
+        save(
+            deps.as_mut(),
+            Plugin::ExactPrice {
+                amount: Coin::new(1u128, denom),
+            },
+        )
+        .unwrap_or_else(|e| panic!("denom {denom:?} should be accepted: {e}"));
+    }
+}
+
+#[test]
+fn save_plugin_caps_the_time_lock() {
+    let (mut deps, contract, creator) = contract_with_creator();
+    let env = env_at(1_000);
+    let info = message_info(&creator, &[]);
+
+    // Two separate reasons, only the first of which is arithmetic: the hook computes
+    // `block.time + time_lock`, and with overflow checks on a `u64::MAX` value traps and
+    // takes the reserve path down with it. Ten years plus one second is nowhere near an
+    // overflow -- it is refused as policy, matching the proxy's approval-expiry cap.
+    for secs in [u64::MAX, u64::MAX / 2, 10 * 365 * 24 * 3600 + 1] {
+        let err = contract
+            .save_plugin(
+                deps.as_mut(),
+                &env,
+                &info,
+                &[Plugin::TimeLock {
+                    time: Duration::from_secs(secs),
+                }],
+            )
+            .expect_err("an unbounded time lock must be refused");
+        assert!(err.to_string().contains("exceeds the maximum"), "{err}");
+    }
+
+    // The ten-year cap itself is allowed, matching the proxy's approval-expiry convention.
+    contract
+        .save_plugin(
+            deps.as_mut(),
+            &env,
+            &info,
+            &[Plugin::TimeLock {
+                time: Duration::from_secs(10 * 365 * 24 * 3600),
+            }],
+        )
+        .unwrap();
+}
+
+#[test]
+fn save_plugin_rejects_listing_windows_that_can_never_open() {
+    let (mut deps, contract, creator) = contract_with_creator();
+    let env = env_at(1_000);
+    let info = message_info(&creator, &[]);
+    let save = |deps: cosmwasm_std::DepsMut, p: Plugin| {
+        contract.save_plugin(deps, &env, &info, &[p]).map(|_| ())
+    };
+
+    // `not_before_plugin` errors while the bound has NOT passed, so a `Never` lower bound
+    // blocks every listing forever.
+    let err = save(
+        deps.as_mut(),
+        Plugin::NotBefore {
+            time: Expiration::Never {},
+        },
+    )
+    .expect_err("a never lower bound must be refused");
+    assert!(
+        err.to_string().contains("blocks every listing forever"),
+        "{err}"
+    );
+
+    // A `Never` upper bound is the mirror image: it never expires, so it never restricts.
+    assert!(
+        save(
+            deps.as_mut(),
+            Plugin::NotAfter {
+                time: Expiration::Never {},
+            }
+        )
+        .is_err()
+    );
+
+    // An upper bound already in the past blocks every listing from here on.
+    let err = save(
+        deps.as_mut(),
+        Plugin::NotAfter {
+            time: Expiration::AtTime(Timestamp::from_seconds(999)),
+        },
+    )
+    .expect_err("an elapsed upper bound must be refused");
+    assert!(err.to_string().contains("already passed"), "{err}");
+
+    // Bounds that describe a real window are accepted, by time and by height alike.
+    save(
+        deps.as_mut(),
+        Plugin::NotBefore {
+            time: Expiration::AtTime(Timestamp::from_seconds(2_000)),
+        },
+    )
+    .unwrap();
+    save(
+        deps.as_mut(),
+        Plugin::NotAfter {
+            time: Expiration::AtTime(Timestamp::from_seconds(5_000)),
+        },
+    )
+    .unwrap();
+    save(
+        deps.as_mut(),
+        Plugin::NotBefore {
+            time: Expiration::AtHeight(env.block.height + 10),
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn save_plugin_rejects_empty_allowlists_that_would_permit_everything() {
+    let (mut deps, contract, creator) = contract_with_creator();
+    let env = env_at(1_000);
+    let info = message_info(&creator, &[]);
+
+    // Both hooks treat an empty list as "allow everything", so storing one leaves a
+    // restriction that silently permits. Refuse it: removing the plugin is the honest way
+    // to express no restriction.
+    for plugin in [
+        Plugin::AllowedMarketplaces {
+            marketplaces: vec![],
+        },
+        Plugin::AllowedCurrencies { denoms: vec![] },
+    ] {
+        let err = contract
+            .save_plugin(deps.as_mut(), &env, &info, &[plugin])
+            .expect_err("an empty allowlist must be refused");
+        assert!(
+            err.to_string().contains("remove the plugin instead"),
+            "{err}"
+        );
+    }
+}
+
+#[test]
+fn save_plugin_validates_the_whole_batch_before_writing_any_of_it() {
+    let (mut deps, contract, creator) = contract_with_creator();
+    let env = env_at(1_000);
+    let info = message_info(&creator, &[]);
+    let recipient = deps.api.addr_make("recipient");
+
+    // A rejected plugin must not leave the collection half configured.
+    let err = contract
+        .save_plugin(
+            deps.as_mut(),
+            &env,
+            &info,
+            &[
+                Plugin::MinimumPrice {
+                    amount: Coin::new(50u128, "uxion"),
+                },
+                Plugin::Royalty {
+                    bps: 20_000,
+                    recipient,
+                },
+            ],
+        )
+        .expect_err("the batch must be refused");
+    assert!(err.to_string().contains("must be below 10000"), "{err}");
+    assert_eq!(
+        contract
+            .config
+            .collection_plugins
+            .range(
+                deps.as_ref().storage,
+                None,
+                None,
+                cosmwasm_std::Order::Ascending
+            )
+            .count(),
+        0,
+        "no plugin from a rejected batch may be stored"
+    );
+}

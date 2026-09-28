@@ -55,6 +55,32 @@ and can enqueue `BankMsg::Send` payouts (e.g., royalties) or raise errors to abo
 Register plugins per collection with `AssetConfig::collection_plugins` and they will be invoked by
 `execute_pluggable` automatically.
 
+### Plugin parameter validation
+
+Saving a plugin is creator-only, and parameters are validated at save time (`Plugin::validate`).
+This matters because several fields fail at *hook* time rather than at save time, and some of them
+brick the whole collection rather than the one message that carries them. Rejected:
+
+| Rule | Why |
+|---|---|
+| `Royalty.bps` must be below `MAX_ROYALTY_BPS` (10000) | At 100% the royalty consumes the whole payment and the seller is sent a zero coin, which the bank module rejects; above it the deduction exceeds the payment. Every buy then fails, and because a configured royalty also disables raw transfers, nothing in the collection can move until the creator removes the plugin. |
+| `Royalty.recipient` and `AllowedMarketplaces.marketplaces` must be valid addresses | `Addr` carries no validation once deserialized from JSON, so a bad address would surface only as a failed bank send on the first buy. |
+| `TimeLock.time` must not exceed `MAX_TIME_LOCK_SECONDS` (ten years) | The hook computes `block.time + time_lock`; with `overflow-checks` on, an extreme value traps and takes the reserve path down with it. Matches the proxy's cap on approval expiry. |
+| Denoms must match `[a-zA-Z][a-zA-Z0-9/:._-]{2,127}` | They are echoed into bank messages, which reject anything the SDK's own denom rule refuses. `cosmwasm_std` has no denom validator, so the rule is mirrored here. IBC and token-factory denoms satisfy it. |
+| `AllowedMarketplaces` and `AllowedCurrencies` must be non-empty | Both hooks treat an empty list as *allow everything*, so storing one leaves a restriction that silently permits. Remove the plugin instead to express no restriction. |
+| `NotBefore.time` may not be `Never` | `not_before_plugin` errors while the bound has *not* passed, and `Never` never passes, so every listing is blocked forever. |
+| `NotAfter.time` may not be `Never` or already elapsed | `Never` never expires, so the bound never restricts anything; a bound already in the past blocks every listing from then on. |
+
+Not validated, and worth knowing:
+
+- **`Royalty { bps: 0 }` still disables raw transfers.** `is_transfer_enabled_plugin` keys off the royalty being configured at all, not its rate, so a zero-rate royalty collects nothing yet forces every movement through the buy flow. That may be deliberate; it is not rejected.
+- **`TimeLock { 0 }` makes explicit reservations impossible.** The hook allows only `reserved_until <= now` while `reserve` requires `> now`, so no reservation can satisfy both.
+- **Contradictions between separately saved plugins are not detected**, for example a `MinimumPrice` in a denom that `AllowedCurrencies` excludes, or a `NotBefore` at or after a `NotAfter`. Validation is per plugin, at save time.
+- **Existing collections are not repaired.** Validation is on the write path only, so a collection that already stored a bad value keeps its behaviour until the creator overwrites the plugin or calls `RemoveCollectionPlugin`, neither of which runs the list/buy/reserve hooks. If the creator has renounced ownership, that state is permanent.
+
+A batch is validated in full before any of it is written, so a rejected plugin cannot leave the
+collection half configured.
+
 ## Using the Library
 
 1. **Instantiate `cw721` normally**

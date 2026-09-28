@@ -2,7 +2,7 @@ use std::{fmt::Display, time::Duration};
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    Addr, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdError,
+    Addr, Api, Binary, Coin, CustomMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdError,
     StdResult, coin,
 };
 use cw721::{
@@ -103,6 +103,42 @@ pub enum Plugin {
     AllowedCurrencies { denoms: Vec<Coin> },
 }
 
+/// A royalty must stay below 100%. At or above it the deduction meets or exceeds the
+/// payment, so the buy either fails outright or sends the seller a zero coin.
+pub const MAX_ROYALTY_BPS: u16 = 10_000;
+
+/// Upper bound on a collection time lock (ten years), matching the proxy's cap on approval
+/// expiry. Keeps `block.time + time_lock` far from overflowing.
+pub const MAX_TIME_LOCK_SECONDS: u64 = 10 * 365 * 24 * 3600;
+
+/// Denoms are only ever compared and echoed into bank messages, so one the bank module
+/// will not accept produces a message that fails at dispatch.
+///
+/// `cosmwasm_std` has no denom validation of its own -- `Api` offers only `addr_validate`
+/// and friends -- so this mirrors the Cosmos SDK's own rule, the anchored regex
+/// `[a-zA-Z][a-zA-Z0-9/:._-]{2,127}`: a leading letter, then two to a hundred and
+/// twenty-seven more characters from that set. IBC (`ibc/<hash>`) and token-factory
+/// (`factory/<addr>/<sub>`) denoms both satisfy it.
+fn validate_denom(c: &Coin, invalid: &dyn Fn(String) -> StdError) -> StdResult<()> {
+    let denom = c.denom.as_str();
+    let bad = |why: &str| invalid(format!("denom {denom:?} {why}"));
+    if !(3..=128).contains(&denom.len()) {
+        return Err(bad("must be between 3 and 128 characters"));
+    }
+    if !denom.starts_with(|ch: char| ch.is_ascii_alphabetic()) {
+        return Err(bad("must start with a letter"));
+    }
+    if let Some(ch) = denom
+        .chars()
+        .find(|ch| !(ch.is_ascii_alphanumeric() || matches!(ch, '/' | ':' | '.' | '_' | '-')))
+    {
+        return Err(bad(&format!(
+            "contains {ch:?}; only letters, digits and / : . _ - are allowed"
+        )));
+    }
+    Ok(())
+}
+
 impl Display for Plugin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -182,6 +218,105 @@ impl Plugin {
             default_plugins::is_transfer_enabled_plugin(ctx)?;
         }
         Ok(true)
+    }
+
+    /// Reject plugin parameters that would be accepted at save time and then fail, or
+    /// silently do nothing, at hook time.
+    ///
+    /// Storing a plugin is creator-only but otherwise unchecked, and several fields brick
+    /// the collection rather than the single message that carries them. A royalty at or
+    /// above 100% is the worst: every buy fails when the deduction exceeds the payment,
+    /// and because a configured royalty also disables raw transfers, nothing in the
+    /// collection can move until the creator removes the plugin. These are honest-typo
+    /// failures, not attacks, which is why they are caught here rather than documented.
+    pub fn validate(&self, api: &dyn Api, env: &Env) -> StdResult<()> {
+        let invalid =
+            |msg: String| StdError::generic_err(format!("{}: {msg}", self.get_plugin_name()));
+        match self {
+            Plugin::Royalty { bps, recipient } => {
+                // Strictly below: at exactly 10000 the royalty consumes the whole payment
+                // and the seller is sent a zero coin, which the bank module rejects.
+                if *bps >= MAX_ROYALTY_BPS {
+                    return Err(invalid(format!(
+                        "royalty of {bps} bps must be below {MAX_ROYALTY_BPS} (100%), \
+                         or every buy in this collection fails"
+                    )));
+                }
+                // `Addr` carries no validation of its own once deserialized from JSON, so
+                // an unusable recipient would only surface as a failed bank send on buy.
+                api.addr_validate(recipient.as_str())
+                    .map_err(|e| invalid(format!("royalty recipient {recipient}: {e}")))?;
+            }
+            Plugin::TimeLock { time } => {
+                // The hook computes `block.time + time_lock`; with overflow checks on, an
+                // extreme value traps and takes the whole reserve path down with it.
+                if time.as_secs() > MAX_TIME_LOCK_SECONDS {
+                    return Err(invalid(format!(
+                        "time lock of {}s exceeds the maximum of {MAX_TIME_LOCK_SECONDS}s",
+                        time.as_secs()
+                    )));
+                }
+            }
+            Plugin::AllowedMarketplaces { marketplaces } => {
+                // An empty list reads as "nothing is allowed" but the hook treats it as
+                // "everything is allowed", so refuse to store one rather than leave a
+                // restriction that silently permits.
+                if marketplaces.is_empty() {
+                    return Err(invalid(
+                        "list is empty, which allows every buyer; remove the plugin instead"
+                            .to_string(),
+                    ));
+                }
+                for addr in marketplaces {
+                    api.addr_validate(addr.as_str())
+                        .map_err(|e| invalid(format!("marketplace {addr}: {e}")))?;
+                }
+            }
+            Plugin::AllowedCurrencies { denoms } => {
+                if denoms.is_empty() {
+                    return Err(invalid(
+                        "list is empty, which allows every currency; remove the plugin instead"
+                            .to_string(),
+                    ));
+                }
+                for coin in denoms {
+                    validate_denom(coin, &invalid)?;
+                }
+            }
+            Plugin::ExactPrice { amount } | Plugin::MinimumPrice { amount } => {
+                validate_denom(amount, &invalid)?;
+            }
+            Plugin::NotBefore { time } => {
+                // `not_before_plugin` errors while the expiration has NOT passed, so a
+                // `Never` never passes and listing is blocked permanently.
+                if matches!(time, Expiration::Never {}) {
+                    return Err(invalid(
+                        "a `never` lower bound blocks every listing forever; remove the \
+                         plugin instead"
+                            .to_string(),
+                    ));
+                }
+            }
+            Plugin::NotAfter { time } => {
+                // The mirror image: `Never` never expires, so the bound never applies,
+                // and one already in the past blocks every listing from here on.
+                if matches!(time, Expiration::Never {}) {
+                    return Err(invalid(
+                        "a `never` upper bound never restricts anything; remove the plugin \
+                         instead"
+                            .to_string(),
+                    ));
+                }
+                if time.is_expired(&env.block) {
+                    return Err(invalid(format!(
+                        "upper bound {time} has already passed, which blocks every listing"
+                    )));
+                }
+            }
+            // The proof is opaque, and nothing consumes it yet; see audit item G2.
+            Plugin::RequiresProof { .. } => {}
+        }
+        Ok(())
     }
 
     pub fn get_plugin_name(&self) -> &str {
@@ -473,13 +608,18 @@ where
     fn save_plugin(
         &self,
         deps: DepsMut,
-        _env: &Env,
+        env: &Env,
         info: &MessageInfo,
         plugins: &[Plugin],
     ) -> StdResult<()> {
         CREATOR
             .assert_owner(deps.storage, &info.sender)
             .map_err(|err| StdError::generic_err(err.to_string()))?;
+        // Validate the whole batch before writing any of it, so a rejected plugin cannot
+        // leave the collection configured with half of what the creator sent.
+        for plugin in plugins {
+            plugin.validate(deps.api, env)?;
+        }
         for plugin in plugins {
             self.config
                 .collection_plugins
