@@ -14,6 +14,14 @@ env:
   # RUST_VERSION in Basic.yml.
   OPTIMIZER_VERSION: "0.17.0"
 
+  # The tag above is mutable: whoever controls the registry namespace can repoint it.
+  # This job mounts the repository into that container and publishes what comes out,
+  # so the tag alone is not a trust boundary. Pinning the digest makes the build fail
+  # rather than run substituted code. Both are given (`tag@digest`); the digest wins.
+  # Re-read it when bumping the version:
+  #     docker buildx imagetools inspect cosmwasm/optimizer:<version> --format '{{.Manifest.Digest}}'
+  OPTIMIZER_DIGEST: "sha256:7e0b9229c1a4118d0c9a2af2e7f5d95a91f264c26a2ce5681c779926e74d7f85"
+
   # cosmwasm-check does not build on current stable (undefined symbol
   # `__rust_probestack`, from the wasmer version it depends on), so it is installed
   # with the same toolchain the optimizer uses.
@@ -24,9 +32,24 @@ jobs:
   release:
     name: Build and publish artifacts
     runs-on: ubuntu-latest
+
+    # Declaring any permission sets every other scope to none, so this grants exactly
+    # what the job needs: checkout reads the repository, the upload step writes release
+    # assets. Without the block the job inherits the repository-wide default, which is
+    # broader than publishing requires.
+    permissions:
+      contents: write
+
+    # Third-party actions are pinned to full commit SHAs rather than tags. `@master` and
+    # `@v2` are movable references: an upstream compromise would otherwise execute here
+    # with this job's release-upload authority. The trailing comment records which
+    # release each SHA is, since a bare SHA is otherwise unmaintainable. To bump one,
+    # resolve the tag and check the commit is signed:
+    #     curl -s https://api.github.com/repos/<owner>/<repo>/commits/<tag> \
+    #       | jq '{sha, verified: .commit.verification.verified}'
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # The optimizer builds each contract in its own pass and strips and optimises the
       # result, so it avoids the feature unification that a workspace-wide `cargo wasm`
@@ -38,10 +61,10 @@ jobs:
             -v "$(pwd)":/code \
             --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
             --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-            cosmwasm/optimizer:${{ env.OPTIMIZER_VERSION }}
+            cosmwasm/optimizer:${{ env.OPTIMIZER_VERSION }}@${{ env.OPTIMIZER_DIGEST }}
 
       - name: Install toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
 
@@ -60,7 +83,7 @@ jobs:
           cosmwasm-check artifacts/*.wasm
 
       - name: Upload artifacts to the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
             artifacts/*.wasm
