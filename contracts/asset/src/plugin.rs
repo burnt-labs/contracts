@@ -92,15 +92,33 @@ pub type DefaultPluginCtx<'a> = PluginCtx<'a, DefaultXionAssetContext, Empty>;
 
 #[cw_serde]
 pub enum Plugin {
-    ExactPrice { amount: Coin },
-    MinimumPrice { amount: Coin },
-    RequiresProof { proof: Vec<u8> },
-    NotBefore { time: Expiration },
-    NotAfter { time: Expiration },
-    TimeLock { time: Duration },
-    Royalty { bps: u16, recipient: Addr },
-    AllowedMarketplaces { marketplaces: Vec<Addr> },
-    AllowedCurrencies { denoms: Vec<Coin> },
+    /// Payment must equal the listing price exactly, so overpayment is refused rather than
+    /// absorbed by the seller. Carries no amount: the listing is the price. Kept as a
+    /// struct variant so collections that stored the old `{ "amount": ... }` form still
+    /// deserialize, with the field ignored.
+    ExactPrice {},
+    MinimumPrice {
+        amount: Coin,
+    },
+    NotBefore {
+        time: Expiration,
+    },
+    NotAfter {
+        time: Expiration,
+    },
+    TimeLock {
+        time: Duration,
+    },
+    Royalty {
+        bps: u16,
+        recipient: Addr,
+    },
+    AllowedMarketplaces {
+        marketplaces: Vec<Addr>,
+    },
+    AllowedCurrencies {
+        denoms: Vec<Coin>,
+    },
 }
 
 /// A royalty must stay below 100%. At or above it the deduction meets or exceeds the
@@ -142,9 +160,8 @@ fn validate_denom(c: &Coin, invalid: &dyn Fn(String) -> StdError) -> StdResult<(
 impl Display for Plugin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Plugin::ExactPrice { amount } => write!(f, "ExactPrice: {amount}"),
+            Plugin::ExactPrice {} => write!(f, "ExactPrice"),
             Plugin::MinimumPrice { amount } => write!(f, "MinimumPrice: {amount}"),
-            Plugin::RequiresProof { proof } => write!(f, "RequiresProof: {proof:?}"),
             Plugin::NotBefore { time } => write!(f, "NotBefore: {time}"),
             Plugin::NotAfter { time } => write!(f, "NotAfter: {time}"),
             Plugin::TimeLock { time } => write!(f, "TimeLock: {time:?}"),
@@ -170,15 +187,16 @@ impl Plugin {
         ctx: &mut PluginCtx<DefaultXionAssetContext, Empty>,
     ) -> StdResult<bool> {
         match self {
-            Plugin::ExactPrice { amount } => {
-                ctx.data.ask_price = Some(amount.clone());
+            Plugin::ExactPrice {} => {
+                // Deliberately does NOT touch `ctx.data.ask_price`. The previous code
+                // overwrote it with the plugin's own amount, which would have priced every
+                // item in the collection identically; the hook sets it from the listing.
                 default_plugins::exact_price_plugin(ctx)?;
             }
             Plugin::MinimumPrice { amount } => {
                 ctx.data.min_price = Some(amount.clone());
                 default_plugins::min_price_plugin(ctx)?;
             }
-            Plugin::RequiresProof { .. } => {}
             Plugin::NotBefore { time } => {
                 ctx.data.not_before = *time;
                 default_plugins::not_before_plugin(ctx)?;
@@ -283,9 +301,11 @@ impl Plugin {
                     validate_denom(coin, &invalid)?;
                 }
             }
-            Plugin::ExactPrice { amount } | Plugin::MinimumPrice { amount } => {
+            Plugin::MinimumPrice { amount } => {
                 validate_denom(amount, &invalid)?;
             }
+            // A flag with no parameters.
+            Plugin::ExactPrice {} => {}
             Plugin::NotBefore { time } => {
                 // `not_before_plugin` errors while the expiration has NOT passed, so a
                 // `Never` never passes and listing is blocked permanently.
@@ -313,8 +333,6 @@ impl Plugin {
                     )));
                 }
             }
-            // The proof is opaque, and nothing consumes it yet; see audit item G2.
-            Plugin::RequiresProof { .. } => {}
         }
         Ok(())
     }
@@ -323,7 +341,6 @@ impl Plugin {
         match self {
             Plugin::ExactPrice { .. } => "ExactPrice",
             Plugin::MinimumPrice { .. } => "MinimumPrice",
-            Plugin::RequiresProof { .. } => "RequiresProof",
             Plugin::NotBefore { .. } => "NotBefore",
             Plugin::NotAfter { .. } => "NotAfter",
             Plugin::TimeLock { .. } => "TimeLock",
@@ -515,8 +532,11 @@ where
         _recipient: &Option<String>,
         ctx: &mut DefaultPluginCtx,
     ) -> StdResult<bool> {
-        // for buys we run the exact price, then allowed marketplaces and royalty plugins if set
+        // for buys we run the exact price, then allowed currencies, marketplaces and royalty
         let config = AssetConfig::<TNftExtension>::default();
+        let exact_price_plugin = config
+            .collection_plugins
+            .may_load(ctx.deps.storage, Plugin::ExactPrice {}.get_plugin_name())?;
         let allowed_marketplaces_plugin = config.collection_plugins.may_load(
             ctx.deps.storage,
             Plugin::AllowedMarketplaces {
@@ -543,6 +563,11 @@ where
                 id: token_id.to_string(),
             })?;
         ctx.data.ask_price = Some(listing.price.clone());
+        // Runs first, and against the listing price set just above, so a collection that
+        // demands exactness rejects overpayment before any royalty is computed on it.
+        if let Some(plugin) = exact_price_plugin {
+            plugin.run_asset_plugin(ctx)?;
+        }
         if let Some(plugin) = allowed_currencies_plugin {
             plugin.run_asset_plugin(ctx)?;
         }

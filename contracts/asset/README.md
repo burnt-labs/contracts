@@ -44,9 +44,9 @@ logic without rewriting the core token implementation.
 
 `plugin.rs` includes a `Plugin` enum and a default plugin module:
 
-- Price guards (`ExactPrice`, `MinimumPrice`).
+- Price guards (`ExactPrice`, `MinimumPrice`). `ExactPrice` takes no parameters: it means *payment must equal the listing price*, so overpayment is refused rather than absorbed by the seller.
 - Temporal restrictions (`NotBefore`, `NotAfter`, `TimeLock`).
-- Access control (`AllowedMarketplaces`, `RequiresProof`).
+- Access control (`AllowedMarketplaces`).
 - Currency allow-listing (`AllowedCurrencies`).
 - Royalty payouts (`Royalty`).
 
@@ -70,6 +70,19 @@ brick the whole collection rather than the one message that carries them. Reject
 | `AllowedMarketplaces` and `AllowedCurrencies` must be non-empty | Both hooks treat an empty list as *allow everything*, so storing one leaves a restriction that silently permits. Remove the plugin instead to express no restriction. |
 | `NotBefore.time` may not be `Never` | `not_before_plugin` errors while the bound has *not* passed, and `Never` never passes, so every listing is blocked forever. |
 | `NotAfter.time` may not be `Never` or already elapsed | `Never` never expires, so the bound never restricts anything; a bound already in the past blocks every listing from then on. |
+
+### Removed and changed plugins
+
+- **`RequiresProof` was removed.** Nothing ever enforced it: no hook loaded it, its run arm
+  was empty, and no message carried a proof to check. A creator could set it and an
+  integrator could read it back from `GetCollectionPlugins`, so it advertised a precondition
+  that did not exist. A collection that already stored one keeps an inert row; no hook reads
+  it, `GetCollectionPlugins` skips rows it cannot deserialize rather than failing, and
+  `RemoveCollectionPlugin` still deletes it by name.
+- **`ExactPrice` lost its `amount` field.** It previously overwrote the listing price with
+  its own stored amount, which would have priced every item in a collection identically had
+  it ever run. It is now a flag checked against the listing price. The old
+  `{"exact_price":{"amount":...}}` wire form still deserializes, with the amount ignored.
 
 Not validated, and worth knowing:
 

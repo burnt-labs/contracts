@@ -348,8 +348,8 @@ where
                     .config
                     .collection_plugins
                     .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-                    .map(|item| item.map(|(_, plugin)| plugin))
-                    .collect::<Result<_, _>>()?;
+                    .filter_map(|item| item.ok().map(|(_, plugin)| plugin)) // backwards compatibility with old plugins
+                    .collect();
                 Ok(to_json_binary(&plugins)?)
             }
             AssetExtensionQueryMsg::GetAllListings { start_after, limit } => {

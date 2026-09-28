@@ -1,16 +1,17 @@
 use std::time::Duration;
 
 use cosmwasm_std::{
-    Addr, Binary, Coin, Deps, Empty, Env, MessageInfo, Response, Timestamp,
+    Addr, Binary, Coin, Deps, Empty, Env, MessageInfo, Response, Timestamp, from_json,
     testing::{message_info, mock_dependencies, mock_env},
 };
 use cw721::{
     Expiration,
     state::{CREATOR, NftInfo},
+    traits::Cw721Query,
 };
 
 use crate::{
-    msg::{AssetExtensionExecuteMsg, ReserveMsg},
+    msg::{AssetExtensionExecuteMsg, AssetExtensionQueryMsg, ReserveMsg},
     plugin::{DefaultXionAssetContext, Plugin, PluginCtx, RoyaltyInfo},
     state::ListingInfo,
     traits::{AssetContract, DefaultAssetContract, PluggableAsset},
@@ -789,9 +790,7 @@ fn save_plugin_rejects_non_owner() {
     let env = env_at(1_000);
     let non_owner = deps.api.addr_make("intruder");
     let info = message_info(&non_owner, &[]);
-    let plugins = vec![Plugin::ExactPrice {
-        amount: Coin::new(100u128, "uxion"),
-    }];
+    let plugins = vec![Plugin::ExactPrice {}];
 
     let err = contract
         .save_plugin(deps.as_mut(), &env, &info, &plugins)
@@ -981,21 +980,12 @@ fn save_plugin_rejects_unusable_addresses_and_denoms() {
         assert!(
             save(
                 deps.as_mut(),
-                Plugin::ExactPrice {
+                Plugin::MinimumPrice {
                     amount: Coin::new(1u128, denom),
                 }
             )
             .is_err(),
             "denom {denom:?} should be refused"
-        );
-        assert!(
-            save(
-                deps.as_mut(),
-                Plugin::MinimumPrice {
-                    amount: Coin::new(1u128, denom),
-                }
-            )
-            .is_err()
         );
         assert!(
             save(
@@ -1039,7 +1029,7 @@ fn save_plugin_rejects_unusable_addresses_and_denoms() {
     ] {
         save(
             deps.as_mut(),
-            Plugin::ExactPrice {
+            Plugin::MinimumPrice {
                 amount: Coin::new(1u128, denom),
             },
         )
@@ -1216,4 +1206,147 @@ fn save_plugin_validates_the_whole_batch_before_writing_any_of_it() {
         0,
         "no plugin from a rejected batch may be stored"
     );
+}
+
+#[test]
+fn exact_price_is_enforced_on_buy_against_the_listing_price() {
+    let (mut deps, contract, creator) = contract_with_creator();
+    let env = env_at(1_000);
+    contract
+        .save_plugin(
+            deps.as_mut(),
+            &env,
+            &message_info(&creator, &[]),
+            &[Plugin::ExactPrice {}],
+        )
+        .unwrap();
+
+    // The listing, not the plugin, sets the price. Before this wiring the plugin was never
+    // loaded at all, so overpayment was silently absorbed by the seller.
+    let seller = deps.api.addr_make("seller");
+    let buyer = deps.api.addr_make("buyer");
+    contract
+        .config
+        .listings
+        .save(
+            deps.as_mut().storage,
+            "t1",
+            &ListingInfo {
+                id: "t1".to_string(),
+                seller: seller.clone(),
+                price: Coin::new(100u128, "uxion"),
+                reserved: None,
+            },
+        )
+        .unwrap();
+
+    let pay = |deps: Deps<'_>, funds: &[Coin]| {
+        let info = message_info(&buyer, funds);
+        let mut ctx = build_ctx(deps, env_at(1_000), info);
+        contract.on_buy_plugin("t1", &None, &mut ctx)
+    };
+    let run = |deps: Deps<'_>, paid: u128| pay(deps, &[Coin::new(paid, "uxion")]);
+
+    run(deps.as_ref(), 100).expect("paying exactly the listing price must pass");
+    assert!(
+        run(deps.as_ref(), 101).is_err(),
+        "overpayment must be refused"
+    );
+    assert!(
+        run(deps.as_ref(), 99).is_err(),
+        "underpayment must be refused"
+    );
+
+    // The denom is checked too, by requiring a coin of the listing's denom to be present.
+    assert!(
+        pay(deps.as_ref(), &[Coin::new(100u128, "uatom")]).is_err(),
+        "the right amount in the wrong denom must be refused"
+    );
+    assert!(pay(deps.as_ref(), &[]).is_err(), "no funds must be refused");
+
+    // Known gap, covered elsewhere: the plugin inspects only the coin matching the ask
+    // denom, so a correct payment plus an unrelated coin satisfies it. The buy path rejects
+    // that separately, refusing any transfer that carries more than one coin.
+    pay(
+        deps.as_ref(),
+        &[Coin::new(100u128, "uxion"), Coin::new(500u128, "uatom")],
+    )
+    .expect("this plugin alone does not police extra coins");
+
+    // Without the plugin the old behaviour returns: overpayment is accepted here and
+    // absorbed by the seller in the buy path.
+    contract
+        .remove_plugin(
+            deps.as_mut(),
+            &env,
+            &message_info(&creator, &[]),
+            &["ExactPrice".to_string()],
+        )
+        .unwrap();
+    run(deps.as_ref(), 101).expect("without the plugin overpayment is absorbed");
+}
+
+#[test]
+fn a_stored_plugin_this_code_no_longer_knows_does_not_break_the_query() {
+    let (mut deps, contract, creator) = contract_with_creator();
+    let env = env_at(1_000);
+
+    // `RequiresProof` was removed because nothing ever enforced it. A collection that
+    // stored one keeps the raw row, so write it the way the old code would have.
+    deps.as_mut().storage.set(
+        b"\x00\x12collection_pluginsRequiresProof",
+        br#"{"requires_proof":{"proof":[1,2,3]}}"#,
+    );
+    contract
+        .save_plugin(
+            deps.as_mut(),
+            &env,
+            &message_info(&creator, &[]),
+            &[Plugin::ExactPrice {}],
+        )
+        .unwrap();
+
+    // Guard against a vacuous test: the raw row must really be in the map's range, and it
+    // must really fail to deserialize. Otherwise the assertion below proves nothing.
+    let raw: Vec<_> = contract
+        .config
+        .collection_plugins
+        .range_raw(
+            deps.as_ref().storage,
+            None,
+            None,
+            cosmwasm_std::Order::Ascending,
+        )
+        .collect();
+    assert_eq!(raw.len(), 2, "the legacy row must be stored in the map");
+    assert_eq!(
+        raw.iter().filter(|r| r.is_err()).count(),
+        1,
+        "the legacy row must be the one that fails to deserialize"
+    );
+
+    // The dead row must not hide the live one: the query skips what it cannot read.
+    let plugins: Vec<Plugin> = from_json(
+        contract
+            .query_extension(
+                deps.as_ref(),
+                &env,
+                AssetExtensionQueryMsg::GetCollectionPlugins {},
+            )
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(plugins, vec![Plugin::ExactPrice {}]);
+}
+
+#[test]
+fn a_legacy_exact_price_with_an_amount_still_deserializes() {
+    // `ExactPrice` used to carry an amount that overwrote the listing price. Dropping the
+    // field must not strand collections that stored the old shape: `cw_serde` does not set
+    // `deny_unknown_fields`, so the stale amount is simply ignored.
+    let legacy: Plugin =
+        from_json(br#"{"exact_price":{"amount":{"denom":"uxion","amount":"100"}}}"#)
+            .expect("the old wire form must still load");
+    assert_eq!(legacy, Plugin::ExactPrice {});
+    assert_eq!(legacy.get_plugin_name(), "ExactPrice");
 }
