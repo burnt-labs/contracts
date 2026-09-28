@@ -1287,12 +1287,12 @@ fn exact_price_is_enforced_on_buy_against_the_listing_price() {
 }
 
 #[test]
-fn a_stored_plugin_this_code_no_longer_knows_does_not_break_the_query() {
+fn a_stored_plugin_this_code_no_longer_knows_fails_the_query_until_removed() {
     let (mut deps, contract, creator) = contract_with_creator();
     let env = env_at(1_000);
 
-    // `RequiresProof` was removed because nothing ever enforced it. A collection that
-    // stored one keeps the raw row, so write it the way the old code would have.
+    // `RequiresProof` was removed outright rather than kept for compatibility. A collection
+    // that stored one keeps the raw row, so write it the way the old code would have.
     deps.as_mut().storage.set(
         b"\x00\x12collection_pluginsRequiresProof",
         br#"{"requires_proof":{"proof":[1,2,3]}}"#,
@@ -1307,7 +1307,7 @@ fn a_stored_plugin_this_code_no_longer_knows_does_not_break_the_query() {
         .unwrap();
 
     // Guard against a vacuous test: the raw row must really be in the map's range, and it
-    // must really fail to deserialize. Otherwise the assertion below proves nothing.
+    // must really fail to deserialize.
     let raw: Vec<_> = contract
         .config
         .collection_plugins
@@ -1325,7 +1325,30 @@ fn a_stored_plugin_this_code_no_longer_knows_does_not_break_the_query() {
         "the legacy row must be the one that fails to deserialize"
     );
 
-    // The dead row must not hide the live one: the query skips what it cannot read.
+    // This is a breaking change, deliberately: the query fails rather than quietly hiding
+    // the row. Skipping it would also hide a corrupt row under a live name, which the hooks
+    // reject anyway, leaving the query claiming a plugin is absent while it blocks listing.
+    assert!(
+        contract
+            .query_extension(
+                deps.as_ref(),
+                &env,
+                AssetExtensionQueryMsg::GetCollectionPlugins {},
+            )
+            .is_err(),
+        "a row this code cannot decode must fail the query, not vanish from it"
+    );
+
+    // The creator clears it by name. Removal deletes by raw key and never deserializes, so
+    // it works even though the variant is gone -- that is what keeps this recoverable.
+    contract
+        .remove_plugin(
+            deps.as_mut(),
+            &env,
+            &message_info(&creator, &[]),
+            &["RequiresProof".to_string()],
+        )
+        .unwrap();
     let plugins: Vec<Plugin> = from_json(
         contract
             .query_extension(
@@ -1349,4 +1372,122 @@ fn a_legacy_exact_price_with_an_amount_still_deserializes() {
             .expect("the old wire form must still load");
     assert_eq!(legacy, Plugin::ExactPrice {});
     assert_eq!(legacy.get_plugin_name(), "ExactPrice");
+}
+
+#[test]
+fn a_corrupt_row_under_a_live_name_is_reported_not_hidden() {
+    let (mut deps, contract, creator) = contract_with_creator();
+    let env = env_at(1_000);
+    contract
+        .save_plugin(
+            deps.as_mut(),
+            &env,
+            &message_info(&creator, &[]),
+            &[Plugin::MinimumPrice {
+                amount: Coin::new(50u128, "uxion"),
+            }],
+        )
+        .unwrap();
+
+    // Every row is decoded strictly, so a corrupt one is reported rather than hidden. This
+    // matters most for a live name: the hooks load `Royalty` with `may_load(..)?`, so such a
+    // row already blocks buying, and a query reporting it absent would hide the cause.
+    deps.as_mut().storage.set(
+        b"\x00\x12collection_pluginsRoyalty",
+        br#"{"royalty":{"bps":"not a number"}}"#,
+    );
+    assert!(
+        contract
+            .query_extension(
+                deps.as_ref(),
+                &env,
+                AssetExtensionQueryMsg::GetCollectionPlugins {},
+            )
+            .is_err(),
+        "a corrupt row under a live plugin name must not be silently skipped"
+    );
+
+    // Once it is gone the query works again, and the live plugin is still there.
+    contract
+        .remove_plugin(
+            deps.as_mut(),
+            &env,
+            &message_info(&creator, &[]),
+            &["Royalty".to_string()],
+        )
+        .unwrap();
+    let plugins: Vec<Plugin> = from_json(
+        contract
+            .query_extension(
+                deps.as_ref(),
+                &env,
+                AssetExtensionQueryMsg::GetCollectionPlugins {},
+            )
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        plugins,
+        vec![Plugin::MinimumPrice {
+            amount: Coin::new(50u128, "uxion")
+        }]
+    );
+}
+
+#[test]
+fn a_legacy_exact_price_row_is_loaded_and_enforced_from_storage() {
+    let (mut deps, contract, creator) = contract_with_creator();
+    let env = env_at(1_000);
+    let buyer = deps.api.addr_make("buyer");
+    let seller = deps.api.addr_make("seller");
+
+    // Written the way the old code stored it, with the amount that used to override the
+    // listing. Loading it through `may_load` in the hook -- not just `from_json` -- is what
+    // proves collections on the old shape keep working.
+    deps.as_mut().storage.set(
+        b"\x00\x12collection_pluginsExactPrice",
+        br#"{"exact_price":{"amount":{"denom":"uxion","amount":"999"}}}"#,
+    );
+    contract
+        .config
+        .listings
+        .save(
+            deps.as_mut().storage,
+            "t1",
+            &ListingInfo {
+                id: "t1".to_string(),
+                seller,
+                price: Coin::new(100u128, "uxion"),
+                reserved: None,
+            },
+        )
+        .unwrap();
+
+    let pay = |deps: Deps<'_>, paid: u128| {
+        let info = message_info(&buyer, &[Coin::new(paid, "uxion")]);
+        let mut ctx = build_ctx(deps, env_at(1_000), info);
+        contract.on_buy_plugin("t1", &None, &mut ctx)
+    };
+
+    // The listing price governs, not the stale 999 the old row carries.
+    pay(deps.as_ref(), 100).expect("the listing price must govern");
+    assert!(
+        pay(deps.as_ref(), 999).is_err(),
+        "the stale amount must not govern"
+    );
+    assert!(pay(deps.as_ref(), 101).is_err());
+
+    // ...and it still shows up in the query, as a parameterless plugin.
+    let plugins: Vec<Plugin> = from_json(
+        contract
+            .query_extension(
+                deps.as_ref(),
+                &env,
+                AssetExtensionQueryMsg::GetCollectionPlugins {},
+            )
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(plugins, vec![Plugin::ExactPrice {}]);
+    let _ = creator;
 }

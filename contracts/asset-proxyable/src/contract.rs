@@ -49,7 +49,7 @@ type BaseContract<'a> = DefaultAssetContract<
 pub const MIGRATABLE_FROM: &[(&str, &str)] = &[
     ("asset", "0.1.0"),
     ("asset", "0.2.0"),
-    (CONTRACT_NAME, "0.1.0"),
+    (CONTRACT_NAME, "0.2.0"),
 ];
 
 /// Same as the base instantiate, but records this crate's cw2 identity so a variant

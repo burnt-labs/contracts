@@ -60,7 +60,7 @@ fn migrate_accepts_the_proxyable_variant_as_a_rollback_source() {
     expect_ok(cw2::set_contract_version(
         deps.as_mut().storage,
         "asset-proxyable",
-        "0.1.0",
+        "0.2.0",
     ));
     expect_ok(
         cw721::state::Cw721Config::<cosmwasm_std::Empty>::default()

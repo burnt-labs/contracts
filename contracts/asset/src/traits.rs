@@ -344,12 +344,19 @@ where
                 Ok(to_json_binary(&listings)?)
             }
             AssetExtensionQueryMsg::GetCollectionPlugins {} => {
+                // Every row must decode. A collection that still holds a plugin under a
+                // name this code has dropped (`RequiresProof`) will fail this query until
+                // its creator clears the row with `RemoveCollectionPlugin`, which deletes by
+                // raw key and needs no deserialization. That is deliberate: skipping
+                // unreadable rows would also hide a corrupt row under a live name, which the
+                // hooks reject with `may_load(..)?` anyway, leaving the query claiming a
+                // plugin is absent while it blocks every listing and buy.
                 let plugins: Vec<_> = self
                     .config
                     .collection_plugins
                     .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-                    .filter_map(|item| item.ok().map(|(_, plugin)| plugin)) // backwards compatibility with old plugins
-                    .collect();
+                    .map(|item| item.map(|(_, plugin)| plugin))
+                    .collect::<Result<_, _>>()?;
                 Ok(to_json_binary(&plugins)?)
             }
             AssetExtensionQueryMsg::GetAllListings { start_after, limit } => {

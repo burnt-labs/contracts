@@ -73,12 +73,18 @@ brick the whole collection rather than the one message that carries them. Reject
 
 ### Removed and changed plugins
 
-- **`RequiresProof` was removed.** Nothing ever enforced it: no hook loaded it, its run arm
-  was empty, and no message carried a proof to check. A creator could set it and an
-  integrator could read it back from `GetCollectionPlugins`, so it advertised a precondition
-  that did not exist. A collection that already stored one keeps an inert row; no hook reads
-  it, `GetCollectionPlugins` skips rows it cannot deserialize rather than failing, and
-  `RemoveCollectionPlugin` still deletes it by name.
+- **`RequiresProof` was removed. This is a breaking change.** Nothing ever enforced it: no
+  hook loaded it, its run arm was empty, and no message carried a proof to check. A creator
+  could set it and an integrator could read it back from `GetCollectionPlugins`, so it
+  advertised a precondition that did not exist. Sending it now fails message deserialization.
+
+  A collection that already stored one keeps the raw row. No hook reads it, so listing,
+  buying and reserving are unaffected, but **`GetCollectionPlugins` fails for that collection
+  until the creator clears the row** with `RemoveCollectionPlugin { plugins: ["RequiresProof"] }`,
+  which deletes by raw key and never deserializes. Skipping unreadable rows was considered
+  and rejected: it would equally hide a *corrupt* row under a live plugin name, and since the
+  hooks load those with `may_load(..)?`, the query would report a plugin as absent while it
+  was blocking every listing and buy.
 - **`ExactPrice` lost its `amount` field.** It previously overwrote the listing price with
   its own stored amount, which would have priced every item in a collection identically had
   it ever run. It is now a flag checked against the listing price. The old

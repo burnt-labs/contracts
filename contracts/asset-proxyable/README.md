@@ -178,6 +178,13 @@ deliberately rotate roles. Requires a wasm admin on the collection.
 
 Fresh instantiations record cw2 name `asset-proxyable`, never `asset`.
 
+**This crate keeps version parity with `asset`.** Both are at `0.2.0`, and when one bumps the
+other bumps with it, even if its own code did not change. The variant is a thin wrapper whose
+behaviour is mostly the base's, so a shared number is the only honest way for a deployed
+collection's cw2 record to say which base behaviour it carries. Keep the two
+`MIGRATABLE_FROM` tables in step when bumping: this crate's accepted sources, and the base's
+entry for `("asset-proxyable", <version>)` that makes rollback work.
+
 A migration that rotates the creator (`with_update { creator: Some(..) }`) clears both sets
 exactly like an accepted handover does, so a new creator always starts with no trusted
 proxies and no approvable operators regardless of the route by which they took over. Both

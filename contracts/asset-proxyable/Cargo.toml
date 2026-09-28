@@ -3,7 +3,7 @@ description = "Asset contract variant that accepts typed, sender-forwarded actio
 edition     = "2024"
 license     = "Apache-2.0"
 name        = "asset-proxyable"
-version     = "0.1.0"
+version     = "0.2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

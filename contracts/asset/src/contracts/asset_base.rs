@@ -30,7 +30,7 @@ use cw721::{
 pub const MIGRATABLE_FROM: &[(&str, &str)] = &[
     (CONTRACT_NAME, "0.1.0"),
     (CONTRACT_NAME, "0.2.0"),
-    ("asset-proxyable", "0.1.0"),
+    ("asset-proxyable", "0.2.0"),
 ];
 
 type AssetBaseContract<'a> = DefaultAssetContract<
