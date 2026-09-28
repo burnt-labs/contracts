@@ -132,6 +132,18 @@ fn end_to_end_proxied_flow() {
     .unwrap();
     assert_eq!(trusted_proxies(&app, &collection), vec![proxy.clone()]);
 
+    // ...and admits the marketplace as an operator a proxy may approve. Trusting the
+    // proxy is not enough on its own: the two lists are separate gates.
+    app.execute_contract(
+        creator.clone(),
+        collection.clone(),
+        &ProxyableExecuteMsg::Proxy(ProxyMsg::AddApprovalOperator {
+            operator: marketplace.to_string(),
+        }),
+        &[],
+    )
+    .unwrap();
+
     // proxy approves the marketplace on alice's behalf
     app.execute_contract(
         proxy.clone(),

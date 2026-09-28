@@ -19,8 +19,9 @@ use crate::{
         ProxyableExecuteMsg, ProxyableQueryMsg,
     },
     state::{
-        MAX_TRUSTED_PROXIES, TRUSTED_PROXIES, clear_trusted_proxies, count_trusted_proxies,
-        has_trusted_proxies, list_trusted_proxies,
+        APPROVAL_OPERATORS, MAX_APPROVAL_OPERATORS, MAX_TRUSTED_PROXIES, TRUSTED_PROXIES,
+        clear_approval_operators, clear_trusted_proxies, count_approval_operators,
+        count_trusted_proxies, has_trusted_proxies, list_approval_operators, list_trusted_proxies,
     },
 };
 
@@ -89,6 +90,12 @@ pub fn execute(
         ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveTrustedProxy { proxy }) => {
             remove_trusted_proxy(deps, env, info, proxy)
         }
+        ProxyableExecuteMsg::Proxy(ProxyMsg::AddApprovalOperator { operator }) => {
+            add_approval_operator(deps, env, info, operator)
+        }
+        ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveApprovalOperator { operator }) => {
+            remove_approval_operator(deps, env, info, operator)
+        }
         ProxyableExecuteMsg::Base(base) => execute_base(deps, env, info, base),
     }
 }
@@ -117,12 +124,17 @@ fn execute_base(
             let previous = CREATOR.item.load(deps.storage)?.owner;
             let response = asset_base::execute(deps.branch(), env, info, base)?;
             let current = CREATOR.item.load(deps.storage)?.owner;
-            let cleared = if previous != current {
-                clear_trusted_proxies(deps.storage)?
+            let (cleared, operators_cleared) = if previous != current {
+                (
+                    clear_trusted_proxies(deps.storage)?,
+                    clear_approval_operators(deps.storage)?,
+                )
             } else {
-                0
+                (0, 0)
             };
-            Ok(response.add_attribute("trusted_proxies_cleared", cleared.to_string()))
+            Ok(response
+                .add_attribute("trusted_proxies_cleared", cleared.to_string())
+                .add_attribute("approval_operators_cleared", operators_cleared.to_string()))
         }
         _ => Ok(asset_base::execute(deps, env, info, base)?),
     }
@@ -175,10 +187,26 @@ fn execute_proxied(
             );
             ("burn", BaseExecuteMsg::Burn { token_id })
         }
-        ProxyAction::ApproveAll { operator, expires } => (
-            "approve_all",
-            BaseExecuteMsg::ApproveAll { operator, expires },
-        ),
+        ProxyAction::ApproveAll { operator, expires } => {
+            // A proxy is trusted to say who the sender is, not what may be approved on
+            // their behalf. Without this a compromised proxy could make any address
+            // operator over every holder. Revocation below is deliberately not gated:
+            // it only removes authority, and must keep working during an incident.
+            // Validate before the lookup: the map is keyed by validated addresses, so a
+            // malformed operator must fail as a bad address rather than silently look
+            // like one that is merely unlisted.
+            let checked = deps.api.addr_validate(&operator)?;
+            ensure!(
+                APPROVAL_OPERATORS.has(deps.storage, &checked),
+                ContractError::OperatorNotApprovable {
+                    operator: operator.clone()
+                }
+            );
+            (
+                "approve_all",
+                BaseExecuteMsg::ApproveAll { operator, expires },
+            )
+        }
         ProxyAction::RevokeAll { operator } => {
             ("revoke_all", BaseExecuteMsg::RevokeAll { operator })
         }
@@ -249,6 +277,16 @@ fn add_trusted_proxy(
             proxy: proxy.to_string()
         }
     );
+    // The two roles must stay disjoint. A proxy that is also an approvable operator can
+    // relay `ApproveAll { operator: itself }` for every holder and then act as an
+    // ordinary cw721 operator, which permits `Approve`, `TransferNft` and `SendNft` --
+    // none of which are in the proxied action set.
+    ensure!(
+        !APPROVAL_OPERATORS.has(deps.storage, &proxy),
+        ContractError::ConflictingProxyAndOperator {
+            address: proxy.to_string()
+        }
+    );
     ensure!(
         count_trusted_proxies(deps.storage) < MAX_TRUSTED_PROXIES,
         ContractError::TooManyTrustedProxies {
@@ -297,6 +335,85 @@ fn add_trusted_proxy(
     ))
 }
 
+/// Operators are creator-managed, like trusted proxies, and for the same reason: the
+/// creator is the party the collection's users already rely on for collection policy.
+fn add_approval_operator(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    operator: String,
+) -> ContractResult<Response> {
+    nonpayable(&info)?;
+    assert_creator(deps.as_ref(), &info.sender)?;
+    // Same shrink-only rule as the trusted set, and for the same reason: these entries
+    // outlive the handover only in the sense that they are cleared on acceptance, and an
+    // incoming creator must be able to rely on what they inspect before accepting.
+    ensure!(
+        !creator_transfer_is_live(deps.as_ref(), &env)?,
+        ContractError::CreatorTransferPending {}
+    );
+    let operator = deps.api.addr_validate(&operator)?;
+    // Inert today, since this contract never sends a message as itself and so can never be
+    // the `info.sender` its own operator check would accept. Excluded anyway, to match
+    // `add_trusted_proxy` and to keep it from becoming dead configuration that later code
+    // could accidentally give meaning to.
+    ensure!(
+        operator != env.contract.address,
+        ContractError::InvalidApprovalOperator {
+            reason: "a collection cannot be its own approval operator".to_string()
+        }
+    );
+    ensure!(
+        !APPROVAL_OPERATORS.has(deps.storage, &operator),
+        ContractError::ApprovalOperatorAlreadyExists {
+            operator: operator.to_string()
+        }
+    );
+    ensure!(
+        !TRUSTED_PROXIES.has(deps.storage, &operator),
+        ContractError::ConflictingProxyAndOperator {
+            address: operator.to_string()
+        }
+    );
+    ensure!(
+        count_approval_operators(deps.storage) < MAX_APPROVAL_OPERATORS,
+        ContractError::TooManyApprovalOperators {
+            max: MAX_APPROVAL_OPERATORS
+        }
+    );
+    APPROVAL_OPERATORS.save(deps.storage, &operator, &cosmwasm_std::Empty {})?;
+    Ok(Response::new().add_event(
+        Event::new("approval_operator_added")
+            .add_attribute("collection", env.contract.address)
+            .add_attribute("operator", operator)
+            .add_attribute("by", info.sender),
+    ))
+}
+
+fn remove_approval_operator(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    operator: String,
+) -> ContractResult<Response> {
+    nonpayable(&info)?;
+    assert_creator(deps.as_ref(), &info.sender)?;
+    let operator = deps.api.addr_validate(&operator)?;
+    ensure!(
+        APPROVAL_OPERATORS.has(deps.storage, &operator),
+        ContractError::ApprovalOperatorNotFound {
+            operator: operator.to_string()
+        }
+    );
+    APPROVAL_OPERATORS.remove(deps.storage, &operator);
+    Ok(Response::new().add_event(
+        Event::new("approval_operator_removed")
+            .add_attribute("collection", env.contract.address)
+            .add_attribute("operator", operator)
+            .add_attribute("by", info.sender),
+    ))
+}
+
 fn remove_trusted_proxy(
     deps: DepsMut,
     env: Env,
@@ -327,18 +444,22 @@ pub fn query(deps: Deps, env: Env, msg: ProxyableQueryMsg) -> StdResult<Binary> 
         ProxyableQueryMsg::Proxy(ProxyQueryMsg::GetTrustedProxies {}) => {
             to_json_binary(&list_trusted_proxies(deps.storage)?)
         }
+        ProxyableQueryMsg::Proxy(ProxyQueryMsg::GetApprovalOperators {}) => {
+            to_json_binary(&list_approval_operators(deps.storage)?)
+        }
         ProxyableQueryMsg::Base(base) => asset_base::query(deps, env, base),
     }
 }
 
 /// Migrate from a base `asset` contract or an earlier `asset-proxyable` version. The stored
 /// cw2 identity is checked first because cw721's migrate rewrites it unconditionally.
-/// The trusted-proxy map is cleared when either:
+/// The trusted-proxy and approvable-operator maps are both cleared when either:
 /// - the source is the base contract (a map does not empty itself on a code migration, and
 ///   dormant entries from an earlier proxyable life must not wake up), or
 /// - the migration changed the creator (`WithUpdate { creator: Some(..) }` rotates the role
 ///   directly through cw721, bypassing the `AcceptOwnership` handover path, and must apply
-///   the same rule: a new creator starts with no trusted proxies).
+///   the same rule: a new creator starts with no trusted proxies and no approvable
+///   operators).
 #[cfg_attr(not(feature = "library"), cosmwasm_std::entry_point)]
 pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> ContractResult<Response> {
     let stored = cw2::get_contract_version(deps.storage)?;
@@ -355,13 +476,17 @@ pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> ContractResult<R
 
     let current_creator = CREATOR.item.may_load(deps.storage)?.and_then(|o| o.owner);
     let creator_changed = previous_creator != current_creator;
-    let cleared = if stored.contract != CONTRACT_NAME || creator_changed {
-        clear_trusted_proxies(deps.storage)?
+    let (cleared, operators_cleared) = if stored.contract != CONTRACT_NAME || creator_changed {
+        (
+            clear_trusted_proxies(deps.storage)?,
+            clear_approval_operators(deps.storage)?,
+        )
     } else {
-        0
+        (0, 0)
     };
     Ok(response
         .add_attribute("from_contract", stored.contract)
         .add_attribute("creator_changed", creator_changed.to_string())
-        .add_attribute("trusted_proxies_cleared", cleared.to_string()))
+        .add_attribute("trusted_proxies_cleared", cleared.to_string())
+        .add_attribute("approval_operators_cleared", operators_cleared.to_string()))
 }

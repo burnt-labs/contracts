@@ -9,14 +9,16 @@ wrapper and collections on the base code id have no proxy surface at all.
 
 - `proxy_execute { sender, action }`: accepted only from a registered trusted proxy, never
   with funds. `action` is one of `burn { token_id }` (owner-only, stricter than a direct
-  burn), `approve_all { operator, expires }`, `revoke_all { operator }`. The action runs
-  through the base contract with `sender` as the effective sender, so the base's own
-  checks (ownership, operator storage, burn-while-listed guard) apply unchanged.
+  burn), `approve_all { operator, expires }` (only for an operator the creator has
+  admitted, see below), `revoke_all { operator }`. The action runs through the base
+  contract with `sender` as the effective sender, so the base's own checks (ownership,
+  operator storage, burn-while-listed guard) apply unchanged.
 - `add_trusted_proxy { proxy, require_immutable? }` / `remove_trusted_proxy { proxy }`:
   cw721 **creator** only, at most 4 entries, events emitted. **Registering a proxy grants it
-  burn and operator approval power over every token owner in the collection**, limited to
-  what those owners could do themselves. Treat it like handing out an operator role
-  collection-wide.
+  burn power over every token owner in the collection**, limited to what those owners could
+  do themselves, plus the ability to approve the operators named in
+  `add_approval_operator`. Treat it like handing out an operator role collection-wide,
+  bounded by that list.
   - `require_immutable` (optional, default `false`) makes the collection check x/wasm at
     registration and refuse anything that is not a contract or that still has a wasm
     admin. A cleared admin can never be set again, so a proxy that passes stays immutable.
@@ -37,7 +39,29 @@ wrapper and collections on the base code id have no proxy surface at all.
   before the handover are ordinary cw721 approvals and persist until they expire or the
   owner revokes them. They are visible on-chain (`proxied_by` attributes) and users can
   revoke them directly or through the proxy at any time.
-- `get_trusted_proxies {}` query.
+- `add_approval_operator { operator }` / `remove_approval_operator { operator }`: cw721
+  **creator** only, at most 8 entries, events emitted. This is the list of operators a
+  proxy is allowed to approve on a holder's behalf. **It fails closed: while the list is
+  empty, no proxied `approve_all` is relayed at all.** A proxy is trusted to say who the
+  sender is, not to choose what that sender approves, so registering a proxy no longer
+  implies it can make any address operator over the collection.
+  - Proxied `revoke_all` is deliberately **not** gated. Revocation only removes authority
+    and has to keep working during an incident, including for an operator that has since
+    been delisted. Same reasoning as the removable-operator path on the proxy.
+  - Removal is prospective. Approvals already granted to a delisted operator survive as
+    ordinary cw721 approvals; delisting only stops new ones. Holders (or a proxy on their
+    behalf) can still revoke them.
+  - The gate is on the proxy path only. A holder signing `approve_all` themselves keeps
+    the unrestricted cw721 behaviour, whatever this list says.
+  - **A trusted proxy may not also be an approvable operator**, enforced in both
+    directions. Otherwise a proxy could relay `approve_all { operator: itself }` for every
+    holder and then act as an ordinary cw721 operator, which permits `approve`,
+    `transfer_nft` and `send_nft` -- none of which are in the proxied action set. The
+    closed action set only bounds a proxy that has not been made an operator.
+  - While a creator transfer is live the list may only shrink, exactly as the trusted set
+    does, so an outgoing creator cannot plant an operator after the incoming one has
+    inspected it. Accepting the handover clears it.
+- `get_trusted_proxies {}` and `get_approval_operators {}` queries.
 
 All base messages and queries keep their exact JSON shape.
 
@@ -62,7 +86,9 @@ can never be set again.
 `add_trusted_proxy` tells this collection: *this address may assert who the sender is.*
 Every proxied action then runs with whatever sender the proxy names, checked only against
 that claimed identity. Within the closed action set that means the proxy can burn any
-token whose owner it names, and can create operator approvals on behalf of any owner.
+token whose owner it names, and can make any owner approve one of the operators the
+creator has admitted with `add_approval_operator`. It cannot choose the operator itself:
+that list is the creator's, and while it is empty no proxied approval is relayed.
 
 That is custodial-equivalent authority over the collection, limited to what each owner
 could do themselves. It is a deliberate design decision, not an oversight: the whole point
@@ -95,6 +121,16 @@ the forwarder pattern: no on-chain mechanism can distinguish a proxy-created app
 one the owner made directly, and revoking other users' approvals from any single key would
 break the effective-sender model the design rests on.
 
+The approval-operator allowlist does not remove this residual, because the same creator
+controls both lists. What it does is make the setup **visible and narrow**: the address
+being approved has to be named on-chain first and emits `approval_operator_added`, so the
+seeding is a matter of public record rather than an invisible consequence of trusting a
+proxy. It also bounds the damage from a proxy that is compromised rather than malicious
+from the start, which is the more likely failure. A proxy whose key or code is taken over
+can still burn, and can still approve the marketplaces the creator listed, but it cannot
+direct approvals to an address of the attacker's choosing, and because the two roles are
+disjoint it cannot approve itself either.
+
 The elimination path, deliberately out of scope, is to stop trusting the proxy's word:
 have each user sign the intended payload and verify that signature here against the
 claimed sender, so a proxy can only relay actions users actually authorized. That is a
@@ -116,6 +152,12 @@ Before treating a handover as complete:
 3. Re-register only the proxies you intend to trust, preferably with `require_immutable`
    set, and confirm the resulting `trusted_proxy_added` events show a contract with no
    wasm admin.
+4. Re-list the operators you intend to allow. Accepting the handover clears
+   `approval_operators` along with the trusted set, so sponsored approvals fail closed
+   until you call `add_approval_operator` yourself. The `approval_operators_cleared`
+   attribute on the accepting transaction says how many entries the previous creator had;
+   the historical `approval_operator_added` events say which addresses they were, which is
+   worth reading before deciding what to re-list.
 
 ### Why the immutability check is opt-in
 
@@ -129,21 +171,44 @@ cannot change". Recommended for production.
 ## Migration
 
 `migrate` accepts an explicit table of cw2 `(name, version)` sources: base `asset` 0.1.0 and
-0.2.0, and prior `asset-proxyable` versions. Coming from `asset`, the trusted-proxy map is
-cleared, so dormant entries from an earlier proxyable life cannot wake up. Use
-`{ "with_update": { "minter": null, "creator": null } }` unless you deliberately rotate
-roles. Requires a wasm admin on the collection.
+0.2.0, and prior `asset-proxyable` versions. Coming from `asset`, both the trusted-proxy map
+and the approval-operator map are cleared, so dormant entries from an earlier proxyable life
+cannot wake up. Use `{ "with_update": { "minter": null, "creator": null } }` unless you
+deliberately rotate roles. Requires a wasm admin on the collection.
 
 Fresh instantiations record cw2 name `asset-proxyable`, never `asset`.
 
-A migration that rotates the creator (`with_update { creator: Some(..) }`) clears the
-trusted-proxy set exactly like an accepted handover does, so a new creator always starts
-with no proxies regardless of the route by which they took over.
+A migration that rotates the creator (`with_update { creator: Some(..) }`) clears both sets
+exactly like an accepted handover does, so a new creator always starts with no trusted
+proxies and no approvable operators regardless of the route by which they took over. Both
+counts are reported as `trusted_proxies_cleared` and `approval_operators_cleared`
+attributes.
+
+### Migrating a live collection onto the approval-operator build
+
+A collection that already runs an older `asset-proxyable` starts this build with an **empty**
+approval-operator list, because the map simply does not exist in its storage yet. An empty
+list denies, so sponsored `approve_all` stops relaying until the creator calls
+`add_approval_operator`. Plan for it:
+
+- **Nothing is left open in the meantime.** Before the migration a trusted proxy could relay
+  an approval to any operator; after it, to none. Authority only ever decreases, so there is
+  no window to race. Burns, revocations, user-signed `approve_all`, and every approval
+  already stored keep working throughout. What stops is *new sponsored approvals*.
+- **Close the gap in one transaction if you care about continuity.** A Cosmos transaction
+  carries several messages, so `MsgMigrateContract` and `MsgExecuteContract` with
+  `add_approval_operator` can travel together: trivially when the wasm admin and the creator
+  are the same key, and otherwise with both signing the one transaction. There is no migrate
+  parameter for this on purpose. Trust configuration is always a separate creator-signed
+  call here, exactly as it is after instantiate, which keeps every entry attributable to a
+  creator through its `approval_operator_added` event.
+- **Remember it is per collection.** Each variant collection has its own list, so a fleet
+  migration needs one `add_approval_operator` per collection, per operator.
 
 Rollback is supported: base `asset` 0.2.0 accepts `asset-proxyable` 0.1.0 as a migration
 source. After rolling back, the proxy messages and queries no longer exist (base code does
-not know them) and the dormant `trusted_proxies` storage is never read; moving forward to
-the variant again clears it.
+not know them) and the dormant `trusted_proxies` and `approval_operators` storage is never
+read; moving forward to the variant again clears both.
 
 ## Relationship to the base crate
 

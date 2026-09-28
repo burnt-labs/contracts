@@ -16,7 +16,7 @@ use crate::{
         BaseExecuteMsg, BaseQueryMsg, InstantiateMsg, ProxyAction, ProxyMsg, ProxyQueryMsg,
         ProxyableExecuteMsg, ProxyableQueryMsg,
     },
-    state::TRUSTED_PROXIES,
+    state::{APPROVAL_OPERATORS, TRUSTED_PROXIES},
 };
 
 type Deps = OwnedDeps<MockStorage, MockApi, MockQuerier>;
@@ -93,6 +93,28 @@ fn mint(deps: DepsMut, minter: &Addr, owner: &Addr, token_id: &str) {
     .unwrap();
 }
 
+fn allow_operator(deps: DepsMut, creator: &Addr, operator: &Addr) {
+    exec(
+        deps,
+        creator,
+        &[],
+        ProxyableExecuteMsg::Proxy(ProxyMsg::AddApprovalOperator {
+            operator: operator.to_string(),
+        }),
+    )
+    .unwrap();
+}
+
+fn approval_operators(deps: &Deps) -> Vec<Addr> {
+    let b = query(
+        deps.as_ref(),
+        mock_env(),
+        ProxyableQueryMsg::Proxy(ProxyQueryMsg::GetApprovalOperators {}),
+    )
+    .unwrap();
+    from_json(&b).unwrap()
+}
+
 fn add_proxy(deps: DepsMut, creator: &Addr, proxy: &Addr) {
     exec(
         deps,
@@ -167,6 +189,7 @@ fn proxied_actions_apply_to_the_effective_sender() {
     let (mut deps, a) = setup();
     mint(deps.as_mut(), &a.minter, &a.alice, "t1");
     add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    allow_operator(deps.as_mut(), &a.creator, &a.marketplace);
 
     // approve_all as alice
     let r = exec(
@@ -393,6 +416,336 @@ fn proxied_burn_respects_the_listing_guard() {
 // ---------------------------------------------------------------------------------------
 
 #[test]
+fn proxied_approve_all_is_limited_to_listed_operators() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+
+    let approve = |op: &Addr| {
+        proxied(
+            &a.alice,
+            ProxyAction::ApproveAll {
+                operator: op.to_string(),
+                expires: None,
+            },
+        )
+    };
+    let revoke = |op: &Addr| {
+        proxied(
+            &a.alice,
+            ProxyAction::RevokeAll {
+                operator: op.to_string(),
+            },
+        )
+    };
+
+    // An empty list denies: the allowlist fails closed, so a freshly instantiated
+    // collection relays no approvals at all until the creator names an operator.
+    assert!(approval_operators(&deps).is_empty());
+    assert_eq!(
+        exec(deps.as_mut(), &a.proxy, &[], approve(&a.marketplace)).unwrap_err(),
+        ContractError::OperatorNotApprovable {
+            operator: a.marketplace.to_string()
+        }
+    );
+    assert!(!is_operator(&deps, &a.alice, &a.marketplace));
+
+    // A malformed operator fails as a bad address, not as an unlisted one.
+    assert!(matches!(
+        exec(
+            deps.as_mut(),
+            &a.proxy,
+            &[],
+            proxied(
+                &a.alice,
+                ProxyAction::ApproveAll {
+                    operator: "not-an-address".to_string(),
+                    expires: None,
+                },
+            )
+        )
+        .unwrap_err(),
+        ContractError::Std(_)
+    ));
+
+    // Listing one operator admits exactly that one.
+    allow_operator(deps.as_mut(), &a.creator, &a.marketplace);
+    assert_eq!(approval_operators(&deps), vec![a.marketplace.clone()]);
+    exec(deps.as_mut(), &a.proxy, &[], approve(&a.marketplace)).unwrap();
+    assert!(is_operator(&deps, &a.alice, &a.marketplace));
+    assert_eq!(
+        exec(deps.as_mut(), &a.proxy, &[], approve(&a.bob)).unwrap_err(),
+        ContractError::OperatorNotApprovable {
+            operator: a.bob.to_string()
+        }
+    );
+    assert!(!is_operator(&deps, &a.alice, &a.bob));
+
+    // Revocation is never gated: it works for a listed operator, and for one that was
+    // never listed, so an incident cannot be made unrecoverable by the allowlist.
+    exec(deps.as_mut(), &a.proxy, &[], revoke(&a.bob)).unwrap();
+    exec(deps.as_mut(), &a.proxy, &[], revoke(&a.marketplace)).unwrap();
+    assert!(!is_operator(&deps, &a.alice, &a.marketplace));
+
+    // Delisting is prospective: an approval already granted survives, and revoking it
+    // through the proxy still works, but no new one can be relayed.
+    exec(deps.as_mut(), &a.proxy, &[], approve(&a.marketplace)).unwrap();
+    exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveApprovalOperator {
+            operator: a.marketplace.to_string(),
+        }),
+    )
+    .unwrap();
+    assert!(is_operator(&deps, &a.alice, &a.marketplace));
+    assert_eq!(
+        exec(deps.as_mut(), &a.proxy, &[], approve(&a.marketplace)).unwrap_err(),
+        ContractError::OperatorNotApprovable {
+            operator: a.marketplace.to_string()
+        }
+    );
+    exec(deps.as_mut(), &a.proxy, &[], revoke(&a.marketplace)).unwrap();
+    assert!(!is_operator(&deps, &a.alice, &a.marketplace));
+}
+
+#[test]
+fn the_allowlist_does_not_constrain_holders_acting_directly() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+
+    // The gate is on the proxy path only. A holder signing for themselves keeps the
+    // unrestricted cw721 behaviour, whatever the allowlist says.
+    assert!(approval_operators(&deps).is_empty());
+    exec(
+        deps.as_mut(),
+        &a.alice,
+        &[],
+        base(BaseExecuteMsg::ApproveAll {
+            operator: a.bob.to_string(),
+            expires: None,
+        }),
+    )
+    .unwrap();
+    assert!(is_operator(&deps, &a.alice, &a.bob));
+}
+
+#[test]
+fn approval_operator_management_is_creator_only_capped_nonpayable_and_self_excluding() {
+    let (mut deps, a) = setup();
+    let add = |op: &Addr| {
+        ProxyableExecuteMsg::Proxy(ProxyMsg::AddApprovalOperator {
+            operator: op.to_string(),
+        })
+    };
+    let remove = |op: &Addr| {
+        ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveApprovalOperator {
+            operator: op.to_string(),
+        })
+    };
+
+    // creator-gated, like trusted-proxy management
+    assert_eq!(
+        exec(deps.as_mut(), &a.minter, &[], add(&a.marketplace)).unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+    assert_eq!(
+        exec(deps.as_mut(), &a.bob, &[], remove(&a.marketplace)).unwrap_err(),
+        ContractError::Unauthorized {}
+    );
+    assert!(matches!(
+        exec(
+            deps.as_mut(),
+            &a.creator,
+            &[coin(1, "uxion")],
+            add(&a.marketplace)
+        )
+        .unwrap_err(),
+        ContractError::Payment(_)
+    ));
+    assert!(matches!(
+        exec(
+            deps.as_mut(),
+            &a.creator,
+            &[coin(1, "uxion")],
+            remove(&a.marketplace)
+        )
+        .unwrap_err(),
+        ContractError::Payment(_)
+    ));
+
+    // the collection cannot be its own approval operator, mirroring the trusted set
+    let me = mock_env().contract.address;
+    assert!(matches!(
+        exec(deps.as_mut(), &a.creator, &[], add(&me)).unwrap_err(),
+        ContractError::InvalidApprovalOperator { .. }
+    ));
+    assert!(approval_operators(&deps).is_empty());
+
+    // add is idempotence-rejecting, symmetric with removing an unknown one
+    let r = exec(deps.as_mut(), &a.creator, &[], add(&a.marketplace)).unwrap();
+    let ev = r
+        .events
+        .iter()
+        .find(|e| e.ty == "approval_operator_added")
+        .unwrap();
+    assert!(ev.attributes.iter().any(|x| x.key == "collection"));
+    assert!(
+        ev.attributes
+            .iter()
+            .any(|x| x.key == "operator" && x.value == a.marketplace.as_str())
+    );
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], add(&a.marketplace)).unwrap_err(),
+        ContractError::ApprovalOperatorAlreadyExists {
+            operator: a.marketplace.to_string()
+        }
+    );
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], remove(&a.bob)).unwrap_err(),
+        ContractError::ApprovalOperatorNotFound {
+            operator: a.bob.to_string()
+        }
+    );
+
+    // cap
+    let extra: Vec<Addr> = (0..7)
+        .map(|i| deps.api.addr_make(&format!("m{i}")))
+        .collect();
+    for op in &extra {
+        exec(deps.as_mut(), &a.creator, &[], add(op)).unwrap();
+    }
+    assert_eq!(approval_operators(&deps).len(), 8);
+    assert_eq!(
+        exec(deps.as_mut(), &a.creator, &[], add(&a.bob)).unwrap_err(),
+        ContractError::TooManyApprovalOperators { max: 8 }
+    );
+
+    // removing frees a slot, and emits the mirrored event
+    let r = exec(deps.as_mut(), &a.creator, &[], remove(&extra[0])).unwrap();
+    assert!(r.events.iter().any(|e| e.ty == "approval_operator_removed"));
+    assert_eq!(approval_operators(&deps).len(), 7);
+    assert!(!approval_operators(&deps).contains(&extra[0]));
+    exec(deps.as_mut(), &a.creator, &[], add(&a.bob)).unwrap();
+    assert_eq!(approval_operators(&deps).len(), 8);
+}
+
+#[test]
+fn creator_handover_clears_the_approval_operator_list() {
+    let (mut deps, a) = setup();
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    allow_operator(deps.as_mut(), &a.creator, &a.marketplace);
+
+    // While the handover is live, both sets may only shrink. Otherwise the outgoing
+    // creator could plant an operator after the incoming one has inspected the list.
+    exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::TransferOwnership {
+                new_owner: a.bob.to_string(),
+                expiry: None,
+            },
+        )),
+    )
+    .unwrap();
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.creator,
+            &[],
+            ProxyableExecuteMsg::Proxy(ProxyMsg::AddApprovalOperator {
+                operator: a.bob.to_string(),
+            })
+        )
+        .unwrap_err(),
+        ContractError::CreatorTransferPending {}
+    );
+    // ...but removal stays available, as it does for trusted proxies.
+    exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveApprovalOperator {
+            operator: a.marketplace.to_string(),
+        }),
+    )
+    .unwrap();
+    allow_operator_after_cancel(&mut deps, &a);
+
+    // Accepting clears both sets: a creator change resets every kind of proxy trust, so
+    // registering a proxy later cannot silently activate the old creator's operator
+    // policy. Both counts are reported as attributes.
+    let r = exec(
+        deps.as_mut(),
+        &a.bob,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::AcceptOwnership,
+        )),
+    )
+    .unwrap();
+    assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("1"));
+    assert_eq!(attr(&r, "approval_operators_cleared"), Some("1"));
+    assert!(trusted_proxies(&deps).is_empty());
+    assert!(approval_operators(&deps).is_empty());
+
+    // The new creator starts from deny: re-registering the proxy alone relays nothing.
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    add_proxy(deps.as_mut(), &a.bob, &a.proxy);
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.proxy,
+            &[],
+            proxied(
+                &a.alice,
+                ProxyAction::ApproveAll {
+                    operator: a.marketplace.to_string(),
+                    expires: None,
+                },
+            )
+        )
+        .unwrap_err(),
+        ContractError::OperatorNotApprovable {
+            operator: a.marketplace.to_string()
+        }
+    );
+}
+
+/// Cancel the live transfer (the cw-ownable self-proposal idiom), re-list the
+/// marketplace, then re-propose, so the test can reach acceptance with both sets non-empty.
+fn allow_operator_after_cancel(deps: &mut Deps, a: &Actors) {
+    exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::TransferOwnership {
+                new_owner: a.creator.to_string(),
+                expiry: None,
+            },
+        )),
+    )
+    .unwrap();
+    allow_operator(deps.as_mut(), &a.creator, &a.marketplace);
+    exec(
+        deps.as_mut(),
+        &a.creator,
+        &[],
+        base(BaseExecuteMsg::UpdateCreatorOwnership(
+            Action::TransferOwnership {
+                new_owner: a.bob.to_string(),
+                expiry: None,
+            },
+        )),
+    )
+    .unwrap();
+}
+
+#[test]
 fn trust_management_is_creator_only_capped_and_self_excluding() {
     let (mut deps, a) = setup();
     let add = |p: &Addr| {
@@ -564,6 +917,7 @@ fn creator_handover_cannot_leave_or_sneak_in_a_trusted_proxy() {
     let (mut deps, a) = setup();
     mint(deps.as_mut(), &a.minter, &a.alice, "t1");
     add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    allow_operator(deps.as_mut(), &a.creator, &a.marketplace);
     let sneaky = deps.api.addr_make("sneaky");
 
     // creator proposes a handover to bob
@@ -1061,6 +1415,32 @@ fn untagged_dispatch_is_unambiguous() {
         ProxyableExecuteMsg::Base(BaseExecuteMsg::Burn { .. })
     ));
 
+    // the operator-allowlist messages land on the proxy arm, and are strict about fields
+    let o: ProxyableExecuteMsg =
+        from_json(r#"{"add_approval_operator":{"operator":"m1"}}"#).unwrap();
+    assert!(matches!(
+        o,
+        ProxyableExecuteMsg::Proxy(ProxyMsg::AddApprovalOperator { .. })
+    ));
+    let o: ProxyableExecuteMsg =
+        from_json(r#"{"remove_approval_operator":{"operator":"m1"}}"#).unwrap();
+    assert!(matches!(
+        o,
+        ProxyableExecuteMsg::Proxy(ProxyMsg::RemoveApprovalOperator { .. })
+    ));
+    assert!(
+        from_json::<ProxyableExecuteMsg>(
+            r#"{"add_approval_operator":{"operator":"m1","extra":1}}"#
+        )
+        .is_err()
+    );
+    assert!(from_json::<ProxyableExecuteMsg>(r#"{"add_approval_operator":{}}"#).is_err());
+    let q: ProxyableQueryMsg = from_json(r#"{"get_approval_operators":{}}"#).unwrap();
+    assert!(matches!(
+        q,
+        ProxyableQueryMsg::Proxy(ProxyQueryMsg::GetApprovalOperators {})
+    ));
+
     // mixed keys are not a valid externally tagged enum on either arm
     assert!(
         from_json::<ProxyableExecuteMsg>(
@@ -1228,10 +1608,19 @@ fn migrate_from_base_asset_clears_dormant_proxies() {
     TRUSTED_PROXIES
         .save(deps.as_mut().storage, &a.proxy, &cosmwasm_std::Empty {})
         .unwrap();
+    APPROVAL_OPERATORS
+        .save(
+            deps.as_mut().storage,
+            &a.marketplace,
+            &cosmwasm_std::Empty {},
+        )
+        .unwrap();
 
     let r = migrate(deps.as_mut(), mock_env(), no_update()).unwrap();
     assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("1"));
+    assert_eq!(attr(&r, "approval_operators_cleared"), Some("1"));
     assert!(trusted_proxies(&deps).is_empty());
+    assert!(approval_operators(&deps).is_empty());
     let v = cw2::get_contract_version(deps.as_ref().storage).unwrap();
     assert_eq!(
         (v.contract.as_str(), v.version.as_str()),
@@ -1278,6 +1667,7 @@ fn migrate_that_rotates_the_creator_clears_proxies() {
     let (mut deps, a) = setup();
     mint(deps.as_mut(), &a.minter, &a.alice, "t1");
     add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+    allow_operator(deps.as_mut(), &a.creator, &a.marketplace);
     let r = migrate(
         deps.as_mut(),
         mock_env(),
@@ -1289,7 +1679,9 @@ fn migrate_that_rotates_the_creator_clears_proxies() {
     .unwrap();
     assert_eq!(attr(&r, "creator_changed"), Some("true"));
     assert_eq!(attr(&r, "trusted_proxies_cleared"), Some("1"));
+    assert_eq!(attr(&r, "approval_operators_cleared"), Some("1"));
     assert!(trusted_proxies(&deps).is_empty());
+    assert!(approval_operators(&deps).is_empty());
     let owner = cw721::state::CREATOR
         .item
         .load(deps.as_ref().storage)
@@ -1577,4 +1969,81 @@ fn require_immutable_is_opt_in_and_checks_the_chain() {
     let strict_fail = exec(deps.as_mut(), &a.creator, &[], add(&a.bob, true));
     assert!(strict_fail.is_err());
     assert_eq!(trusted_proxies(&deps).len(), 3);
+}
+
+/// Regression probe for the role-overlap escalation: a trusted proxy that is also a
+/// listed approval operator can approve *itself* for any holder, and a real cw721
+/// operator may transfer tokens, which is not in the proxied action set at all.
+#[test]
+fn proxy_that_is_also_an_approval_operator_cannot_escalate() {
+    let (mut deps, a) = setup();
+    mint(deps.as_mut(), &a.minter, &a.alice, "t1");
+    add_proxy(deps.as_mut(), &a.creator, &a.proxy);
+
+    // Listing the proxy as an operator on itself must be refused, in both orders.
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.creator,
+            &[],
+            ProxyableExecuteMsg::Proxy(ProxyMsg::AddApprovalOperator {
+                operator: a.proxy.to_string(),
+            })
+        )
+        .unwrap_err(),
+        ContractError::ConflictingProxyAndOperator {
+            address: a.proxy.to_string()
+        }
+    );
+    allow_operator(deps.as_mut(), &a.creator, &a.marketplace);
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.creator,
+            &[],
+            ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+                proxy: a.marketplace.to_string(),
+                require_immutable: false,
+            })
+        )
+        .unwrap_err(),
+        ContractError::ConflictingProxyAndOperator {
+            address: a.marketplace.to_string()
+        }
+    );
+
+    // So the proxy can never make itself an operator, and therefore never reaches the
+    // transfer path that the proxied action set deliberately excludes.
+    assert_eq!(
+        exec(
+            deps.as_mut(),
+            &a.proxy,
+            &[],
+            proxied(
+                &a.alice,
+                ProxyAction::ApproveAll {
+                    operator: a.proxy.to_string(),
+                    expires: None,
+                },
+            )
+        )
+        .unwrap_err(),
+        ContractError::OperatorNotApprovable {
+            operator: a.proxy.to_string()
+        }
+    );
+    assert!(!is_operator(&deps, &a.alice, &a.proxy));
+    assert!(
+        exec(
+            deps.as_mut(),
+            &a.proxy,
+            &[],
+            base(BaseExecuteMsg::TransferNft {
+                recipient: a.bob.to_string(),
+                token_id: "t1".to_string(),
+            })
+        )
+        .is_err()
+    );
+    assert_eq!(owner_of(&deps, "t1"), Some(a.alice.to_string()));
 }

@@ -65,6 +65,7 @@ struct World {
     collection: Addr,
     marketplace: Addr,
     proxy: Addr,
+    proxy_code: u64,
     proxyable_code: u64,
     base_code: u64,
 }
@@ -159,6 +160,19 @@ fn world() -> World {
     )
     .unwrap();
 
+    // ...and, separately, admits the marketplace as something a proxy may be approved
+    // for. Both allowlists have to name it: the proxy's bounds what the admin sponsors,
+    // the collection's bounds what a compromised proxy could ever grant.
+    app.execute_contract(
+        creator.clone(),
+        collection.clone(),
+        &ProxyableExecuteMsg::Proxy(ProxyMsg::AddApprovalOperator {
+            operator: marketplace.to_string(),
+        }),
+        &[],
+    )
+    .unwrap();
+
     World {
         app,
         creator,
@@ -168,6 +182,7 @@ fn world() -> World {
         collection,
         marketplace,
         proxy,
+        proxy_code,
         proxyable_code,
         base_code,
     }
@@ -941,4 +956,107 @@ fn removing_a_collection_stops_every_sponsored_call_to_it() {
         )
         .unwrap();
     assert_eq!(owner_of(&w, "t1"), None);
+}
+
+/// The two allowlists are independent, and the collection's is the one that binds.
+///
+/// The proxy's `allowed_operators` bounds what the admin is willing to sponsor; it is
+/// the admin's list, on the admin's contract. The collection's approval-operator list
+/// bounds what any proxy may ever be approved for, and it belongs to the creator. A
+/// proxy that is compromised, or simply deployed with a wider list than the creator
+/// expects, still cannot make an arbitrary address operator over the collection's
+/// holders.
+#[test]
+fn a_proxy_cannot_approve_an_operator_the_collection_has_not_admitted() {
+    let mut w = world();
+    let alice = w.alice.clone();
+    mint(&mut w, &alice, "t1");
+    let outsider = w.app.api().addr_make("outsider");
+
+    // A second proxy, sponsoring a wider set of operators than the collection admits.
+    let wide_proxy = w
+        .app
+        .instantiate_contract(
+            w.proxy_code,
+            w.admin.clone(),
+            &InstantiateMsg {
+                admin: w.admin.to_string(),
+                allowed_operators: vec![w.marketplace.to_string(), outsider.to_string()],
+                max_approval_seconds: Some(30 * 24 * 3600),
+                collections: vec![w.collection.to_string()],
+            },
+            &[],
+            "wide-proxy",
+            None,
+        )
+        .unwrap();
+    w.app
+        .execute_contract(
+            w.creator.clone(),
+            w.collection.clone(),
+            &ProxyableExecuteMsg::Proxy(ProxyMsg::AddTrustedProxy {
+                proxy: wide_proxy.to_string(),
+                require_immutable: false,
+            }),
+            &[],
+        )
+        .unwrap();
+
+    // The proxy's own policy is happy to relay it.
+    let q: asset_proxy::msg::IsAllowedResponse = w
+        .app
+        .wrap()
+        .query_wasm_smart(
+            &wide_proxy,
+            &QueryMsg::IsAllowed {
+                collection: w.collection.to_string(),
+                action: asset_proxy::msg::ProxyAction::ApproveAll {
+                    operator: outsider.to_string(),
+                    expires: Some(in_a_week(&w)),
+                },
+            },
+        )
+        .unwrap();
+    assert!(q.allowed, "the proxy policy should admit its own operator");
+
+    // The collection refuses anyway, and nothing is granted.
+    let err = w
+        .app
+        .execute_contract(
+            w.alice.clone(),
+            wide_proxy.clone(),
+            &ExecuteMsg::SponsoredApproval {
+                collection: w.collection.to_string(),
+                action: ApprovalAction::ApproveAll {
+                    operator: outsider.to_string(),
+                    expires: Some(in_a_week(&w)),
+                },
+            },
+            &[],
+        )
+        .unwrap_err();
+    assert!(
+        err.root_cause()
+            .to_string()
+            .contains("not approvable through a proxy"),
+        "{err:#}"
+    );
+    assert!(!is_operator(&w, &w.alice, &outsider));
+
+    // The operator both lists name still works through the same proxy.
+    w.app
+        .execute_contract(
+            w.alice.clone(),
+            wide_proxy,
+            &ExecuteMsg::SponsoredApproval {
+                collection: w.collection.to_string(),
+                action: ApprovalAction::ApproveAll {
+                    operator: w.marketplace.to_string(),
+                    expires: Some(in_a_week(&w)),
+                },
+            },
+            &[],
+        )
+        .unwrap();
+    assert!(is_operator(&w, &w.alice, &w.marketplace));
 }

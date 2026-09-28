@@ -65,6 +65,19 @@ pub enum ProxyMsg {
     },
     /// Remove a proxy contract. cw721 `CREATOR` only.
     RemoveTrustedProxy { proxy: String },
+    /// Allow `operator` to be named in a proxied `ApproveAll`. cw721 `CREATOR` only.
+    ///
+    /// This bounds what a trusted proxy can approve on a holder's behalf, so a compromised
+    /// proxy cannot make an arbitrary address operator over the collection. It does not
+    /// restrict a holder approving whoever they like directly: they sign for themselves.
+    /// The list starts empty, which relays no approvals until the creator adds one.
+    AddApprovalOperator { operator: String },
+    /// Stop `operator` being named in new proxied approvals. cw721 `CREATOR` only.
+    ///
+    /// Prospective only: approvals already stored on this collection are untouched, and
+    /// holders revoke those themselves. Revocation is never gated by this list, so a
+    /// removed operator can still be revoked through a proxy.
+    RemoveApprovalOperator { operator: String },
 }
 
 /// The closed set of actions a trusted proxy may relay. Anything else must be sent by the
@@ -101,4 +114,7 @@ pub enum ProxyableQueryMsg {
 pub enum ProxyQueryMsg {
     #[returns(Vec<Addr>)]
     GetTrustedProxies {},
+    /// Operators a trusted proxy may name in a relayed `ApproveAll`. Empty relays none.
+    #[returns(Vec<Addr>)]
+    GetApprovalOperators {},
 }

@@ -32,6 +32,32 @@ pub enum ContractError {
     #[error("Trusted proxy not found: {proxy}")]
     TrustedProxyNotFound { proxy: String },
 
+    #[error(
+        "Operator is not approvable through a proxy: {operator}. The collection creator \
+         lists which operators a proxy may approve; an empty list relays no approvals."
+    )]
+    OperatorNotApprovable { operator: String },
+
+    #[error("Invalid approval operator: {reason}")]
+    InvalidApprovalOperator { reason: String },
+
+    #[error("Operator is already approvable: {operator}")]
+    ApprovalOperatorAlreadyExists { operator: String },
+
+    #[error(
+        "Address is already registered in the other role: {address}. A trusted proxy must \
+         not also be an approvable operator: it could approve itself for every holder and \
+         then act as an ordinary cw721 operator, which permits transfers the proxied \
+         action set deliberately excludes."
+    )]
+    ConflictingProxyAndOperator { address: String },
+
+    #[error("Approval operator not found: {operator}")]
+    ApprovalOperatorNotFound { operator: String },
+
+    #[error("Too many approval operators (max {max})")]
+    TooManyApprovalOperators { max: usize },
+
     #[error("Cannot renounce creator ownership while trusted proxies are registered")]
     TrustedProxiesNotEmpty {},
 

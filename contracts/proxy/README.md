@@ -13,7 +13,7 @@ The effective sender forwarded to a collection is always this contract's own
 | Message | Who | Effect |
 |---|---|---|
 | `sponsored_burn { collection, token_id }` | any user | Burn `token_id` as the caller. The collection enforces owner-only. |
-| `sponsored_approval { collection, action }` | any user | `approve_all` a currently allowed operator, or `revoke_all` an operator that is or ever was allowed here, as the caller. |
+| `sponsored_approval { collection, action }` | any user | `approve_all` an operator allowed both here and by the target collection, or `revoke_all` an operator that is or ever was allowed here, as the caller. |
 | `add_collection { collection }` | admin | Allowlist a collection as a target for sponsored calls. |
 | `remove_collection { collection }` | admin | Remove it. Nothing is relayed there afterwards, revocation included; users revoke directly on the collection. |
 | `remove_allowed_operator { operator }` | admin | Remove an operator. There is no way to add one after instantiation. Prospective only: existing approvals persist until expiry or revocation, and `revoke_all` keeps working for the removed operator. |
@@ -70,6 +70,20 @@ exceed what the caller could do directly, and a relayed burn is stricter (owner-
   exercise every approval users granted it, proxy or not. Removal is permanent for this
   deployment; approvals already stored on collections are unaffected and users can still
   revoke them directly or through the proxy.
+- **Naming an operator here is not sufficient.** Each `asset-proxyable` collection keeps
+  its own `approval_operators` list, set by its creator, and a proxied `approve_all` has
+  to pass both. This list is the admin's statement about what they will sponsor; the
+  collection's is the creator's statement about what any proxy may ever be approved for,
+  and it fails closed while empty. When onboarding a collection, the creator has to call
+  `add_approval_operator` with the marketplace address as well as `add_trusted_proxy`, so
+  onboarding is two creator transactions on the collection, not one. Miss the second and
+  sponsored approvals are rejected by the collection with "not approvable through a proxy".
+  The collection also refuses to list a trusted proxy as an approvable operator, so this
+  proxy's own address must never be named there.
+- Revocation is treated differently on each side, and neither side can be used to strand a
+  user. The collection does not gate proxied `revoke_all` at all. This proxy accepts it for
+  any operator that is, or ever was, in its own `allowed_operators`, so removing an
+  operator after an incident does not take the sponsored revocation path away with it.
 - **Set `max_approval_seconds` in production.** Without a cap, `approve_all` with no expiry
   stores a permanent approval that outlives the sponsored session and any later operator
   removal. The cap bounds the worst case after an operator incident.
