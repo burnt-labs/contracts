@@ -113,16 +113,15 @@ approval came through a proxy. So:
   the trusted-proxy set, and still leaves those approvals;
 - the approvals persist until they expire or each owner revokes them individually.
 
-**Accepted residual (2026-09-24).** A creator can register a proxy they control, seed
-operator approvals from every holder to an address they control, and then hand the
-collection over. The new creator sees an empty trusted-proxy set and may reasonably
-conclude the collection is clean while those approvals are still live. This is inherent to
-the forwarder pattern: no on-chain mechanism can distinguish a proxy-created approval from
-one the owner made directly, and revoking other users' approvals from any single key would
-break the effective-sender model the design rests on.
+**What this means for a handover.** A previous creator could have registered a proxy they
+controlled, had it create operator approvals for holders, and then handed the collection on. The
+incoming creator sees an empty trusted-proxy set, which does not by itself mean no approvals are
+outstanding. This follows from the forwarder pattern: nothing on chain distinguishes a
+proxy-created approval from one the owner made directly, and revoking other users' approvals
+from any single key would break the effective-sender model the design rests on. The checklist
+below is how to inspect for them.
 
-The approval-operator allowlist does not remove this residual, because the same creator
-controls both lists. What it does is make the setup **visible and narrow**: the address
+The approval-operator list does not change that, because the same creator controls both lists. What it does is make the setup **visible and narrow**: the address
 being approved has to be named on-chain first and emits `approval_operator_added`, so the
 seeding is a matter of public record rather than an invisible consequence of trusting a
 proxy. It also bounds the damage from a proxy that is compromised rather than malicious
@@ -165,7 +164,7 @@ Before treating a handover as complete:
 legitimate setup while the proxy itself is still being iterated on: a hard rule would
 block it. Turn it on once the proxy deployment is final. It does not defend against a
 malicious creator, who can register a hostile immutable contract just as easily, but for
-an honest deployment it converts "trust this address" into "trust this audited code that
+an honest deployment it converts "trust this address" into "trust this reviewed code that
 cannot change". Recommended for production.
 
 ## Migration

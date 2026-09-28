@@ -11,7 +11,7 @@ pub const MAX_TRUSTED_PROXIES: usize = 4;
 ///
 /// Trusting a proxy means trusting it to say who the sender is. Without this list that
 /// also means trusting it to say *what* is approved, so a compromised proxy could make an
-/// attacker operator over every holder in the collection. This bounds that to addresses
+/// arbitrary operator over every holder in the collection. This bounds that to addresses
 /// the creator chose, and it lives here rather than in the proxy so swapping the proxy
 /// cannot sidestep it.
 ///

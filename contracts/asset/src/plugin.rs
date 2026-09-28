@@ -245,8 +245,9 @@ impl Plugin {
     /// the collection rather than the single message that carries them. A royalty at or
     /// above 100% is the worst: every buy fails when the deduction exceeds the payment,
     /// and because a configured royalty also disables raw transfers, nothing in the
-    /// collection can move until the creator removes the plugin. These are honest-typo
-    /// failures, not attacks, which is why they are caught here rather than documented.
+    /// collection can move until the creator removes the plugin. A misconfiguration is far
+    /// more likely than deliberate misuse, so these are caught at save time rather than left
+    /// to be discovered by the first buyer.
     pub fn validate(&self, api: &dyn Api, env: &Env) -> StdResult<()> {
         let invalid =
             |msg: String| StdError::generic_err(format!("{}: {msg}", self.get_plugin_name()));

@@ -71,6 +71,51 @@ brick the whole collection rather than the one message that carries them. Reject
 | `NotBefore.time` may not be `Never` | `not_before_plugin` errors while the bound has *not* passed, and `Never` never passes, so every listing is blocked forever. |
 | `NotAfter.time` may not be `Never` or already elapsed | `Never` never expires, so the bound never restricts anything; a bound already in the past blocks every listing from then on. |
 
+### `AllowedMarketplaces`: who may settle a sale
+
+The plugin restricts **who may call `Buy`**, not where the token may go. The buy path delivers
+to a freely chosen `recipient`, which is unaffected, so a marketplace named here can still sell
+to anyone — it is the caller that must be on the list, and the end buyer arrives as `recipient`.
+The name suggests a restriction on the destination; it is a restriction on the settler.
+
+This is the plugin that decides whether a collection is an open or a closed market, so it is
+worth a deliberate decision at deploy time.
+
+This contract is a **venue in its own right**: it holds listings and exposes a public `Buy`, so
+a collection can trade without depending on any marketplace. A marketplace that charges a fee
+records the gross price the buyer pays and lists here at the *net* price, so a routed sale pays
+the seller the net amount while the fee settles separately. By default both routes stay open — a
+buyer may settle here directly at the net price, or go through the marketplace at the gross
+price and have the fee collected. Naming a marketplace here closes the first route:
+
+```json
+{ "update_extension": { "msg": { "set_collection_plugin": { "plugins": [
+  { "allowed_marketplaces": { "marketplaces": ["xion1marketplace..."] } }
+] } } } }
+```
+
+Creator-only, like every plugin. What changes once it is set:
+
+| Caller of `Buy` | Result |
+|---|---|
+| A listed marketplace contract | allowed, and may deliver to any `recipient` |
+| An end buyer calling directly | refused, `buyer is not an allowed marketplace` |
+| Any other marketplace | refused |
+
+Three things to weigh before setting it:
+
+- **No direct settlement remains at all.** No private sale on the collection, and if the named
+  marketplace is paused, migrated to a new address or retired, nothing in the collection can be
+  bought until the creator updates the list. Rotating a marketplace address is one transaction
+  per collection.
+- **It gates buying, not listing.** The list hook does not load this plugin, so a token owner
+  can still create a listing here; nobody can *fill* it except a named marketplace.
+- **An empty list means allow everything**, which is why storing one is refused outright (see
+  the validation table above), so a no-op cannot be mistaken for a restriction.
+
+Both configurations are covered end to end in
+`contracts/marketplace/tests/tests/test_allowed_marketplaces.rs`.
+
 ### Removed and changed plugins
 
 - **`RequiresProof` was removed. This is a breaking change.** Nothing ever enforced it: no

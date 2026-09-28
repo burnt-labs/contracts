@@ -1839,7 +1839,7 @@ fn migrate_rejects_unknown_sources() {
 }
 
 // ---------------------------------------------------------------------------------------
-// optional immutability check (audit item I)
+// optional immutability check
 // ---------------------------------------------------------------------------------------
 
 /// Make the mock querier describe some addresses as contracts.
