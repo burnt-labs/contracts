@@ -170,7 +170,8 @@ cannot change". Recommended for production.
 ## Migration
 
 `migrate` accepts an explicit table of cw2 `(name, version)` sources: base `asset` 0.1.0 and
-0.2.0, and prior `asset-proxyable` versions. Coming from `asset`, both the trusted-proxy map
+0.2.0, and `asset-proxyable` at its own current version, which allows redeploying a patched
+build over an existing one. Coming from `asset`, both the trusted-proxy map
 and the approval-operator map are cleared, so dormant entries from an earlier proxyable life
 cannot wake up. Use `{ "with_update": { "minter": null, "creator": null } }` unless you
 deliberately rotate roles. Requires a wasm admin on the collection.
@@ -190,17 +191,17 @@ proxies and no approvable operators regardless of the route by which they took o
 counts are reported as `trusted_proxies_cleared` and `approval_operators_cleared`
 attributes.
 
-### Migrating a live collection onto the approval-operator build
+### A collection arriving on this build starts with no approvable operators
 
-A collection that already runs an older `asset-proxyable` starts this build with an **empty**
-approval-operator list, because the map simply does not exist in its storage yet. An empty
-list denies, so sponsored `approve_all` stops relaying until the creator calls
-`add_approval_operator`. Plan for it:
+Every route onto this code — a fresh instantiation, or a migration from base `asset` — leaves
+the approval-operator list **empty**, and an empty list denies. Sponsored `approve_all` relays
+nothing until the creator calls `add_approval_operator`. Plan for it:
 
-- **Nothing is left open in the meantime.** Before the migration a trusted proxy could relay
-  an approval to any operator; after it, to none. Authority only ever decreases, so there is
-  no window to race. Burns, revocations, user-signed `approve_all`, and every approval
-  already stored keep working throughout. What stops is *new sponsored approvals*.
+- **Nothing is left open in the meantime.** The list denies while empty, so there is no
+  window in which the collection is more permissive than it ends up being — a proxy can relay
+  no approvals at all until the creator names an operator. Burns, revocations, user-signed
+  `approve_all`, and every approval already stored keep working throughout. What waits on
+  configuration is *new sponsored approvals*.
 - **Close the gap in one transaction if you care about continuity.** A Cosmos transaction
   carries several messages, so `MsgMigrateContract` and `MsgExecuteContract` with
   `add_approval_operator` can travel together: trivially when the wasm admin and the creator
@@ -211,7 +212,7 @@ list denies, so sponsored `approve_all` stops relaying until the creator calls
 - **Remember it is per collection.** Each variant collection has its own list, so a fleet
   migration needs one `add_approval_operator` per collection, per operator.
 
-Rollback is supported: base `asset` 0.2.0 accepts `asset-proxyable` 0.1.0 as a migration
+Rollback is supported: base `asset` 0.2.0 accepts `asset-proxyable` 0.2.0 as a migration
 source. After rolling back, the proxy messages and queries no longer exist (base code does
 not know them) and the dormant `trusted_proxies` and `approval_operators` storage is never
 read; moving forward to the variant again clears both.
