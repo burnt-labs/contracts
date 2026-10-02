@@ -4,38 +4,26 @@ resolver = "3"
 
 [profile.release]
 opt-level       = 3    # Use slightly better optimizations.
-overflow-checks = true # Disable integer overflow checks.
+overflow-checks = true # Trap on integer overflow instead of wrapping.
 
 
 [workspace.dependencies]
-anyhow = "1.0.100"
-base64 = "0.21.4"
-bech32 = "0.9.1"
-cosmos-sdk-proto = { package = "xion-cosmos-sdk-proto", version = "0.26.1", default-features = false, features = [
-  "std",
-  "cosmwasm",
-  "xion",
-  "serde",
-] }
+anyhow          = "1.0.100"
 cosmwasm-schema = "2.2.2"
-cosmwasm-std = { version = "2.2.2", features = ["stargate", "cosmwasm_2_1"] }
+cosmwasm-std    = { version = "2.2.2", features = ["stargate", "cosmwasm_2_1"] }
 cw-address-like = "2.0.0"
 cw-storage-plus = "2.0.0"
-cw-utils = "2.0.0"
-cw2 = "2.0.0"
-cw721 = "0.21.0"
-cw721-base = "0.21.0"
+cw-utils        = "2.0.0"
+cw2             = "2.0.0"
+cw721           = "0.21.0"
+cw721-base      = "0.21.0"
+# Pinned deliberately. ed25519-zebra 4.1.0 feature-gated `batch`, which
+# cosmwasm-crypto uses while setting default-features = false, so resolving any
+# 4.1.x breaks the build. The fix (CosmWasm PR #2681, issue #2525) landed on the
+# 3.1.x line only and is not backported to cosmwasm 2.x, which is what we build
+# against. Remove the pin only once cosmwasm-std here is 3.1.0 or newer.
 ed25519-zebra = { version = "=4.0.3", default-features = false }
-getrandom = { version = "0.2.10", features = ["custom"] }
-hex = "0.4"
-p256 = { version = "0.13.2", features = ["ecdsa-core", "arithmetic", "serde"] }
-phf = { version = "0.11.2", features = ["macros"] }
-ripemd = "0.1.3"
-rsa = { version = "0.9.10" }
-schemars = "0.8.10"
-serde = { version = "1.0.203", default-features = false, features = ["derive"] }
-serde_json = "1.0.87"
-sha2 = { version = "0.10.8", features = ["oid"] }
-thiserror = "1"
-tiny-keccak = { version = "2", features = ["keccak"] }
-url = "2.5.2"
+schemars      = "0.8.10"
+serde         = { version = "1.0.203", default-features = false, features = ["derive"] }
+serde_json    = "1.0.87"
+thiserror     = "1"

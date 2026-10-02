@@ -2,6 +2,8 @@
 /target
 **/target
 **/schema
+# optimizer build cache, mounted into the container by CI (see Basic.yml)
+/.optimizer
 .vscode
 /artifacts
 # Cargo+Git helper file

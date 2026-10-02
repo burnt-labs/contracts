@@ -189,23 +189,48 @@ fn royalty_plugin_creates_deduction_and_message() {
     }
 }
 
-#[allow(dead_code)]
-fn royalty_plugin_rounds_up_small_amounts() {
+/// Replaces a function that was named `royalty_plugin_rounds_up_small_amounts`, carried
+/// `#[allow(dead_code)]` with no `#[test]`, and so never ran. Its assertions described
+/// rounding *up*, which the plugin does not do: `multiply_ratio` floors. Had it been
+/// enabled it would have panicked indexing `attributes[0]`, because a zero royalty returns
+/// before any attribute is pushed. This pins the real behaviour instead.
+#[test]
+fn royalty_plugin_floors_and_skips_dust_amounts() {
     let deps = mock_dependencies();
     let env = env_at(1_000);
+    // 1 uxion at 1 bps floors to zero: the plugin takes nothing and adds no message.
     let info = message_info(&deps.api.addr_make("buyer"), &[Coin::new(1u128, "uxion")]);
-    let mut ctx = build_ctx(deps.as_ref(), env, info);
-
+    let mut ctx = build_ctx(deps.as_ref(), env.clone(), info);
     ctx.data.ask_price = Some(Coin::new(1u128, "uxion"));
     ctx.royalty.collection_royalty_recipient = Some(Addr::unchecked("artist"));
-    ctx.royalty.collection_royalty_bps = Some(1); // 0.01%
+    ctx.royalty.collection_royalty_bps = Some(1);
     ctx.royalty.primary_complete = true;
 
     assert!(default_plugins::royalty_plugin(&mut ctx).is_ok());
-    let attr = &ctx.response.attributes[0];
-    assert_eq!(attr.key, "royalty_amount");
-    assert_eq!(attr.value, Coin::new(1u128, "uxion").to_string());
+    assert!(
+        ctx.response.attributes.is_empty(),
+        "a floored-to-zero royalty must not be announced"
+    );
+    assert!(ctx.response.messages.is_empty());
+    assert!(ctx.deductions.is_empty());
 
+    // Large enough to survive the floor: 10000 at 1 bps is exactly 1.
+    let info = message_info(
+        &deps.api.addr_make("buyer"),
+        &[Coin::new(10_000u128, "uxion")],
+    );
+    let mut ctx = build_ctx(deps.as_ref(), env, info);
+    ctx.data.ask_price = Some(Coin::new(10_000u128, "uxion"));
+    ctx.royalty.collection_royalty_recipient = Some(Addr::unchecked("artist"));
+    ctx.royalty.collection_royalty_bps = Some(1);
+    ctx.royalty.primary_complete = true;
+
+    assert!(default_plugins::royalty_plugin(&mut ctx).is_ok());
+    assert_eq!(ctx.response.attributes[0].key, "royalty_amount");
+    assert_eq!(
+        ctx.response.attributes[0].value,
+        Coin::new(1u128, "uxion").to_string()
+    );
     match &ctx.response.messages[0].msg {
         CosmosMsg::Bank(BankMsg::Send { to_address, amount }) => {
             assert_eq!(to_address, "artist");

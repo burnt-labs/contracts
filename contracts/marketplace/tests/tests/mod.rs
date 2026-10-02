@@ -1,4 +1,5 @@
 mod test_accept_offer;
+mod test_allowed_marketplaces;
 mod test_approval_queue;
 mod test_buy_item;
 mod test_cancel_collection_offer;
@@ -10,3 +11,4 @@ mod test_create_offer;
 mod test_helpers;
 mod test_listing_queries;
 mod test_reserved_listing_buy;
+mod test_safeguards;

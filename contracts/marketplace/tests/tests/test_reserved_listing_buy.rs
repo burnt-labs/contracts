@@ -48,7 +48,7 @@ fn test_double_buy_blocked_when_approvals_stay_enabled() {
         buyer_a.clone(),
         marketplace_contract.clone(),
         &buy_msg,
-        &[price.clone()],
+        std::slice::from_ref(&price),
     );
     assert!(
         result.is_ok(),
@@ -96,7 +96,7 @@ fn test_double_buy_blocked_when_approvals_stay_enabled() {
         buyer_b.clone(),
         marketplace_contract.clone(),
         &buy_msg,
-        &[price.clone()],
+        std::slice::from_ref(&price),
     );
 
     assert!(
@@ -213,7 +213,7 @@ fn test_double_buy_blocked_when_approvals_toggled_off() {
         buyer_a.clone(),
         marketplace_contract.clone(),
         &buy_msg,
-        &[price.clone()],
+        std::slice::from_ref(&price),
     );
     assert!(
         result.is_ok(),
@@ -270,7 +270,7 @@ fn test_double_buy_blocked_when_approvals_toggled_off() {
         buyer_b.clone(),
         marketplace_contract.clone(),
         &buy_msg,
-        &[price.clone()],
+        std::slice::from_ref(&price),
     );
 
     assert!(

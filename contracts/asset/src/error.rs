@@ -42,6 +42,9 @@ pub enum ContractError {
 
     #[error("Stale listing")]
     StaleListing {},
+
+    #[error("Cannot migrate from {contract} {version}")]
+    InvalidMigration { contract: String, version: String },
 }
 
 impl From<ContractError> for cw721::error::Cw721ContractError {

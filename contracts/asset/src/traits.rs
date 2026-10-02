@@ -344,6 +344,13 @@ where
                 Ok(to_json_binary(&listings)?)
             }
             AssetExtensionQueryMsg::GetCollectionPlugins {} => {
+                // Every row must decode. A collection that still holds a plugin under a
+                // name this code has dropped (`RequiresProof`) will fail this query until
+                // its creator clears the row with `RemoveCollectionPlugin`, which deletes by
+                // raw key and needs no deserialization. That is deliberate: skipping
+                // unreadable rows would also hide a corrupt row under a live name, which the
+                // hooks reject with `may_load(..)?` anyway, leaving the query claiming a
+                // plugin is absent while it blocks every listing and buy.
                 let plugins: Vec<_> = self
                     .config
                     .collection_plugins
@@ -431,6 +438,9 @@ pub trait PluggableAsset<
                 Cw721ExecuteMsg::UpdateExtension { msg } => {
                     self.on_update_extension_plugin(msg, &mut plugin_ctx)?
                 }
+                Cw721ExecuteMsg::Burn { token_id } => {
+                    self.on_burn_plugin(token_id, &mut plugin_ctx)?
+                }
                 _ => true,
             };
             plugin_response = plugin_ctx.response;
@@ -487,6 +497,25 @@ pub trait PluggableAsset<
         _msg: &TExtensionMsg,
         _ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
     ) -> StdResult<bool> {
+        Ok(true)
+    }
+
+    /// Burning is rejected while the token is listed, same rule as transfers: a listed
+    /// token cannot leave until it is delisted.
+    fn on_burn_plugin(
+        &self,
+        token_id: &str,
+        ctx: &mut PluginCtx<Context, TCustomResponseMsg>,
+    ) -> StdResult<bool> {
+        if AssetConfig::<TNftExtension>::default()
+            .listings
+            .may_load(ctx.deps.storage, token_id)?
+            .is_some()
+        {
+            return Err(StdError::generic_err(
+                "cannot burn a token while it is listed",
+            ));
+        }
         Ok(true)
     }
 
