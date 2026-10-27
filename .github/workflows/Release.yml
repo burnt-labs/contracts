@@ -1,3 +1,6 @@
+# Sanctioned bespoke: github-workflows v1.8.0 has no CosmWasm optimizer
+# artifact-release flow. Preserve the per-contract digest-pinned build,
+# cosmwasm-check validation and release asset names; revisit when supported.
 name: release wasm
 
 on:
@@ -31,7 +34,7 @@ env:
 jobs:
   release:
     name: Build and publish artifacts
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
 
     # Declaring any permission sets every other scope to none, so this grants exactly
     # what the job needs: checkout reads the repository, the upload step writes release
