@@ -1,0 +1,22 @@
+[package]
+edition = "2021"
+name    = "one-way-swap"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# enable feature if you want to disable entry points
+library = []
+
+[dependencies]
+cosmwasm-schema = { workspace = true }
+cosmwasm-std    = { workspace = true }
+cw-storage-plus = { workspace = true }
+cw-utils        = { workspace = true }
+cw2             = { workspace = true }
+thiserror       = { workspace = true }
+
+[dev-dependencies]
+cw-multi-test = { version = "2", features = ["staking", "stargate", "cosmwasm_2_2"] }
