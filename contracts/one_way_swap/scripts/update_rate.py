@@ -6,6 +6,17 @@ The contract rate is out_denom base units per 1 in_denom base unit:
 
     rate = 10^(OUT_DECIMALS - IN_DECIMALS) / price      (floored to 18 decimal places)
 
+Mainnet (xion-mainnet-1), checked against on-chain bank metadata:
+  in_denom   ibc/F082B65C88E4B6D5EF1DB243CDA1D331D002759E938A0F5CD3FFDC5D53B3E349
+             USDC from noble-1 over channel-2, 6 decimals. ibc/6490A7... (Axelar) and
+             ibc/6B1993... (Noble via Osmosis) are different denoms and won't match.
+  out_denom  uxion (VERONA, 6 decimals). "uverona" is only a display alias and holds no balance.
+  Both use 6 decimals, so the rate is VERONA per USDC (1 / price): at $0.121985 per VERONA
+  the rate is 8.197729229003566012 and 1 USDC pays 8.197729 VERONA.
+  PRICE_URL=https://api.coingecko.com/api/v3/simple/price?ids=verona&vs_currencies=usd
+  PRICE_FIELD=verona.usd  NODE=https://rpc.xion-mainnet-1.burnt.com:443  CHAIN_ID=xion-mainnet-1
+  CoinGecko quotes USD; this treats 1 USDC as $1.
+
 Environment:
   CONTRACT      swap contract address                                    (required)
   KEY           xiond keyring key that signs                             (required)
