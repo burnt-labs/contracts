@@ -1,3 +1,8 @@
+# Sanctioned bespoke: github-workflows v1.8.0 requires seven independent
+# quality commands and enforced coverage; this repository has no coverage gate.
+# Keep the pinned Rust 1.86.0 checks and digest-pinned per-contract optimizer
+# plus cosmwasm-check artifact validation. Revisit when the shared platform
+# supports this artifact graph without invented gates or workspace wasm builds.
 name: Basic
 
 on:
@@ -62,7 +67,7 @@ permissions:
 jobs:
   test:
     name: Test Suite
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-4
     steps:
       - name: Checkout sources
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -81,7 +86,7 @@ jobs:
 
   lints:
     name: Lints
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-4
     steps:
       - name: Checkout sources
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -102,7 +107,7 @@ jobs:
 
   artifacts:
     name: Contract artifacts
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     steps:
       - name: Checkout sources
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
